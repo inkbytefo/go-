@@ -1,0 +1,153 @@
+package token
+
+// TokenType, bir token'ın türünü temsil eden bir string'dir.
+type TokenType string
+
+// Token, kaynak koddaki bir token'ı temsil eder.
+type Token struct {
+	Type    TokenType // Token türü (örn: IDENT, INT, LPAREN)
+	Literal string    // Token'ın değişmez değeri (örn: "x", "123", "(")
+	Line    int       // Token'ın bulunduğu satır numarası
+	Column  int       // Token'ın bulunduğu sütun numarası
+}
+
+// Anahtar kelimeler ve token türleri
+const (
+	// Özel token türleri
+	ILLEGAL TokenType = "ILLEGAL" // Tanınmayan token veya karakter
+	EOF     TokenType = "EOF"     // Dosya sonu
+
+	// Tanımlayıcılar + Değişmez Değerler (Literals)
+	IDENT  TokenType = "IDENT"  // main, foobar, x, y, ...
+	INT    TokenType = "INT"    // 1343456
+	FLOAT  TokenType = "FLOAT"  // 3.14
+	STRING TokenType = "STRING" // "hello world"
+	CHAR   TokenType = "CHAR"   // 'a'
+
+	// Operatörler
+	ASSIGN   TokenType = "="
+	PLUS     TokenType = "+"
+	MINUS    TokenType = "-"
+	BANG     TokenType = "!"
+	ASTERISK TokenType = "*"
+	SLASH    TokenType = "/"
+	MODULO   TokenType = "%"
+
+	LT     TokenType = "<"
+	GT     TokenType = ">"
+	LTOEQ  TokenType = "<="
+	GTOEQ  TokenType = ">="
+	EQ     TokenType = "=="
+	NOT_EQ TokenType = "!="
+
+	// Ayırıcılar (Delimiters)
+	COMMA     TokenType = ","
+	SEMICOLON TokenType = ";" // İsteğe bağlı
+	COLON     TokenType = ":"
+
+	LPAREN   TokenType = "("
+	RPAREN   TokenType = ")"
+	LBRACE   TokenType = "{"
+	RBRACE   TokenType = "}"
+	LBRACKET TokenType = "["
+	RBRACKET TokenType = "]"
+
+	// Anahtar Kelimeler (Keywords)
+	PACKAGE    TokenType = "PACKAGE"
+	IMPORT     TokenType = "IMPORT"
+	FUNC       TokenType = "FUNC"
+	VAR        TokenType = "VAR"
+	CONST      TokenType = "CONST"
+	RETURN     TokenType = "RETURN"
+	IF         TokenType = "IF"
+	ELSE       TokenType = "ELSE"
+	FOR        TokenType = "FOR"
+	WHILE      TokenType = "WHILE" // C++ tarzı döngü için eklenebilir
+	BREAK      TokenType = "BREAK"
+	CONTINUE   TokenType = "CONTINUE"
+	STRUCT     TokenType = "STRUCT"
+	INTERFACE  TokenType = "INTERFACE"
+	MAP        TokenType = "MAP"
+	CHAN       TokenType = "CHAN"
+	GO         TokenType = "GO"
+	DEFER      TokenType = "DEFER"
+	SELECT     TokenType = "SELECT"
+	TYPE       TokenType = "TYPE"
+	FALLTHROUGH TokenType = "FALLTHROUGH"
+	RANGE      TokenType = "RANGE"
+
+	// GO+ Eklemeleri
+	CLASS    TokenType = "CLASS"
+	TEMPLATE TokenType = "TEMPLATE" // template<T>
+	THROW    TokenType = "THROW"
+	TRY      TokenType = "TRY"
+	CATCH    TokenType = "CATCH"
+	SCOPE    TokenType = "SCOPE"    // scope {} (RAII için)
+	PUBLIC   TokenType = "PUBLIC"   // Sınıf üyeleri için
+	PRIVATE  TokenType = "PRIVATE"  // Sınıf üyeleri için
+	PROTECTED TokenType = "PROTECTED"// Sınıf üyeleri için
+	NEW      TokenType = "NEW"
+	DELETE   TokenType = "DELETE"   // Manuel bellek yönetimi için (unsafe bloklarda)
+	UNSAFE   TokenType = "UNSAFE"
+	ALLOC    TokenType = "ALLOC"    // Manuel bellek yönetimi için
+	FREE     TokenType = "FREE"     // Manuel bellek yönetimi için
+	THIS     TokenType = "THIS"
+	SUPER    TokenType = "SUPER"
+	NULL     TokenType = "NULL"
+	TRUE     TokenType = "TRUE"
+	FALSE    TokenType = "FALSE"
+)
+
+// keywords, anahtar kelimeleri token türleriyle eşler.
+var keywords = map[string]TokenType{
+	"package":    PACKAGE,
+	"import":     IMPORT,
+	"func":       FUNC,
+	"var":        VAR,
+	"const":      CONST,
+	"return":     RETURN,
+	"if":         IF,
+	"else":       ELSE,
+	"for":        FOR,
+	"while":      WHILE,
+	"break":      BREAK,
+	"continue":   CONTINUE,
+	"struct":     STRUCT,
+	"interface":  INTERFACE,
+	"map":        MAP,
+	"chan":       CHAN,
+	"go":         GO,
+	"defer":      DEFER,
+	"select":     SELECT,
+	"type":       TYPE,
+	"fallthrough":FALLTHROUGH,
+	"range":      RANGE,
+	"class":      CLASS,
+	"template":   TEMPLATE,
+	"throw":      THROW,
+	"try":        TRY,
+	"catch":      CATCH,
+	"scope":      SCOPE,
+	"public":     PUBLIC,
+	"private":    PRIVATE,
+	"protected":  PROTECTED,
+	"new":        NEW,
+	"delete":     DELETE,
+	"unsafe":     UNSAFE,
+	"alloc":      ALLOC,
+	"free":       FREE,
+	"this":       THIS,
+	"super":      SUPER,
+	"nil":        NULL, // Go'daki nil'e karşılık
+	"true":       TRUE,
+	"false":      FALSE,
+}
+
+// LookupIdent, verilen tanımlayıcının bir anahtar kelime olup olmadığını kontrol eder.
+// Eğer anahtar kelimeyse, ilgili TokenType'ı döndürür, değilse IDENT döndürür.
+func LookupIdent(ident string) TokenType {
+	if tok, ok := keywords[ident]; ok {
+		return tok
+	}
+	return IDENT
+}

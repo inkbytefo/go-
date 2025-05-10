@@ -1,0 +1,62 @@
+package ast
+
+import "goplus/internal/token" // Token paketi tamamlandığında eklenecek
+
+// Node, AST'deki her düğümün sahip olması gereken temel arayüzdür.
+// TODO: TokenLiteral() metodu, düğümle ilişkili token'ın değişmez değerini döndürmelidir.
+type Node interface {
+	TokenLiteral() string
+	String() string // Hata ayıklama ve test için AST düğümünün okunabilir bir temsilini döndürür
+}
+
+// Statement, bir ifadeyi temsil eden bir AST düğümüdür.
+// TODO: statementNode() metodu, Statement arayüzünü uygulayan düğümleri işaretlemek için kullanılır.
+type Statement interface {
+	Node
+	statementNode()
+}
+
+// Expression, bir değeri temsil eden bir AST düğümüdür.
+// TODO: expressionNode() metodu, Expression arayüzünü uygulayan düğümleri işaretlemek için kullanılır.
+type Expression interface {
+	Node
+	expressionNode()
+}
+
+// Program, bir GO+ programının kök AST düğümüdür.
+// Her geçerli GO+ programı bir dizi ifadeden (Statement) oluşur.
+// TODO: Program struct'ını ve alanlarını tanımla.
+type Program struct {
+	Statements []Statement
+}
+
+// TokenLiteral, programın ilk ifadesinin token değişmez değerini döndürür (eğer varsa).
+func (p *Program) TokenLiteral() string {
+	if len(p.Statements) > 0 {
+		return p.Statements[0].TokenLiteral()
+	}
+	return ""
+}
+
+// String, programdaki tüm ifadelerin okunabilir bir temsilini döndürür.
+func (p *Program) String() string {
+	// TODO: Programın String() metodunu implemente et.
+	var out string // strings.Builder kullanmak daha verimli olabilir
+	for _, s := range p.Statements {
+		out += s.String()
+	}
+	return out
+}
+
+// TODO: Diğer AST düğüm türleri (örneğin, LetStatement, ReturnStatement, Identifier, IntegerLiteral, ExpressionStatement vb.)
+// burada tanımlanacak.
+
+// Identifier, bir tanımlayıcıyı (değişken adı, fonksiyon adı vb.) temsil eder.
+// type Identifier struct {
+// 	Token token.Token // token.IDENT token'ı
+// 	Value string
+// }
+
+// func (i *Identifier) expressionNode()      {}
+// func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
+// func (i *Identifier) String() string       { return i.Value }

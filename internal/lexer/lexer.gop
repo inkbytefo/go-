@@ -1,0 +1,74 @@
+package lexer
+
+// Token represents a lexical token.
+// TODO: Define Token struct and token types (e.g., Identifier, Keyword, Operator, Literal, etc.)
+type Token struct {
+	Type    string // TokenType (to be defined)
+	Literal string
+	Line    int
+	Column  int
+}
+
+// Lexer holds the state of the scanner.
+// TODO: Implement the Lexer struct and its methods for tokenizing GO+ source code.
+type Lexer struct {
+	input        string
+	position     int  // current position in input (points to current char)
+	readPosition int  // current reading position in input (after current char)
+	ch           byte // current char under examination
+}
+
+// New creates a new Lexer.
+func New(input string) *Lexer {
+	l := &Lexer{input: input}
+	l.readChar() // Initialize l.ch, l.position, and l.readPosition
+	return l
+}
+
+// readChar gives us the next character and advances our position in the input string.
+// TODO: Implement readChar logic.
+func (l *Lexer) readChar() {
+	if l.readPosition >= len(l.input) {
+		l.ch = 0 // ASCII code for "NUL" character, signifying EOF or not read anything yet
+	} else {
+		l.ch = l.input[l.readPosition]
+	}
+	l.position = l.readPosition
+	l.readPosition++
+}
+
+// NextToken returns the next token from the input.
+// TODO: This is the main function of the lexer. It needs to be implemented to recognize all GO+ tokens.
+func (l *Lexer) NextToken() Token {
+	// Placeholder: This will be replaced with actual tokenizing logic.
+	// For now, it just returns an EOF token if we are at the end of the input.
+	if l.ch == 0 {
+		return Token{Type: "EOF", Literal: "", Line: 0, Column: 0} // TODO: Track line and column numbers
+	}
+
+	// Skip whitespace for now (a real lexer would handle this more gracefully or create whitespace tokens)
+	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+		l.readChar()
+	}
+
+	// Example: recognizing a simple operator (this is highly simplified)
+	switch l.ch {
+	case '=':
+		// TODO: Handle '==' (equality operator)
+		return Token{Type: "ASSIGN", Literal: string(l.ch), Line: 0, Column: 0} // Placeholder line/col
+	case '+':
+		return Token{Type: "PLUS", Literal: string(l.ch), Line: 0, Column: 0} // Placeholder line/col
+	// ... add more cases for other operators, keywords, identifiers, literals etc.
+	case 0:
+		return Token{Type: "EOF", Literal: "", Line: 0, Column: 0}
+	default:
+		// If it's a letter, it could be an identifier or a keyword
+		// If it's a digit, it could be a number literal
+		// This part needs significant expansion
+		return Token{Type: "ILLEGAL", Literal: string(l.ch), Line: 0, Column: 0} // Placeholder
+	}
+
+	// l.readChar() // Advance to the next character before the next call to NextToken()
+	// The above line is commented out because the switch cases should handle advancing or the default case should.
+	// This is a very basic placeholder and needs a full implementation.
+}

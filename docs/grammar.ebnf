@@ -1,0 +1,194 @@
+(* GO+ Language Grammar - EBNF - Initial Draft *)
+
+SourceFile = PackageClause { ImportDecl } { TopLevelDecl } ;
+
+PackageClause = "package" PackageName ;
+PackageName = identifier ;
+ImportDecl = "import" ( ImportSpec | "(" { ImportSpec ";" } ")" ) ;
+ImportSpec = [ "." | PackageName ] ImportPath ;
+ImportPath = string_lit ;
+
+TopLevelDecl = Declaration | FunctionDecl | MethodDecl | ClassDecl | InterfaceDecl ;
+
+Declaration = ConstDecl | TypeDecl | VarDecl ;
+ConstDecl = "const" ( ConstSpec | "(" { ConstSpec ";" } ")" ) ;
+ConstSpec = IdentifierList [ Type ] "=" ExpressionList ;
+TypeDecl = "type" ( TypeSpec | "(" { TypeSpec ";" } ")" ) ;
+TypeSpec = identifier [ TypeParameters ] Type ;
+VarDecl = "var" ( VarSpec | "(" { VarSpec ";" } ")" ) ;
+VarSpec = IdentifierList ( Type [ "=" ExpressionList ] | "=" ExpressionList ) ;
+
+IdentifierList = identifier { "," identifier } ;
+ExpressionList = Expression { "," Expression } ;
+
+FunctionDecl = "func" FunctionName [ TypeParameters ] Signature [ FunctionBody ] ;
+FunctionName = identifier ;
+FunctionBody = Block ;
+MethodDecl = "func" Receiver FunctionName Signature [ FunctionBody ] ;
+Receiver = "(" [ identifier ] [ "*" ] BaseTypeName ")" ;
+BaseTypeName = identifier ;
+
+TypeParameters = "[" TypeParamDecl { "," TypeParamDecl } "]" ;
+TypeParamDecl = IdentifierList Type ;
+
+Signature = Parameters [ Result ] ;
+Parameters = "(" [ ParameterList [ "," ] ] ")" ;
+ParameterList = ParameterDecl { "," ParameterDecl } ;
+ParameterDecl = [ IdentifierList ] [ "..." ] Type ;
+Result = Type | Parameters ; (* Simplified: Go allows named return types which are like parameters *)
+
+ClassDecl = "class" identifier [ TypeParameters ] [ "extends" TypeName ] [ "implements" TypeNameList ] "{" { ClassMemberDecl } "}" ;
+TypeNameList = TypeName { "," TypeName } ;
+ClassMemberDecl = FieldDecl | MethodDecl | ConstructorDecl ;
+FieldDecl = [ "public" | "private" | "protected" ] VarDecl ; (* Simplified access modifiers *)
+ConstructorDecl = "func" "(" [ ParameterList ] ")" FunctionBody ; (* Simplified constructor syntax *)
+
+InterfaceDecl = "interface" identifier [ TypeParameters ] "{" { MethodSpec ";" } "}" ;
+MethodSpec = FunctionName Signature ;
+
+Block = "{" [ StatementList ] "}" ;
+StatementList = { Statement [ ";" ] } ; (* Semicolons might be optional or auto-inserted by fmt tool *)
+
+Statement =
+    Declaration |
+    LabeledStmt |
+    SimpleStmt |
+    GoStmt |
+    ReturnStmt |
+    BreakStmt |
+    ContinueStmt |
+    GotoStmt |
+    FallthroughStmt |
+    Block |
+    IfStmt |
+    SwitchStmt |
+    SelectStmt |
+    ForStmt |
+    DeferStmt |
+    TryCatchStmt |  (* GO+ specific *)
+    ThrowStmt |    (* GO+ specific *)
+    ScopeStmt ;    (* GO+ specific for RAII *)
+
+LabeledStmt = identifier ":" Statement ;
+SimpleStmt = EmptyStmt | ExpressionStmt | SendStmt | IncDecStmt | Assignment | ShortVarDecl ;
+EmptyStmt = ;
+Assignment = ExpressionList assign_op ExpressionList ;
+ShortVarDecl = IdentifierList ":=" ExpressionList ;
+ExpressionStmt = Expression ;
+IncDecStmt = Expression ( "++" | "--" ) ;
+SendStmt = Channel "<-" Expression ;
+assign_op = [ add_op | mul_op ] "=" ; (* e.g. +=, *=, = *)
+add_op = "+" | "-" | "|" | "^" ;
+mul_op = "*" | "/" | "%" | "<<" | ">>" | "&" | "&^" ;
+
+GoStmt = "go" Expression ;
+ReturnStmt = "return" [ ExpressionList ] ;
+BreakStmt = "break" [ identifier ] ;
+ContinueStmt = "continue" [ identifier ] ;
+GotoStmt = "goto" identifier ;
+FallthroughStmt = "fallthrough" ;
+DeferStmt = "defer" Expression ;
+
+IfStmt = "if" [ SimpleStmt ";" ] Expression Block [ "else" ( IfStmt | Block ) ] ;
+SwitchStmt = "switch" [ SimpleStmt ";" ] [ Expression ] "{" { ExprCaseClause } "}" ;
+ExprCaseClause = ExprSwitchCase ":" StatementList ;
+ExprSwitchCase = "case" ExpressionList | "default" ;
+SelectStmt = "select" "{" { CommClause } "}" ;
+CommClause = CommCase ":" StatementList ;
+CommCase = "case" ( SendStmt | RecvStmt ) | "default" ;
+RecvStmt = [ ExpressionList "=" | IdentifierList ":=" ] Expression ; (* RecvExpr with unary <- *) 
+
+ForStmt = "for" [ Condition | ForClause | RangeClause ] Block ;
+Condition = Expression ;
+ForClause = [ InitStmt ] ";" [ Condition ] ";" [ PostStmt ] ;
+InitStmt = SimpleStmt ;
+PostStmt = SimpleStmt ;
+RangeClause = [ ExpressionList "=" | IdentifierList ":=" ] "range" Expression ;
+
+TryCatchStmt = "try" Block { CatchClause } [ FinallyClause ] ;
+CatchClause = "catch" [ "(" identifier Type ")" ] Block ;
+FinallyClause = "finally" Block ;
+ThrowStmt = "throw" Expression ;
+ScopeStmt = "scope" Block ;
+
+Expression = UnaryExpr | Expression binary_op Expression ;
+UnaryExpr = PrimaryExpr | unary_op UnaryExpr ;
+binary_op = "||" | "&&" | rel_op | add_op | mul_op ;
+rel_op = "==" | "!=" | "<" | "<=" | ">" | ">=" ;
+unary_op = "+" | "-" | "!" | "^" | "*" | "&" | "<-" ;
+
+PrimaryExpr =
+    Operand |
+    Conversion |
+    PrimaryExpr Selector |
+    PrimaryExpr Index |
+    PrimaryExpr Slice |
+    PrimaryExpr TypeAssertion |
+    PrimaryExpr Arguments ;
+
+Operand = Literal | OperandName | "(" Expression ")" ;
+Literal = BasicLit | CompositeLit | FunctionLit | ClassLit ; (* ClassLit for class instantiation *)
+BasicLit = int_lit | float_lit | char_lit | string_lit | "true" | "false" | "nil" ; (* nil is GO+ specific, Go uses nil as a zero value for certain types *) 
+OperandName = identifier | QualifiedIdent ;
+QualifiedIdent = PackageName "." identifier ;
+
+CompositeLit = TypeName "{" [ ElementList [ "," ] ] "}" ; (* General form for struct, array, slice, map *) 
+ElementList = Element { "," Element } ;
+Element = Expression | LiteralValue ; (* LiteralValue for struct fields: Key ":" Value *) 
+LiteralValue = Key ":" Value | Value ; 
+Key = identifier | Expression ; 
+Value = Expression | LiteralValue ; 
+
+FunctionLit = "func" Signature FunctionBody ;
+ClassLit = "new" TypeName Arguments ; (* GO+ specific for class instantiation *)
+
+Conversion = Type "(" Expression [ "," ] ")" ;
+Selector = "." identifier ;
+Index = "[" Expression "]" ;
+Slice = "[" [ Expression ] ":" [ Expression ] "]" | 
+        "[" [ Expression ] ":" Expression ":" Expression "]" ;
+TypeAssertion = "." "(" Type ")" ;
+Arguments = "(" [ ( ExpressionList | Type [ "," ExpressionList ] ) [ "..." ] [ "," ] ] ")" ;
+
+Type = TypeName | TypeLit | "(" Type ")" ;
+TypeName = identifier | QualifiedIdent ;
+TypeLit =
+    ArrayType |
+    StructType |
+    PointerType |
+    FunctionType |
+    InterfaceType |
+    SliceType |
+    MapType |
+    ChannelType |
+    TemplateType ; (* GO+ specific *)
+
+ArrayType = "[" ArrayLength "]" ElementType ;
+ArrayLength = Expression ;
+ElementType = Type ;
+StructType = "struct" "{" { FieldDecl ";" } "}" ;
+PointerType = "*" BaseType ;
+BaseType = Type ;
+FunctionType = "func" Signature ;
+InterfaceType = "interface" "{" { MethodSpec ";" } "}" ;
+SliceType = "[" "]" ElementType ;
+MapType = "map" "[" KeyType "]" ElementType ;
+KeyType = Type ;
+ChannelType = ( "chan" | "chan" "<-" | "<-" "chan" ) ElementType ;
+TemplateType = identifier "<" TypeList ">" ; (* GO+ specific: template<T> becomes Type<ArgType> *)
+TypeList = Type { "," Type } ;
+
+(* Lexical elements - placeholders, actual tokens defined by lexer *)
+identifier = letter { letter | digit | "_" } ;
+letter = /* Unicode letter */ ;
+digit = "0"..."9" ;
+int_lit = digit { digit } ; (* Add support for hex, octal, binary *) 
+float_lit = ( digit { digit } "." { digit } [ exponent ] ) | ( digit { digit } exponent ) | ( "." digit { digit } [ exponent ] ) ; 
+exponent = ( "e" | "E" ) [ "+" | "-" ] digit { digit } ;
+char_lit = "'" ( /* Unicode char */ | escape_seq ) "'" ;
+string_lit = "\"" { /* Unicode char */ | escape_seq } "\"" | "`" { /* Unicode char except ` */ } "`" ;
+escape_seq = "\\" ( "a" | "b" | "f" | "n" | "r" | "t" | "v" | "\\" | "'" | "\"" | octal_byte_value | hex_byte_value | unicode_value ) ;
+
+(* Comments are not part of the grammar but handled by lexer *)
+(* LineComment = "//" { any_char_except_newline } EOL ; *)
+(* BlockComment = "/*" { any_char } "*/" ; *)
