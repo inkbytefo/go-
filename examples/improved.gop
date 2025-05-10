@@ -1,0 +1,29 @@
+// GO+ örnek programı
+package main
+
+import "fmt"
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    
+    // Kısa değişken tanımlama
+    y := 20
+    
+    // This kullanımı
+    this.value = 30
+    
+    // Üye erişimi
+    person.name = "Ahmet"
+    
+    // Metot çağrısı
+    result := add(x, y)
+    
+    fmt.Println("Sonuç:", result)
+}
+
+// Fonksiyon tanımı
+func add(a int, b int) int {
+    return a + b
+}

@@ -41,12 +41,35 @@ GO+ dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri öze
 
 ### Parser Paketi (Gelişmiş)
 
-- [ ] **Paket ve Import Bildirimleri**: Paket ve import bildirimlerini ayrıştırma.
-- [ ] **Değişken ve Sabit Tanımlamaları**: Değişken ve sabit tanımlamalarını ayrıştırma.
-- [ ] **Fonksiyon Tanımları**: Fonksiyon tanımlarını ayrıştırma.
-- [ ] **Kontrol Yapıları**: If, for, while vb. kontrol yapılarını ayrıştırma.
-- [ ] **Sınıf ve Şablon Tanımları**: Sınıf ve şablon tanımlarını ayrıştırma.
-- [ ] **İstisna İşleme**: Try-catch-finally yapılarını ayrıştırma.
+- [x] **Paket ve Import Bildirimleri**: Paket ve import bildirimlerini ayrıştırma.
+  - Paket bildirimi ayrıştırma eklendi.
+  - Tek ve çoklu import bildirimi ayrıştırma eklendi.
+
+- [x] **Değişken ve Sabit Tanımlamaları**: Değişken ve sabit tanımlamalarını ayrıştırma.
+  - Değişken tanımlama ayrıştırma eklendi.
+  - Sabit tanımlama ayrıştırma eklendi.
+  - Tip tanımlama desteği eklendi.
+
+- [x] **Fonksiyon Tanımları**: Fonksiyon tanımlarını ayrıştırma.
+  - Fonksiyon tanımlama ayrıştırma eklendi.
+  - Parametre ve dönüş tipi ayrıştırma eklendi.
+  - Metot tanımlama ayrıştırma eklendi.
+
+- [x] **Sınıf ve Şablon Tanımları**: Sınıf ve şablon tanımlarını ayrıştırma.
+  - Sınıf tanımlama ayrıştırma eklendi.
+  - Şablon tanımlama ayrıştırma eklendi.
+  - Kalıtım ve arayüz uygulamaları ayrıştırma eklendi.
+  - Erişim belirleyicileri ayrıştırma eklendi.
+
+- [x] **İstisna İşleme**: Try-catch-finally yapılarını ayrıştırma.
+  - Try-catch-finally ayrıştırma eklendi.
+  - Throw ifadesi ayrıştırma eklendi.
+
+- [x] **Parser İyileştirmeleri**: Parser'ın daha karmaşık ifadeleri ayrıştırabilmesi için iyileştirmeler.
+  - This ve super anahtar kelimeleri için ayrıştırma eklendi.
+  - Sınıf üye erişimi için ayrıştırma iyileştirildi.
+  - Hata kurtarma mekanizmaları geliştirildi.
+  - Kısa değişken tanımlama (`:=`) için ayrıştırma eklendi.
 
 ## Planlanan Görevler
 
@@ -86,5 +109,5 @@ GO+ dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri öze
 
 ## Son Güncelleme
 
-Tarih: 2023-07-10
-Durum: Temel altyapı tamamlandı, parser geliştiriliyor.
+Tarih: 2023-07-12
+Durum: Parser paketi iyileştirildi, semantik analiz aşamasına geçilecek.

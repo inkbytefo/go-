@@ -77,6 +77,7 @@ const (
 	SEMICOLON TokenType = ";" // İsteğe bağlı
 	COLON     TokenType = ":"
 	DOT       TokenType = "."
+	DEFINE    TokenType = ":=" // Kısa değişken tanımlama
 
 	LPAREN   TokenType = "("
 	RPAREN   TokenType = ")"

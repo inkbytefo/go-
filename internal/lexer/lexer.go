@@ -20,11 +20,11 @@ type Lexer struct {
 // New creates a new Lexer.
 func New(input string) *Lexer {
 	l := &Lexer{
-		input:        input,
-		line:         1,
-		column:       1,
-		startLine:    1,
-		startColumn:  1,
+		input:       input,
+		line:        1,
+		column:      1,
+		startLine:   1,
+		startColumn: 1,
 	}
 	l.readChar() // Initialize l.ch, l.position, and l.readPosition
 	return l
@@ -309,7 +309,7 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.newToken(token.SCOPE_RES, "::")
 		} else if l.peekChar() == '=' {
 			l.readChar()
-			tok = l.newToken(token.TokenType(":="), ":=") // Kısa değişken tanımlama
+			tok = l.newToken(token.DEFINE, ":=") // Kısa değişken tanımlama
 		} else {
 			tok = l.newToken(token.COLON, ":")
 		}
