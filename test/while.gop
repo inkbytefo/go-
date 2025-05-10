@@ -1,0 +1,15 @@
+// While döngüsü örneği
+package main
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var i int = 0
+    var sum int = 0
+    
+    // While döngüsü
+    while i < 10 {
+        sum = sum + i
+        i = i + 1
+    }
+}

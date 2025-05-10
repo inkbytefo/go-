@@ -1,0 +1,16 @@
+// Basit bir GO+ test programı
+package main
+
+import "fmt"
+
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Toplama işlemi
+    z := x + y
+    
+    // Sonucu yazdır
+    fmt.Println("Toplam:", z)
+}

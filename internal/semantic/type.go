@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"fmt"
-	"goplus/internal/ast"
 )
 
 // Type, bir tipi temsil eder.
@@ -76,20 +75,20 @@ type FunctionType struct {
 // String, fonksiyon tipinin string temsilini döndürür.
 func (ft *FunctionType) String() string {
 	result := "func("
-	
+
 	for i, paramType := range ft.ParameterTypes {
 		if i > 0 {
 			result += ", "
 		}
 		result += paramType.String()
 	}
-	
+
 	result += ")"
-	
+
 	if ft.ReturnType != nil {
 		result += " " + ft.ReturnType.String()
 	}
-	
+
 	return result
 }
 
@@ -99,21 +98,21 @@ func (ft *FunctionType) Equals(other Type) bool {
 		if len(ft.ParameterTypes) != len(otherFunc.ParameterTypes) {
 			return false
 		}
-		
+
 		for i, paramType := range ft.ParameterTypes {
 			if !paramType.Equals(otherFunc.ParameterTypes[i]) {
 				return false
 			}
 		}
-		
+
 		if ft.ReturnType == nil && otherFunc.ReturnType == nil {
 			return true
 		}
-		
+
 		if ft.ReturnType == nil || otherFunc.ReturnType == nil {
 			return false
 		}
-		
+
 		return ft.ReturnType.Equals(otherFunc.ReturnType)
 	}
 	return false
@@ -170,16 +169,16 @@ type TemplateType struct {
 // String, şablon tipinin string temsilini döndürür.
 func (tt *TemplateType) String() string {
 	result := tt.Name + "<"
-	
+
 	for i, param := range tt.Parameters {
 		if i > 0 {
 			result += ", "
 		}
 		result += param
 	}
-	
+
 	result += ">"
-	
+
 	return result
 }
 

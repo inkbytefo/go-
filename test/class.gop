@@ -1,0 +1,19 @@
+// Sınıf tanımlama örneği
+package main
+
+// Kişi sınıfı
+class Person {
+    var name string
+    var age int
+    
+    // Metot
+    func sayHello() {
+        // Metot gövdesi
+    }
+}
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var p Person
+}

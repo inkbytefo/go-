@@ -1,0 +1,15 @@
+// Basit bir GO+ test programı
+package main
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Aritmetik işlemler
+    var sum int = x + y
+    var diff int = x - y
+    var prod int = x * y
+    var quot int = x / y
+}

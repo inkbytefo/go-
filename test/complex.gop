@@ -1,0 +1,33 @@
+// Karmaşık bir GO+ test programı
+package main
+
+import "fmt"
+
+// Toplama fonksiyonu
+func add(a int, b int) int {
+    return a + b
+}
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Fonksiyon çağrısı
+    var z int = add(x, y)
+    
+    // Koşul ifadesi
+    if z > 25 {
+        z = z - 5
+    } else {
+        z = z + 5
+    }
+    
+    // Döngü
+    var i int = 0
+    while i < 5 {
+        z = z + 1
+        i = i + 1
+    }
+}

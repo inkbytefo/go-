@@ -1,0 +1,15 @@
+// Koşul ifadesi örneği
+package main
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    
+    // Koşul ifadesi
+    if x > 5 {
+        x = x + 1
+    } else {
+        x = x - 1
+    }
+}

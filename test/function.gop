@@ -1,0 +1,17 @@
+// Fonksiyon tanımlama ve çağırma örneği
+package main
+
+// Toplama fonksiyonu
+func add(a int, b int) int {
+    return a + b
+}
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Fonksiyon çağrısı
+    var z int = add(x, y)
+}

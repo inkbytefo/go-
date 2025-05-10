@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"fmt"
-	"goplus/internal/ast"
 	"goplus/internal/token"
 )
 
@@ -89,9 +88,9 @@ type FunctionSignature struct {
 
 // ClassInfo, bir sınıfın bilgilerini temsil eder.
 type ClassInfo struct {
-	Fields    map[string]*Symbol
-	Methods   map[string]*Symbol
-	Extends   *Symbol
+	Fields     map[string]*Symbol
+	Methods    map[string]*Symbol
+	Extends    *Symbol
 	Implements []*Symbol
 }
 
@@ -113,11 +112,11 @@ func NewScope(parent *Scope) *Scope {
 		Children: []*Scope{},
 		IsGlobal: false,
 	}
-	
+
 	if parent != nil {
 		parent.Children = append(parent.Children, s)
 	}
-	
+
 	return s
 }
 
@@ -129,7 +128,7 @@ func (s *Scope) Define(name string, symbolType SymbolType, tok token.Token) *Sym
 		Scope: s,
 		Token: tok,
 	}
-	
+
 	s.Symbols[name] = symbol
 	return symbol
 }
@@ -140,11 +139,11 @@ func (s *Scope) Resolve(name string) *Symbol {
 	if ok {
 		return symbol
 	}
-	
+
 	if s.Parent != nil {
 		return s.Parent.Resolve(name)
 	}
-	
+
 	return nil
 }
 
@@ -158,16 +157,16 @@ func (s *Scope) String() string {
 	} else {
 		scopeType = "Local"
 	}
-	
+
 	result := fmt.Sprintf("Scope(%s):\n", scopeType)
-	
+
 	for name, symbol := range s.Symbols {
 		result += fmt.Sprintf("  %s: %s\n", name, symbol.Type)
 	}
-	
+
 	for _, child := range s.Children {
 		result += child.String()
 	}
-	
+
 	return result
 }

@@ -1,0 +1,22 @@
+// Semantik analiz testi
+package main
+
+import "fmt"
+
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Kısa değişken tanımlama
+    z := x + y
+    
+    // Tip kontrolü
+    // Hata: String ile int toplanamaz
+    // error := "Hata: " + z
+    
+    // Doğru kullanım
+    message := "Toplam: " + fmt.Sprint(z)
+    
+    fmt.Println(message)
+}

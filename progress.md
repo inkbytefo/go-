@@ -71,25 +71,58 @@ GO+ dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri öze
   - Hata kurtarma mekanizmaları geliştirildi.
   - Kısa değişken tanımlama (`:=`) için ayrıştırma eklendi.
 
-## Planlanan Görevler
+## Devam Eden Çalışmalar
 
 ### Semantik Analiz
 
-- [ ] **Sembol Tablosu**: Kapsam (scope) yönetimi ve sembol tanımlama/çözümleme.
-- [ ] **Tip Sistemi**: Temel tipler, karmaşık tipler, şablon tipler ve tip çıkarımı.
-- [ ] **Tip Kontrolü**: İfadelerin ve deyimlerin tip kontrolü.
-- [ ] **İsim Çözümlemesi**: Değişken, fonksiyon ve tip isimlerinin çözümlenmesi.
-- [ ] **Erişim Kontrolü**: Public, private, protected erişim kontrolü.
+- [x] **Sembol Tablosu**: Kapsam (scope) yönetimi ve sembol tanımlama/çözümleme.
+  - Scope yapısı oluşturuldu.
+  - Sembol tanımlama ve çözümleme fonksiyonları eklendi.
+  - İç içe kapsamlar için destek eklendi.
+
+- [x] **Tip Sistemi**: Temel tipler, karmaşık tipler, şablon tipler ve tip çıkarımı.
+  - Temel tipler (int, float, string, bool, char, null) eklendi.
+  - Karmaşık tipler (array, map, function, class, interface) eklendi.
+  - Şablon tipler için destek eklendi.
+
+- [x] **Tip Kontrolü**: İfadelerin ve deyimlerin tip kontrolü.
+  - Aritmetik operatörler için tip kontrolü eklendi.
+  - Karşılaştırma operatörleri için tip kontrolü eklendi.
+  - Mantıksal operatörler için tip kontrolü eklendi.
+  - Atama operatörleri için tip kontrolü eklendi.
+
+- [x] **İsim Çözümlemesi**: Değişken, fonksiyon ve tip isimlerinin çözümlenmesi.
+  - Tanımlayıcıların çözümlenmesi için destek eklendi.
+  - Fonksiyon ve metot çağrıları için destek eklendi.
+  - Üye erişimi için destek eklendi.
+
+- [x] **Erişim Kontrolü**: Public, private, protected erişim kontrolü.
+  - Sınıf üyeleri için erişim belirleyicileri eklendi.
+  - Erişim kontrolü için destek eklendi.
+
+- [ ] **Semantik Analiz İyileştirmeleri**: Semantik analiz bileşeninin daha karmaşık ifadeleri analiz edebilmesi için iyileştirmeler.
+  - Hata mesajlarının iyileştirilmesi.
+  - Daha karmaşık tip çıkarımı.
+  - Daha iyi hata kurtarma mekanizmaları.
 
 ### Ara Kod Üretimi (IR Generation)
 
-- [ ] **LLVM Entegrasyonu**: LLVM Go bağlayıcılarını projeye entegre etme.
-- [ ] **IR Üretimi**: İfadeler, deyimler, fonksiyonlar ve sınıflar için IR üretimi.
+- [x] **IRGenerator Yapısı**: IRGenerator yapısı ve temel fonksiyonları oluşturuldu.
+- [x] **LLVM Entegrasyonu**: LLVM Go bağlayıcıları (llir/llvm) projeye entegre edildi.
+- [x] **Temel Tipler ve İfadeler için IR Üretimi**: Temel tipler (int, float, string, bool) ve sabit değerler için IR üretimi eklendi.
+- [x] **Aritmetik ve Mantıksal İfadeler için IR Üretimi**: Aritmetik ve mantıksal ifadeler için IR üretimi eklendi.
+- [x] **Değişken Tanımlamaları için IR Üretimi**: Değişken tanımlamaları için IR üretimi eklendi.
+- [x] **Fonksiyon Tanımlamaları ve Çağrıları için IR Üretimi**: Fonksiyon tanımlamaları ve çağrıları için IR üretimi eklendi.
+- [x] **Kontrol Akışı için IR Üretimi**: If ifadeleri ve while döngüleri için IR üretimi eklendi.
+- [x] **Sınıf Tanımlamaları için IR Üretimi**: Sınıf tanımlamaları için IR üretimi eklendi.
+- [x] **Optimizasyon ve Kod Üretimi**: LLVM optimizasyon geçişleri ve hedef kod üretimi.
 
 ### Optimizasyon ve Kod Üretimi
 
-- [ ] **IR Optimizasyonu**: LLVM optimizasyon geçişlerini yapılandırma.
-- [ ] **Hedef Kod Üretimi**: Farklı platformlar için makine kodu üretimi.
+- [x] **IR Optimizasyonu Altyapısı**: LLVM optimizasyon geçişleri için altyapı oluşturuldu.
+- [x] **IR Optimizasyonu**: LLVM optimizasyon geçişlerini yapılandırma.
+- [x] **Hedef Kod Üretimi**: Farklı platformlar için makine kodu üretimi.
+- [x] **Çalıştırılabilir Dosya Oluşturma**: Çalıştırılabilir dosya oluşturma.
 
 ### Standart Kütüphane ve Araçlar
 
@@ -109,5 +142,5 @@ GO+ dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri öze
 
 ## Son Güncelleme
 
-Tarih: 2023-07-12
-Durum: Parser paketi iyileştirildi, semantik analiz aşamasına geçilecek.
+Tarih: 2023-07-24
+Durum: Optimizasyon ve kod üretimi bileşenleri tamamlandı. LLVM optimizasyon geçişleri ve hedef kod üretimi eklendi. Farklı optimizasyon seviyeleri (O0, O1, O2, O3) ve çıktı formatları (LLVM IR, Assembly, Object, Executable) destekleniyor. Komut satırı arayüzü güncellendi.
