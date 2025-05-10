@@ -202,6 +202,10 @@ func (p *Parser) ParseProgram() *ast.Program {
 // parseStatement, bir ifadeyi ayrıştırır.
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
+	case token.PACKAGE:
+		return p.parsePackageStatement()
+	case token.IMPORT:
+		return p.parseImportStatement()
 	case token.VAR:
 		return p.parseVarStatement()
 	case token.CONST:
@@ -243,10 +247,33 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	// Opsiyonel tip
-	if p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.LBRACKET) {
+	if p.peekTokenIs(token.IDENT) {
 		p.nextToken()
-		// TODO: Tip ayrıştırma eklenecek
-		// stmt.Type = p.parseType()
+		stmt.Type = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	} else if p.peekTokenIs(token.LBRACKET) {
+		p.nextToken()
+		// Dizi tipi
+		// TODO: Dizi tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.FUNC) {
+		p.nextToken()
+		// Fonksiyon tipi
+		// TODO: Fonksiyon tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.MAP) {
+		p.nextToken()
+		// Map tipi
+		// TODO: Map tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.CHAN) {
+		p.nextToken()
+		// Kanal tipi
+		// TODO: Kanal tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.INTERFACE) {
+		p.nextToken()
+		// Arayüz tipi
+		// TODO: Arayüz tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.STRUCT) {
+		p.nextToken()
+		// Struct tipi
+		// TODO: Struct tipi ayrıştırma eklenecek
 	}
 
 	// Opsiyonel değer
@@ -267,25 +294,75 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 func (p *Parser) parseConstStatement() *ast.ConstStatement {
 	stmt := &ast.ConstStatement{Token: p.curToken}
 
-	if !p.expectPeek(token.IDENT) {
-		return nil
-	}
-
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-	// Opsiyonel tip
-	if p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.LBRACKET) {
+	// Tek bir sabit
+	if p.peekTokenIs(token.IDENT) {
 		p.nextToken()
-		// TODO: Tip ayrıştırma eklenecek
-		// stmt.Type = p.parseType()
-	}
+		stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.ASSIGN) {
+		// Opsiyonel tip
+		if p.peekTokenIs(token.IDENT) {
+			p.nextToken()
+			stmt.Type = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		}
+
+		if !p.expectPeek(token.ASSIGN) {
+			return nil
+		}
+
+		p.nextToken()
+		stmt.Value = p.parseExpression(LOWEST)
+	} else if p.peekTokenIs(token.LPAREN) {
+		// Çoklu sabit
+		p.nextToken() // '(' token'ını atla
+
+		// İlk sabit
+		if p.peekTokenIs(token.IDENT) {
+			p.nextToken()
+			stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+			// Opsiyonel tip
+			if p.peekTokenIs(token.IDENT) {
+				p.nextToken()
+				stmt.Type = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			}
+
+			if !p.expectPeek(token.ASSIGN) {
+				return nil
+			}
+
+			p.nextToken()
+			stmt.Value = p.parseExpression(LOWEST)
+		}
+
+		// Diğer sabitler (şu anda tek bir sabit destekleniyor, çoklu sabit için genişletilebilir)
+		for p.peekTokenIs(token.COMMA) {
+			p.nextToken() // ',' token'ını atla
+
+			if p.peekTokenIs(token.IDENT) {
+				p.nextToken()
+				// Çoklu sabit için burada bir dizi oluşturulabilir
+
+				// Opsiyonel tip
+				if p.peekTokenIs(token.IDENT) {
+					p.nextToken()
+				}
+
+				if !p.expectPeek(token.ASSIGN) {
+					return nil
+				}
+
+				p.nextToken()
+				// Çoklu sabit için burada bir dizi oluşturulabilir
+			}
+		}
+
+		if !p.expectPeek(token.RPAREN) {
+			return nil
+		}
+	} else {
+		p.peekError(token.IDENT)
 		return nil
 	}
-
-	p.nextToken()
-	stmt.Value = p.parseExpression(LOWEST)
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
@@ -516,6 +593,13 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
 
+	// Fonksiyon adı (opsiyonel)
+	if p.peekTokenIs(token.IDENT) {
+		p.nextToken()
+		// Fonksiyon adı için bir alan eklenebilir
+		// lit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	}
+
 	if !p.expectPeek(token.LPAREN) {
 		return nil
 	}
@@ -525,8 +609,31 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 	// Opsiyonel dönüş tipi
 	if p.peekTokenIs(token.IDENT) {
 		p.nextToken()
-		// TODO: Tip ayrıştırma eklenecek
-		// lit.ReturnType = p.parseType()
+		lit.ReturnType = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	} else if p.peekTokenIs(token.LBRACKET) {
+		p.nextToken()
+		// Dizi dönüş tipi
+		// TODO: Dizi tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.FUNC) {
+		p.nextToken()
+		// Fonksiyon dönüş tipi
+		// TODO: Fonksiyon tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.MAP) {
+		p.nextToken()
+		// Map dönüş tipi
+		// TODO: Map tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.CHAN) {
+		p.nextToken()
+		// Kanal dönüş tipi
+		// TODO: Kanal tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.INTERFACE) {
+		p.nextToken()
+		// Arayüz dönüş tipi
+		// TODO: Arayüz tipi ayrıştırma eklenecek
+	} else if p.peekTokenIs(token.STRUCT) {
+		p.nextToken()
+		// Struct dönüş tipi
+		// TODO: Struct tipi ayrıştırma eklenecek
 	}
 
 	if !p.expectPeek(token.LBRACE) {
@@ -540,10 +647,48 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 
 // parseFunctionStatement, bir fonksiyon tanımını ayrıştırır.
 func (p *Parser) parseFunctionStatement() ast.Statement {
-	return &ast.ExpressionStatement{
-		Token:      p.curToken,
-		Expression: p.parseFunctionLiteral(),
+	stmt := &ast.ExpressionStatement{
+		Token: p.curToken,
 	}
+
+	// Fonksiyon adı
+	if p.peekTokenIs(token.IDENT) {
+		p.nextToken()
+
+		// Eğer bir sonraki token parantez ise, bu bir fonksiyon tanımıdır
+		if p.peekTokenIs(token.LPAREN) {
+			funcLit := &ast.FunctionLiteral{Token: stmt.Token}
+			// Fonksiyon adı için bir alan eklenebilir
+			// funcLit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+			p.nextToken() // '(' token'ını al
+
+			funcLit.Parameters = p.parseFunctionParameters()
+
+			// Opsiyonel dönüş tipi
+			if p.peekTokenIs(token.IDENT) {
+				p.nextToken()
+				funcLit.ReturnType = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			}
+
+			if !p.expectPeek(token.LBRACE) {
+				return nil
+			}
+
+			funcLit.Body = p.parseBlockStatement()
+
+			stmt.Expression = funcLit
+		} else {
+			// Değişken tanımı veya başka bir ifade
+			p.nextToken()
+			stmt.Expression = p.parseExpression(LOWEST)
+		}
+	} else {
+		// Anonim fonksiyon
+		stmt.Expression = p.parseFunctionLiteral()
+	}
+
+	return stmt
 }
 
 // parseFunctionParameters, bir fonksiyonun parametrelerini ayrıştırır.
@@ -557,13 +702,32 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 
 	p.nextToken()
 
+	// İlk parametre
 	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	// Parametre tipi (opsiyonel)
+	if p.peekTokenIs(token.IDENT) {
+		p.nextToken()
+		// Parametre tipi için bir alan eklenebilir
+		// ident.Type = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	}
+
 	identifiers = append(identifiers, ident)
 
+	// Diğer parametreler
 	for p.peekTokenIs(token.COMMA) {
-		p.nextToken()
-		p.nextToken()
+		p.nextToken() // ',' token'ını atla
+		p.nextToken() // Parametre adını al
+
 		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+		// Parametre tipi (opsiyonel)
+		if p.peekTokenIs(token.IDENT) {
+			p.nextToken()
+			// Parametre tipi için bir alan eklenebilir
+			// ident.Type = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		}
+
 		identifiers = append(identifiers, ident)
 	}
 
@@ -1008,4 +1172,64 @@ func (p *Parser) parseTemplateExpression() ast.Expression {
 	exp.Body = p.parseExpression(LOWEST)
 
 	return exp
+}
+
+// parsePackageStatement, bir paket bildirimini ayrıştırır.
+func (p *Parser) parsePackageStatement() ast.Statement {
+	stmt := &ast.PackageStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.IDENT) {
+		return nil
+	}
+
+	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+// parseImportStatement, bir import bildirimini ayrıştırır.
+func (p *Parser) parseImportStatement() ast.Statement {
+	stmt := &ast.ImportStatement{Token: p.curToken}
+
+	// Tek bir import
+	if p.peekTokenIs(token.STRING) {
+		p.nextToken()
+		stmt.Path = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+	} else if p.peekTokenIs(token.LPAREN) {
+		// Çoklu import
+		p.nextToken() // '(' token'ını atla
+
+		// İlk import
+		if p.peekTokenIs(token.STRING) {
+			p.nextToken()
+			stmt.Path = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+		}
+
+		// Diğer importlar (şu anda tek bir import destekleniyor, çoklu import için genişletilebilir)
+		for p.peekTokenIs(token.COMMA) {
+			p.nextToken() // ',' token'ını atla
+
+			if p.peekTokenIs(token.STRING) {
+				p.nextToken()
+				// Çoklu import için burada bir dizi oluşturulabilir
+			}
+		}
+
+		if !p.expectPeek(token.RPAREN) {
+			return nil
+		}
+	} else {
+		p.peekError(token.STRING)
+		return nil
+	}
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt
 }

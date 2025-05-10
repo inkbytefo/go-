@@ -449,11 +449,11 @@ func (hl *HashLiteral) String() string {
 // ForStatement, bir for döngüsünü temsil eder.
 // Örnek: for i := 0; i < 10; i++ { ... }
 type ForStatement struct {
-	Token      token.Token // token.FOR token'ı
-	Init       Statement   // Opsiyonel başlangıç ifadesi
-	Condition  Expression  // Opsiyonel koşul
-	Post       Statement   // Opsiyonel sonrası ifadesi
-	Body       *BlockStatement
+	Token     token.Token // token.FOR token'ı
+	Init      Statement   // Opsiyonel başlangıç ifadesi
+	Condition Expression  // Opsiyonel koşul
+	Post      Statement   // Opsiyonel sonrası ifadesi
+	Body      *BlockStatement
 }
 
 func (fs *ForStatement) statementNode()       {}
@@ -509,7 +509,7 @@ func (ws *WhileStatement) String() string {
 type ClassStatement struct {
 	Token      token.Token // token.CLASS token'ı
 	Name       *Identifier
-	Extends    *Identifier // Opsiyonel kalıtım
+	Extends    *Identifier   // Opsiyonel kalıtım
 	Implements []*Identifier // Opsiyonel arayüz uygulamaları
 	Body       *BlockStatement
 }
@@ -614,10 +614,10 @@ func (tcs *TryCatchStatement) String() string {
 // CatchClause, bir catch bloğunu temsil eder.
 // Örnek: catch (e Error) { ... }
 type CatchClause struct {
-	Token      token.Token // token.CATCH token'ı
-	Parameter  *Identifier // Opsiyonel parametre
-	Type       Expression  // Opsiyonel tip
-	Body       *BlockStatement
+	Token     token.Token // token.CATCH token'ı
+	Parameter *Identifier // Opsiyonel parametre
+	Type      Expression  // Opsiyonel tip
+	Body      *BlockStatement
 }
 
 func (cc *CatchClause) expressionNode()      {}
@@ -758,5 +758,37 @@ func (me *MemberExpression) String() string {
 
 	out.WriteString(me.Member.String())
 
+	return out.String()
+}
+
+// PackageStatement, bir paket bildirimini temsil eder.
+// Örnek: package main
+type PackageStatement struct {
+	Token token.Token // token.PACKAGE token'ı
+	Name  *Identifier
+}
+
+func (ps *PackageStatement) statementNode()       {}
+func (ps *PackageStatement) TokenLiteral() string { return ps.Token.Literal }
+func (ps *PackageStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(ps.TokenLiteral() + " ")
+	out.WriteString(ps.Name.String())
+	return out.String()
+}
+
+// ImportStatement, bir import bildirimini temsil eder.
+// Örnek: import "fmt"
+type ImportStatement struct {
+	Token token.Token // token.IMPORT token'ı
+	Path  *StringLiteral
+}
+
+func (is *ImportStatement) statementNode()       {}
+func (is *ImportStatement) TokenLiteral() string { return is.Token.Literal }
+func (is *ImportStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(is.TokenLiteral() + " ")
+	out.WriteString(is.Path.String())
 	return out.String()
 }
