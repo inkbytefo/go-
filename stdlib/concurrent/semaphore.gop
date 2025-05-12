@@ -1,0 +1,176 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Semaphore
+package concurrent
+
+import (
+    "sync"
+    "time"
+)
+
+// Semaphore, sınırlı sayıda eşzamanlı erişimi kontrol etmek için kullanılır.
+class Semaphore {
+    private var count int
+    private var mu sync.Mutex
+    private var cond *sync.Cond
+
+    // New, belirtilen sayıda izne sahip yeni bir Semaphore oluşturur.
+    // count, aynı anda kaç goroutine'in kritik bölgeye girebileceğini belirtir.
+    static func New(count int) *Semaphore {
+        if count < 0 {
+            throw "semaphore: count cannot be negative"
+        }
+        
+        s := new Semaphore()
+        s.count = count
+        s.mu = sync.Mutex{}
+        s.cond = sync.NewCond(&s.mu)
+        
+        return s
+    }
+
+    // Acquire, semaphore'dan bir izin alır.
+    // Eğer izin yoksa, bir izin serbest kalana kadar bloke olur.
+    func (s *Semaphore) Acquire() {
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        
+        for s.count == 0 {
+            s.cond.Wait()
+        }
+        
+        s.count--
+    }
+
+    // TryAcquire, semaphore'dan bir izin almayı dener.
+    // Eğer izin varsa true döndürür, yoksa false döndürür ve bloke olmaz.
+    func (s *Semaphore) TryAcquire() bool {
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        
+        if s.count > 0 {
+            s.count--
+            return true
+        }
+        
+        return false
+    }
+
+    // AcquireWithTimeout, belirtilen süre içinde semaphore'dan bir izin almayı dener.
+    // Eğer süre dolmadan izin alınabilirse true döndürür, süre dolarsa false döndürür.
+    func (s *Semaphore) AcquireWithTimeout(timeout time.Duration) bool {
+        deadline := time.Now().Add(timeout)
+        
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        
+        for s.count == 0 {
+            waitTime := time.Until(deadline)
+            if waitTime <= 0 {
+                return false
+            }
+            
+            // Koşullu değişken için zaman aşımı desteği yok, bu yüzden kısa aralıklarla kontrol ediyoruz
+            s.mu.Unlock()
+            time.Sleep(waitTime / 10) // Toplam sürenin 1/10'u kadar bekle
+            s.mu.Lock()
+            
+            if s.count > 0 {
+                break
+            }
+            
+            if time.Now().After(deadline) {
+                return false
+            }
+        }
+        
+        s.count--
+        return true
+    }
+
+    // Release, semaphore'a bir izin geri verir.
+    // Bu, Acquire veya TryAcquire ile izin alan bir goroutine tarafından çağrılmalıdır.
+    func (s *Semaphore) Release() {
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        
+        s.count++
+        s.cond.Signal() // Bekleyen bir goroutine varsa uyandır
+    }
+
+    // ReleaseMany, semaphore'a belirtilen sayıda izin geri verir.
+    func (s *Semaphore) ReleaseMany(count int) {
+        if count <= 0 {
+            return
+        }
+        
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        
+        s.count += count
+        
+        // Bekleyen tüm goroutine'leri uyandır
+        // Not: Bu, tüm bekleyen goroutine'lerin uyanmasına neden olabilir,
+        // ancak sadece count kadarı izin alabilecektir
+        s.cond.Broadcast()
+    }
+
+    // GetCount, mevcut izin sayısını döndürür.
+    func (s *Semaphore) GetCount() int {
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        
+        return s.count
+    }
+}
+
+// BinarySemaphore, en fazla bir goroutine'in kritik bölgeye girmesine izin veren bir semaphore'dur.
+// Mutex'e benzer, ancak farklı goroutine'ler tarafından kilitlenip açılabilir.
+class BinarySemaphore {
+    private var sem *Semaphore
+
+    // New, yeni bir BinarySemaphore oluşturur.
+    // initialState true ise, semaphore başlangıçta açık (izin var) olur.
+    // initialState false ise, semaphore başlangıçta kapalı (izin yok) olur.
+    static func New(initialState bool) *BinarySemaphore {
+        bs := new BinarySemaphore()
+        
+        if initialState {
+            bs.sem = Semaphore.New(1) // Açık (izin var)
+        } else {
+            bs.sem = Semaphore.New(0) // Kapalı (izin yok)
+        }
+        
+        return bs
+    }
+
+    // Acquire, semaphore'u kilitler.
+    // Eğer semaphore zaten kilitliyse, açılana kadar bloke olur.
+    func (bs *BinarySemaphore) Acquire() {
+        bs.sem.Acquire()
+    }
+
+    // TryAcquire, semaphore'u kilitlemeyi dener.
+    // Eğer semaphore açıksa true döndürür, kilitliyse false döndürür ve bloke olmaz.
+    func (bs *BinarySemaphore) TryAcquire() bool {
+        return bs.sem.TryAcquire()
+    }
+
+    // AcquireWithTimeout, belirtilen süre içinde semaphore'u kilitlemeyi dener.
+    // Eğer süre dolmadan kilitlenebilirse true döndürür, süre dolarsa false döndürür.
+    func (bs *BinarySemaphore) AcquireWithTimeout(timeout time.Duration) bool {
+        return bs.sem.AcquireWithTimeout(timeout)
+    }
+
+    // Release, semaphore'u açar.
+    // Bu, Acquire veya TryAcquire ile kilitleyen bir goroutine tarafından çağrılmalıdır.
+    func (bs *BinarySemaphore) Release() {
+        // Önce mevcut sayıyı kontrol et, eğer zaten 1 ise (açıksa), bir şey yapma
+        if bs.sem.GetCount() == 0 {
+            bs.sem.Release()
+        }
+    }
+
+    // IsLocked, semaphore'un kilitli olup olmadığını kontrol eder.
+    func (bs *BinarySemaphore) IsLocked() bool {
+        return bs.sem.GetCount() == 0
+    }
+}

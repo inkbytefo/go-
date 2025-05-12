@@ -1,0 +1,249 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Future/Promise Test
+package concurrent
+
+import (
+    "testing"
+    "time"
+    "sync/atomic"
+)
+
+// TestFuturePromiseBasic, Future ve Promise için temel testler içerir.
+func TestFuturePromiseBasic(t *testing.T) {
+    // Promise ve Future oluştur
+    promise, future := Promise.New<int>()
+    
+    // Başlangıçta tamamlanmamış olmalı
+    if future.IsDone() {
+        t.Error("Yeni oluşturulan future tamamlanmamış olmalı")
+    }
+    
+    // Başlangıçta iptal edilmemiş olmalı
+    if future.IsCancelled() {
+        t.Error("Yeni oluşturulan future iptal edilmemiş olmalı")
+    }
+    
+    // Promise'i tamamla
+    promise.Complete(42)
+    
+    // Şimdi tamamlanmış olmalı
+    if !future.IsDone() {
+        t.Error("Tamamlanan future tamamlanmış olmalı")
+    }
+    
+    // Sonucu kontrol et
+    result := future.Get()
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+}
+
+// TestFuturePromiseError, Future ve Promise'in hata durumunu test eder.
+func TestFuturePromiseError(t *testing.T) {
+    // Promise ve Future oluştur
+    promise, future := Promise.New<string>()
+    
+    // Promise'i hata ile tamamla
+    promise.CompleteWithError("test error")
+    
+    // Şimdi tamamlanmış olmalı
+    if !future.IsDone() {
+        t.Error("Hata ile tamamlanan future tamamlanmış olmalı")
+    }
+    
+    // Sonucu almaya çalışırken panik oluşmalı
+    defer func() {
+        if r := recover(); r == nil {
+            t.Error("Hata ile tamamlanan future'ın sonucunu almak panik oluşturmalı")
+        }
+    }()
+    
+    future.Get()
+}
+
+// TestFutureCancel, Future'ın iptal edilmesini test eder.
+func TestFutureCancel(t *testing.T) {
+    // Promise ve Future oluştur
+    _, future := Promise.New<int>()
+    
+    // Future'ı iptal et
+    result := future.Cancel()
+    
+    // İptal başarılı olmalı
+    if !result {
+        t.Error("İptal başarılı olmalı")
+    }
+    
+    // Şimdi iptal edilmiş olmalı
+    if !future.IsCancelled() {
+        t.Error("İptal edilen future iptal edilmiş olmalı")
+    }
+    
+    // Sonucu almaya çalışırken panik oluşmalı
+    defer func() {
+        if r := recover(); r == nil {
+            t.Error("İptal edilen future'ın sonucunu almak panik oluşturmalı")
+        }
+    }()
+    
+    future.Get()
+}
+
+// TestFutureGetWithTimeout, GetWithTimeout metodunu test eder.
+func TestFutureGetWithTimeout(t *testing.T) {
+    // Promise ve Future oluştur
+    promise, future := Promise.New<int>()
+    
+    // Kısa bir zaman aşımı ile sonucu almaya çalış
+    start := time.Now()
+    result, ok := future.GetWithTimeout(50 * time.Millisecond)
+    elapsed := time.Since(start)
+    
+    // Zaman aşımı oluşmalı
+    if ok {
+        t.Error("Kısa zaman aşımında GetWithTimeout false döndürmeli")
+    }
+    
+    if result != 0 {
+        t.Errorf("Zaman aşımında sonuç 0 olmalı, alınan: %d", result)
+    }
+    
+    // Geçen süre yaklaşık 50ms olmalı
+    if elapsed < 40*time.Millisecond || elapsed > 100*time.Millisecond {
+        t.Errorf("Beklenen zaman aşımı süresi ~50ms, alınan: %v", elapsed)
+    }
+    
+    // Promise'i tamamla
+    promise.Complete(42)
+    
+    // Şimdi sonucu alabilmeliyiz
+    result, ok = future.GetWithTimeout(50 * time.Millisecond)
+    
+    // Sonuç alınmalı
+    if !ok {
+        t.Error("Tamamlanan future için GetWithTimeout true döndürmeli")
+    }
+    
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+}
+
+// TestFutureCallback, AddCallback metodunu test eder.
+func TestFutureCallback(t *testing.T) {
+    // Promise ve Future oluştur
+    promise, future := Promise.New<int>()
+    
+    // Callback çağrılma sayısını takip etmek için
+    var callbackCalled int32
+    
+    // Callback ekle
+    future.AddCallback(func(result int, err interface{}) {
+        atomic.AddInt32(&callbackCalled, 1)
+        
+        if err != nil {
+            t.Errorf("Callback'te hata olmamalı, alınan: %v", err)
+        }
+        
+        if result != 42 {
+            t.Errorf("Callback'te beklenen sonuç 42, alınan: %d", result)
+        }
+    })
+    
+    // Promise'i tamamla
+    promise.Complete(42)
+    
+    // Callback'in çağrılmasını bekle
+    time.Sleep(50 * time.Millisecond)
+    
+    // Callback çağrılmış olmalı
+    if atomic.LoadInt32(&callbackCalled) != 1 {
+        t.Errorf("Callback çağrılma sayısı 1 olmalı, alınan: %d", atomic.LoadInt32(&callbackCalled))
+    }
+}
+
+// TestCompletableFutureBasic, CompletableFuture için temel testler içerir.
+func TestCompletableFutureBasic(t *testing.T) {
+    // CompletableFuture oluştur
+    cf := CompletableFuture.New<int>()
+    
+    // Başlangıçta tamamlanmamış olmalı
+    if cf.IsDone() {
+        t.Error("Yeni oluşturulan completable future tamamlanmamış olmalı")
+    }
+    
+    // CompletableFuture'ı tamamla
+    cf.Complete(42)
+    
+    // Şimdi tamamlanmış olmalı
+    if !cf.IsDone() {
+        t.Error("Tamamlanan completable future tamamlanmış olmalı")
+    }
+    
+    // Sonucu kontrol et
+    result := cf.Get()
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+}
+
+// TestSupplyAsync, SupplyAsync fonksiyonunu test eder.
+func TestSupplyAsync(t *testing.T) {
+    // SupplyAsync ile bir Future oluştur
+    future := SupplyAsync<int>(func() int {
+        time.Sleep(50 * time.Millisecond)
+        return 42
+    })
+    
+    // Başlangıçta tamamlanmamış olmalı
+    if future.IsDone() {
+        t.Error("Yeni oluşturulan future tamamlanmamış olmalı")
+    }
+    
+    // Sonucu bekle
+    result := future.Get()
+    
+    // Sonuç 42 olmalı
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+    
+    // Şimdi tamamlanmış olmalı
+    if !future.IsDone() {
+        t.Error("Get çağrıldıktan sonra future tamamlanmış olmalı")
+    }
+}
+
+// TestRunAsync, RunAsync fonksiyonunu test eder.
+func TestRunAsync(t *testing.T) {
+    // Çalıştırma sayısını takip etmek için
+    var runCount int32
+    
+    // RunAsync ile bir Future oluştur
+    future := RunAsync(func() {
+        time.Sleep(50 * time.Millisecond)
+        atomic.AddInt32(&runCount, 1)
+    })
+    
+    // Başlangıçta tamamlanmamış olmalı
+    if future.IsDone() {
+        t.Error("Yeni oluşturulan future tamamlanmamış olmalı")
+    }
+    
+    // Tamamlanmasını bekle
+    result := future.Get()
+    
+    // Sonuç true olmalı
+    if !result {
+        t.Error("RunAsync sonucu true olmalı")
+    }
+    
+    // Şimdi tamamlanmış olmalı
+    if !future.IsDone() {
+        t.Error("Get çağrıldıktan sonra future tamamlanmış olmalı")
+    }
+    
+    // Fonksiyon çalıştırılmış olmalı
+    if atomic.LoadInt32(&runCount) != 1 {
+        t.Errorf("Fonksiyon çalıştırma sayısı 1 olmalı, alınan: %d", atomic.LoadInt32(&runCount))
+    }
+}

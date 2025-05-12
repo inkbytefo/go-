@@ -1,0 +1,242 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Barrier
+package concurrent
+
+import (
+    "sync"
+    "time"
+)
+
+// Barrier, bir grup goroutine'in belirli bir noktada buluşmasını sağlar.
+// Tüm goroutine'ler bariyere ulaştığında, hepsi aynı anda devam eder.
+class Barrier {
+    private var count int // Beklenen goroutine sayısı
+    private var waiting int // Şu anda bekleyen goroutine sayısı
+    private var generation int // Bariyer jenerasyonu
+    private var mu sync.Mutex
+    private var cond *sync.Cond
+
+    // New, belirtilen sayıda goroutine için yeni bir Barrier oluşturur.
+    static func New(count int) *Barrier {
+        if count <= 0 {
+            throw "barrier: count must be positive"
+        }
+        
+        b := new Barrier()
+        b.count = count
+        b.waiting = 0
+        b.generation = 0
+        b.mu = sync.Mutex{}
+        b.cond = sync.NewCond(&b.mu)
+        
+        return b
+    }
+
+    // Wait, bariyerde bekler.
+    // Tüm goroutine'ler Wait'i çağırana kadar bloke olur.
+    // Tüm goroutine'ler bariyere ulaştığında, hepsi aynı anda devam eder.
+    func (b *Barrier) Wait() {
+        b.mu.Lock()
+        defer b.mu.Unlock()
+        
+        generation := b.generation
+        
+        // Bekleyen goroutine sayısını artır
+        b.waiting++
+        
+        if b.waiting == b.count {
+            // Son goroutine bariyere ulaştı
+            b.waiting = 0
+            b.generation++
+            b.cond.Broadcast() // Tüm bekleyen goroutine'leri uyandır
+            return
+        }
+        
+        // Diğer goroutine'leri bekle
+        for generation == b.generation {
+            b.cond.Wait()
+        }
+    }
+
+    // WaitWithTimeout, belirtilen süre içinde bariyerde bekler.
+    // Eğer süre dolmadan tüm goroutine'ler bariyere ulaşırsa true döndürür.
+    // Süre dolarsa false döndürür ve beklemekten vazgeçer.
+    func (b *Barrier) WaitWithTimeout(timeout time.Duration) bool {
+        deadline := time.Now().Add(timeout)
+        
+        b.mu.Lock()
+        defer b.mu.Unlock()
+        
+        generation := b.generation
+        
+        // Bekleyen goroutine sayısını artır
+        b.waiting++
+        
+        if b.waiting == b.count {
+            // Son goroutine bariyere ulaştı
+            b.waiting = 0
+            b.generation++
+            b.cond.Broadcast() // Tüm bekleyen goroutine'leri uyandır
+            return true
+        }
+        
+        // Diğer goroutine'leri bekle
+        for generation == b.generation {
+            waitTime := time.Until(deadline)
+            if waitTime <= 0 {
+                // Zaman aşımı, beklemekten vazgeç
+                b.waiting--
+                return false
+            }
+            
+            // Koşullu değişken için zaman aşımı desteği yok, bu yüzden kısa aralıklarla kontrol ediyoruz
+            b.mu.Unlock()
+            time.Sleep(waitTime / 10) // Toplam sürenin 1/10'u kadar bekle
+            b.mu.Lock()
+            
+            if generation != b.generation {
+                // Diğer goroutine'ler bariyeri geçti
+                return true
+            }
+            
+            if time.Now().After(deadline) {
+                // Zaman aşımı, beklemekten vazgeç
+                b.waiting--
+                return false
+            }
+        }
+        
+        return true
+    }
+
+    // Reset, bariyeri sıfırlar.
+    // Tüm bekleyen goroutine'ler serbest bırakılır ve yeni bir jenerasyon başlatılır.
+    // Bu, bariyerin yeniden kullanılabilmesini sağlar.
+    func (b *Barrier) Reset() {
+        b.mu.Lock()
+        defer b.mu.Unlock()
+        
+        b.waiting = 0
+        b.generation++
+        b.cond.Broadcast() // Tüm bekleyen goroutine'leri uyandır
+    }
+
+    // GetCount, bariyerin beklediği toplam goroutine sayısını döndürür.
+    func (b *Barrier) GetCount() int {
+        b.mu.Lock()
+        defer b.mu.Unlock()
+        
+        return b.count
+    }
+
+    // GetWaiting, şu anda bariyerde bekleyen goroutine sayısını döndürür.
+    func (b *Barrier) GetWaiting() int {
+        b.mu.Lock()
+        defer b.mu.Unlock()
+        
+        return b.waiting
+    }
+
+    // SetCount, bariyerin beklediği toplam goroutine sayısını değiştirir.
+    // Eğer yeni sayı, mevcut bekleyen goroutine sayısından küçük veya eşitse,
+    // bariyer hemen serbest bırakılır.
+    func (b *Barrier) SetCount(count int) {
+        if count <= 0 {
+            throw "barrier: count must be positive"
+        }
+        
+        b.mu.Lock()
+        defer b.mu.Unlock()
+        
+        b.count = count
+        
+        if b.waiting >= b.count {
+            // Yeterli sayıda goroutine zaten bekliyor, bariyeri serbest bırak
+            b.waiting = 0
+            b.generation++
+            b.cond.Broadcast()
+        }
+    }
+}
+
+// CyclicBarrier, bir grup goroutine'in belirli bir noktada buluşmasını sağlar.
+// Tüm goroutine'ler bariyere ulaştığında, belirtilen bir eylem çalıştırılır ve
+// ardından tüm goroutine'ler devam eder. Bariyer otomatik olarak sıfırlanır.
+class CyclicBarrier {
+    private var barrier *Barrier
+    private var action func()
+    private var mu sync.Mutex
+
+    // New, belirtilen sayıda goroutine için yeni bir CyclicBarrier oluşturur.
+    // action, tüm goroutine'ler bariyere ulaştığında çalıştırılacak fonksiyondur.
+    // Eğer action nil ise, hiçbir eylem çalıştırılmaz.
+    static func New(count int, action func()) *CyclicBarrier {
+        if count <= 0 {
+            throw "cyclicbarrier: count must be positive"
+        }
+        
+        cb := new CyclicBarrier()
+        cb.barrier = Barrier.New(count)
+        cb.action = action
+        
+        return cb
+    }
+
+    // Wait, bariyerde bekler.
+    // Tüm goroutine'ler Wait'i çağırana kadar bloke olur.
+    // Tüm goroutine'ler bariyere ulaştığında, action çalıştırılır ve
+    // ardından tüm goroutine'ler devam eder.
+    func (cb *CyclicBarrier) Wait() {
+        cb.mu.Lock()
+        
+        // Son goroutine mi kontrol et
+        isLast := cb.barrier.GetWaiting() == cb.barrier.GetCount() - 1
+        
+        cb.mu.Unlock()
+        
+        // Bariyerde bekle
+        cb.barrier.Wait()
+        
+        // Eğer son goroutine ise ve action varsa, action'ı çalıştır
+        if isLast && cb.action != nil {
+            cb.action()
+        }
+    }
+
+    // WaitWithTimeout, belirtilen süre içinde bariyerde bekler.
+    // Eğer süre dolmadan tüm goroutine'ler bariyere ulaşırsa true döndürür.
+    // Süre dolarsa false döndürür ve beklemekten vazgeçer.
+    func (cb *CyclicBarrier) WaitWithTimeout(timeout time.Duration) bool {
+        cb.mu.Lock()
+        
+        // Son goroutine mi kontrol et
+        isLast := cb.barrier.GetWaiting() == cb.barrier.GetCount() - 1
+        
+        cb.mu.Unlock()
+        
+        // Bariyerde bekle
+        result := cb.barrier.WaitWithTimeout(timeout)
+        
+        // Eğer son goroutine ise, action'ı çalıştır
+        if result && isLast && cb.action != nil {
+            cb.action()
+        }
+        
+        return result
+    }
+
+    // Reset, bariyeri sıfırlar.
+    // Tüm bekleyen goroutine'ler serbest bırakılır ve yeni bir jenerasyon başlatılır.
+    func (cb *CyclicBarrier) Reset() {
+        cb.barrier.Reset()
+    }
+
+    // GetParties, bariyerin beklediği toplam goroutine sayısını döndürür.
+    func (cb *CyclicBarrier) GetParties() int {
+        return cb.barrier.GetCount()
+    }
+
+    // GetNumberWaiting, şu anda bariyerde bekleyen goroutine sayısını döndürür.
+    func (cb *CyclicBarrier) GetNumberWaiting() int {
+        return cb.barrier.GetWaiting()
+    }
+}

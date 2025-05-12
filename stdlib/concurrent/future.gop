@@ -1,0 +1,317 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Future/Promise
+package concurrent
+
+import (
+    "sync"
+    "time"
+)
+
+// Future, asenkron bir işlemin sonucunu temsil eder.
+// Future, sonucun ne zaman hazır olacağını bilmeden, sonucu almak için kullanılır.
+class Future<T> {
+    private var result T
+    private var err interface{}
+    private var done bool
+    private var cancelled bool
+    private var mu sync.Mutex
+    private var cond *sync.Cond
+    private var callbacks []func(T, interface{})
+
+    // New, yeni bir Future oluşturur.
+    static func New<T>() *Future<T> {
+        f := new Future<T>()
+        f.done = false
+        f.cancelled = false
+        f.mu = sync.Mutex{}
+        f.cond = sync.NewCond(&f.mu)
+        f.callbacks = make([]func(T, interface{}), 0)
+        
+        return f
+    }
+
+    // Get, Future'ın sonucunu döndürür.
+    // Eğer sonuç henüz hazır değilse, hazır olana kadar bloke olur.
+    // Eğer Future iptal edilmişse veya bir hata oluşmuşsa, panik oluşturur.
+    func (f *Future<T>) Get() T {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        // Sonuç hazır olana kadar bekle
+        for !f.done && !f.cancelled {
+            f.cond.Wait()
+        }
+        
+        // Eğer iptal edilmişse, panik oluştur
+        if f.cancelled {
+            throw "future: cancelled"
+        }
+        
+        // Eğer hata oluşmuşsa, panik oluştur
+        if f.err != nil {
+            throw f.err
+        }
+        
+        return f.result
+    }
+
+    // GetWithTimeout, belirtilen süre içinde Future'ın sonucunu döndürür.
+    // Eğer süre dolmadan sonuç hazır olursa, sonucu ve true döndürür.
+    // Süre dolarsa, default T değeri ve false döndürür.
+    // Eğer Future iptal edilmişse veya bir hata oluşmuşsa, panik oluşturur.
+    func (f *Future<T>) GetWithTimeout(timeout time.Duration) (T, bool) {
+        deadline := time.Now().Add(timeout)
+        
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        // Sonuç hazır olana kadar bekle
+        for !f.done && !f.cancelled {
+            waitTime := time.Until(deadline)
+            if waitTime <= 0 {
+                var zero T
+                return zero, false
+            }
+            
+            // Koşullu değişken için zaman aşımı desteği yok, bu yüzden kısa aralıklarla kontrol ediyoruz
+            f.mu.Unlock()
+            time.Sleep(waitTime / 10) // Toplam sürenin 1/10'u kadar bekle
+            f.mu.Lock()
+            
+            if f.done || f.cancelled {
+                break
+            }
+            
+            if time.Now().After(deadline) {
+                var zero T
+                return zero, false
+            }
+        }
+        
+        // Eğer iptal edilmişse, panik oluştur
+        if f.cancelled {
+            throw "future: cancelled"
+        }
+        
+        // Eğer hata oluşmuşsa, panik oluştur
+        if f.err != nil {
+            throw f.err
+        }
+        
+        return f.result, true
+    }
+
+    // IsDone, Future'ın tamamlanıp tamamlanmadığını kontrol eder.
+    func (f *Future<T>) IsDone() bool {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        return f.done
+    }
+
+    // IsCancelled, Future'ın iptal edilip edilmediğini kontrol eder.
+    func (f *Future<T>) IsCancelled() bool {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        return f.cancelled
+    }
+
+    // Cancel, Future'ı iptal eder.
+    // Eğer Future zaten tamamlanmışsa, false döndürür.
+    // Aksi takdirde, Future'ı iptal eder ve true döndürür.
+    func (f *Future<T>) Cancel() bool {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        if f.done {
+            return false
+        }
+        
+        f.cancelled = true
+        f.cond.Broadcast()
+        
+        // Callback'leri çağır
+        var zero T
+        for _, callback := range f.callbacks {
+            go callback(zero, "future: cancelled")
+        }
+        
+        return true
+    }
+
+    // AddCallback, Future tamamlandığında veya iptal edildiğinde çağrılacak bir callback ekler.
+    // Callback, sonuç ve hata parametreleriyle çağrılır.
+    func (f *Future<T>) AddCallback(callback func(T, interface{})) {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        if f.done || f.cancelled {
+            // Future zaten tamamlanmış veya iptal edilmiş, hemen callback'i çağır
+            go callback(f.result, f.err)
+        } else {
+            // Callback'i listeye ekle
+            f.callbacks = append(f.callbacks, callback)
+        }
+    }
+
+    // complete, Future'ı tamamlar ve sonucu ayarlar.
+    // Bu, Promise tarafından çağrılır.
+    func (f *Future<T>) complete(result T) {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        if f.done || f.cancelled {
+            return
+        }
+        
+        f.result = result
+        f.done = true
+        f.cond.Broadcast()
+        
+        // Callback'leri çağır
+        for _, callback := range f.callbacks {
+            go callback(result, nil)
+        }
+    }
+
+    // completeWithError, Future'ı bir hata ile tamamlar.
+    // Bu, Promise tarafından çağrılır.
+    func (f *Future<T>) completeWithError(err interface{}) {
+        f.mu.Lock()
+        defer f.mu.Unlock()
+        
+        if f.done || f.cancelled {
+            return
+        }
+        
+        f.err = err
+        f.done = true
+        f.cond.Broadcast()
+        
+        // Callback'leri çağır
+        var zero T
+        for _, callback := range f.callbacks {
+            go callback(zero, err)
+        }
+    }
+}
+
+// Promise, bir Future'ın sonucunu ayarlamak için kullanılır.
+// Promise, asenkron bir işlemin sonucunu temsil eden Future'ı tamamlamak için kullanılır.
+class Promise<T> {
+    private var future *Future<T>
+
+    // New, yeni bir Promise ve ilişkili Future oluşturur.
+    static func New<T>() (*Promise<T>, *Future<T>) {
+        p := new Promise<T>()
+        p.future = Future.New<T>()
+        
+        return p, p.future
+    }
+
+    // Complete, Promise'i tamamlar ve sonucu ayarlar.
+    func (p *Promise<T>) Complete(result T) {
+        p.future.complete(result)
+    }
+
+    // CompleteWithError, Promise'i bir hata ile tamamlar.
+    func (p *Promise<T>) CompleteWithError(err interface{}) {
+        p.future.completeWithError(err)
+    }
+
+    // GetFuture, Promise ile ilişkili Future'ı döndürür.
+    func (p *Promise<T>) GetFuture() *Future<T> {
+        return p.future
+    }
+}
+
+// CompletableFuture, tamamlanabilir bir Future'ı temsil eder.
+// CompletableFuture, hem Future hem de Promise özelliklerini birleştirir.
+class CompletableFuture<T> {
+    private var future *Future<T>
+    private var promise *Promise<T>
+
+    // New, yeni bir CompletableFuture oluşturur.
+    static func New<T>() *CompletableFuture<T> {
+        cf := new CompletableFuture<T>()
+        cf.promise, cf.future = Promise.New<T>()
+        
+        return cf
+    }
+
+    // Get, Future'ın sonucunu döndürür.
+    func (cf *CompletableFuture<T>) Get() T {
+        return cf.future.Get()
+    }
+
+    // GetWithTimeout, belirtilen süre içinde Future'ın sonucunu döndürür.
+    func (cf *CompletableFuture<T>) GetWithTimeout(timeout time.Duration) (T, bool) {
+        return cf.future.GetWithTimeout(timeout)
+    }
+
+    // IsDone, Future'ın tamamlanıp tamamlanmadığını kontrol eder.
+    func (cf *CompletableFuture<T>) IsDone() bool {
+        return cf.future.IsDone()
+    }
+
+    // IsCancelled, Future'ın iptal edilip edilmediğini kontrol eder.
+    func (cf *CompletableFuture<T>) IsCancelled() bool {
+        return cf.future.IsCancelled()
+    }
+
+    // Cancel, Future'ı iptal eder.
+    func (cf *CompletableFuture<T>) Cancel() bool {
+        return cf.future.Cancel()
+    }
+
+    // AddCallback, Future tamamlandığında veya iptal edildiğinde çağrılacak bir callback ekler.
+    func (cf *CompletableFuture<T>) AddCallback(callback func(T, interface{})) {
+        cf.future.AddCallback(callback)
+    }
+
+    // Complete, Promise'i tamamlar ve sonucu ayarlar.
+    func (cf *CompletableFuture<T>) Complete(result T) {
+        cf.promise.Complete(result)
+    }
+
+    // CompleteWithError, Promise'i bir hata ile tamamlar.
+    func (cf *CompletableFuture<T>) CompleteWithError(err interface{}) {
+        cf.promise.CompleteWithError(err)
+    }
+}
+
+// SupplyAsync, verilen fonksiyonu asenkron olarak çalıştırır ve sonucu içeren bir Future döndürür.
+template<T> func SupplyAsync(supplier func() T) *Future<T> {
+    promise, future := Promise.New<T>()
+    
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                promise.CompleteWithError(r)
+            }
+        }()
+        
+        result := supplier()
+        promise.Complete(result)
+    }()
+    
+    return future
+}
+
+// RunAsync, verilen fonksiyonu asenkron olarak çalıştırır ve bir Future döndürür.
+func RunAsync(runnable func()) *Future<bool> {
+    promise, future := Promise.New<bool>()
+    
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                promise.CompleteWithError(r)
+            }
+        }()
+        
+        runnable()
+        promise.Complete(true)
+    }()
+    
+    return future
+}

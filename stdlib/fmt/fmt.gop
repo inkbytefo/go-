@@ -1,0 +1,90 @@
+// GO+ Standart Kütüphane - Fmt Paketi
+package fmt
+
+import (
+    "fmt" // Go'nun fmt paketini kullan
+)
+
+// Print, standart çıktıya yazdırır.
+// Argümanlar, Go'nun fmt.Print fonksiyonuna iletilir.
+func Print(args ...interface{}) (n int, err error) {
+    return fmt.Print(args...)
+}
+
+// Println, standart çıktıya yazdırır ve bir satır sonu ekler.
+// Argümanlar, Go'nun fmt.Println fonksiyonuna iletilir.
+func Println(args ...interface{}) (n int, err error) {
+    return fmt.Println(args...)
+}
+
+// Printf, biçimlendirilmiş bir dizeyi standart çıktıya yazdırır.
+// Argümanlar, Go'nun fmt.Printf fonksiyonuna iletilir.
+func Printf(format string, args ...interface{}) (n int, err error) {
+    return fmt.Printf(format, args...)
+}
+
+// Sprint, argümanları bir dizeye dönüştürür.
+// Argümanlar, Go'nun fmt.Sprint fonksiyonuna iletilir.
+func Sprint(args ...interface{}) string {
+    return fmt.Sprint(args...)
+}
+
+// Sprintf, biçimlendirilmiş bir dizeyi döndürür.
+// Argümanlar, Go'nun fmt.Sprintf fonksiyonuna iletilir.
+func Sprintf(format string, args ...interface{}) string {
+    return fmt.Sprintf(format, args...)
+}
+
+// Fprint, bir yazıcıya yazdırır.
+// Argümanlar, Go'nun fmt.Fprint fonksiyonuna iletilir.
+func Fprint(w io.Writer, args ...interface{}) (n int, err error) {
+    return fmt.Fprint(w, args...)
+}
+
+// Fprintln, bir yazıcıya yazdırır ve bir satır sonu ekler.
+// Argümanlar, Go'nun fmt.Fprintln fonksiyonuna iletilir.
+func Fprintln(w io.Writer, args ...interface{}) (n int, err error) {
+    return fmt.Fprintln(w, args...)
+}
+
+// Fprintf, biçimlendirilmiş bir dizeyi bir yazıcıya yazdırır.
+// Argümanlar, Go'nun fmt.Fprintf fonksiyonuna iletilir.
+func Fprintf(w io.Writer, format string, args ...interface{}) (n int, err error) {
+    return fmt.Fprintf(w, format, args...)
+}
+
+// Scan, standart girdiden okur.
+// Argümanlar, Go'nun fmt.Scan fonksiyonuna iletilir.
+func Scan(args ...interface{}) (n int, err error) {
+    return fmt.Scan(args...)
+}
+
+// Scanln, standart girdiden bir satır okur.
+// Argümanlar, Go'nun fmt.Scanln fonksiyonuna iletilir.
+func Scanln(args ...interface{}) (n int, err error) {
+    return fmt.Scanln(args...)
+}
+
+// Scanf, biçimlendirilmiş bir dizeyi standart girdiden okur.
+// Argümanlar, Go'nun fmt.Scanf fonksiyonuna iletilir.
+func Scanf(format string, args ...interface{}) (n int, err error) {
+    return fmt.Scanf(format, args...)
+}
+
+// Stringer, bir nesnenin dize temsilini döndüren bir arayüzdür.
+interface Stringer {
+    func String() string
+}
+
+// Formatter, özel biçimlendirme için bir arayüzdür.
+interface Formatter {
+    func Format(f State, c rune)
+}
+
+// State, biçimlendirme durumunu temsil eden bir arayüzdür.
+interface State {
+    func Write(b []byte) (n int, err error)
+    func Width() (wid int, ok bool)
+    func Precision() (prec int, ok bool)
+    func Flag(c int) bool
+}

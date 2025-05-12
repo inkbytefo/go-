@@ -1,0 +1,29 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - WaitGroup
+package concurrent
+
+import (
+    "sync"
+)
+
+// WaitGroup, goroutine'lerin tamamlanmasını beklemek için kullanılır.
+// Go'nun sync.WaitGroup yapısını temel alır.
+class WaitGroup {
+    private var wg sync.WaitGroup
+
+    // Add, WaitGroup sayacını delta kadar artırır.
+    // delta negatif olabilir, bu durumda sayaç azalır.
+    // Eğer sayaç negatif olursa, panik oluşturur.
+    func (wg *WaitGroup) Add(delta int) {
+        wg.wg.Add(delta)
+    }
+
+    // Done, WaitGroup sayacını bir azaltır.
+    func (wg *WaitGroup) Done() {
+        wg.wg.Done()
+    }
+
+    // Wait, WaitGroup sayacı sıfır olana kadar bloke olur.
+    func (wg *WaitGroup) Wait() {
+        wg.wg.Wait()
+    }
+}

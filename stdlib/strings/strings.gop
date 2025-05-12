@@ -1,0 +1,166 @@
+// GO+ Standart Kütüphane - Strings Paketi
+package strings
+
+import (
+    "strings" // Go'nun strings paketini kullan
+)
+
+// Contains, s dizesinin substr alt dizesini içerip içermediğini kontrol eder.
+func Contains(s, substr string) bool {
+    return strings.Contains(s, substr)
+}
+
+// ContainsAny, s dizesinin chars dizesindeki karakterlerden herhangi birini içerip içermediğini kontrol eder.
+func ContainsAny(s, chars string) bool {
+    return strings.ContainsAny(s, chars)
+}
+
+// Count, s dizesindeki substr alt dizesinin sayısını döndürür.
+func Count(s, substr string) int {
+    return strings.Count(s, substr)
+}
+
+// HasPrefix, s dizesinin prefix ile başlayıp başlamadığını kontrol eder.
+func HasPrefix(s, prefix string) bool {
+    return strings.HasPrefix(s, prefix)
+}
+
+// HasSuffix, s dizesinin suffix ile bitip bitmediğini kontrol eder.
+func HasSuffix(s, suffix string) bool {
+    return strings.HasSuffix(s, suffix)
+}
+
+// Index, s dizesindeki substr alt dizesinin ilk indeksini döndürür.
+// Eğer substr bulunamazsa, -1 döndürür.
+func Index(s, substr string) int {
+    return strings.Index(s, substr)
+}
+
+// IndexAny, s dizesindeki chars dizesindeki karakterlerden herhangi birinin ilk indeksini döndürür.
+// Eğer hiçbir karakter bulunamazsa, -1 döndürür.
+func IndexAny(s, chars string) int {
+    return strings.IndexAny(s, chars)
+}
+
+// Join, elems dizisindeki dizeleri sep ayırıcısıyla birleştirir.
+func Join(elems []string, sep string) string {
+    return strings.Join(elems, sep)
+}
+
+// LastIndex, s dizesindeki substr alt dizesinin son indeksini döndürür.
+// Eğer substr bulunamazsa, -1 döndürür.
+func LastIndex(s, substr string) int {
+    return strings.LastIndex(s, substr)
+}
+
+// LastIndexAny, s dizesindeki chars dizesindeki karakterlerden herhangi birinin son indeksini döndürür.
+// Eğer hiçbir karakter bulunamazsa, -1 döndürür.
+func LastIndexAny(s, chars string) int {
+    return strings.LastIndexAny(s, chars)
+}
+
+// Repeat, s dizesini count kez tekrarlar.
+func Repeat(s string, count int) string {
+    return strings.Repeat(s, count)
+}
+
+// Replace, s dizesindeki old alt dizesini new alt dizesiyle değiştirir.
+// n parametresi, kaç kez değiştirileceğini belirtir. n < 0 ise, tüm eşleşmeler değiştirilir.
+func Replace(s, old, new string, n int) string {
+    return strings.Replace(s, old, new, n)
+}
+
+// ReplaceAll, s dizesindeki old alt dizesinin tüm örneklerini new alt dizesiyle değiştirir.
+func ReplaceAll(s, old, new string) string {
+    return strings.ReplaceAll(s, old, new)
+}
+
+// Split, s dizesini sep ayırıcısına göre böler.
+func Split(s, sep string) []string {
+    return strings.Split(s, sep)
+}
+
+// SplitN, s dizesini sep ayırıcısına göre en fazla n parçaya böler.
+func SplitN(s, sep string, n int) []string {
+    return strings.SplitN(s, sep, n)
+}
+
+// ToLower, s dizesindeki tüm karakterleri küçük harfe dönüştürür.
+func ToLower(s string) string {
+    return strings.ToLower(s)
+}
+
+// ToUpper, s dizesindeki tüm karakterleri büyük harfe dönüştürür.
+func ToUpper(s string) string {
+    return strings.ToUpper(s)
+}
+
+// Trim, s dizesinin başındaki ve sonundaki cutset dizesindeki karakterleri kaldırır.
+func Trim(s, cutset string) string {
+    return strings.Trim(s, cutset)
+}
+
+// TrimLeft, s dizesinin başındaki cutset dizesindeki karakterleri kaldırır.
+func TrimLeft(s, cutset string) string {
+    return strings.TrimLeft(s, cutset)
+}
+
+// TrimRight, s dizesinin sonundaki cutset dizesindeki karakterleri kaldırır.
+func TrimRight(s, cutset string) string {
+    return strings.TrimRight(s, cutset)
+}
+
+// TrimSpace, s dizesinin başındaki ve sonundaki boşluk karakterlerini kaldırır.
+func TrimSpace(s string) string {
+    return strings.TrimSpace(s)
+}
+
+// Builder, dize oluşturmak için kullanılır.
+class Builder {
+    private var builder strings.Builder
+
+    // Write, p baytlarını builder'a yazar.
+    func (b *Builder) Write(p []byte) (int, error) {
+        return b.builder.Write(p)
+    }
+
+    // WriteString, s dizesini builder'a yazar.
+    func (b *Builder) WriteString(s string) (int, error) {
+        return b.builder.WriteString(s)
+    }
+
+    // WriteByte, c baytını builder'a yazar.
+    func (b *Builder) WriteByte(c byte) error {
+        return b.builder.WriteByte(c)
+    }
+
+    // WriteRune, r runesini builder'a yazar.
+    func (b *Builder) WriteRune(r rune) (int, error) {
+        return b.builder.WriteRune(r)
+    }
+
+    // String, builder'ın içeriğini dize olarak döndürür.
+    func (b *Builder) String() string {
+        return b.builder.String()
+    }
+
+    // Len, builder'ın içeriğinin uzunluğunu döndürür.
+    func (b *Builder) Len() int {
+        return b.builder.Len()
+    }
+
+    // Cap, builder'ın kapasitesini döndürür.
+    func (b *Builder) Cap() int {
+        return b.builder.Cap()
+    }
+
+    // Reset, builder'ı sıfırlar.
+    func (b *Builder) Reset() {
+        b.builder.Reset()
+    }
+
+    // Grow, builder'ın kapasitesini en az n bayt artırır.
+    func (b *Builder) Grow(n int) {
+        b.builder.Grow(n)
+    }
+}

@@ -1,0 +1,75 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Mutex
+package concurrent
+
+import (
+    "sync"
+)
+
+// Mutex, karşılıklı dışlama için kullanılır.
+// Go'nun sync.Mutex yapısını temel alır.
+class Mutex {
+    private var mu sync.Mutex
+
+    // Lock, mutex'i kilitler.
+    // Eğer mutex zaten kilitliyse, kilit açılana kadar bloke olur.
+    func (m *Mutex) Lock() {
+        m.mu.Lock()
+    }
+
+    // Unlock, mutex'in kilidini açar.
+    // Kilitli olmayan bir mutex'in kilidini açmak panik oluşturur.
+    func (m *Mutex) Unlock() {
+        m.mu.Unlock()
+    }
+
+    // TryLock, mutex'i kilitlemeyi dener.
+    // Eğer mutex zaten kilitliyse, false döndürür.
+    // Eğer mutex kilitlenebildiyse, true döndürür.
+    func (m *Mutex) TryLock() bool {
+        return m.mu.TryLock()
+    }
+}
+
+// RWMutex, okuma/yazma mutex'i olarak kullanılır.
+// Go'nun sync.RWMutex yapısını temel alır.
+class RWMutex {
+    private var mu sync.RWMutex
+
+    // Lock, mutex'i yazma için kilitler.
+    // Eğer mutex zaten kilitliyse, kilit açılana kadar bloke olur.
+    func (m *RWMutex) Lock() {
+        m.mu.Lock()
+    }
+
+    // Unlock, mutex'in yazma kilidini açar.
+    // Kilitli olmayan bir mutex'in kilidini açmak panik oluşturur.
+    func (m *RWMutex) Unlock() {
+        m.mu.Unlock()
+    }
+
+    // RLock, mutex'i okuma için kilitler.
+    // Eğer mutex yazma için kilitliyse, kilit açılana kadar bloke olur.
+    func (m *RWMutex) RLock() {
+        m.mu.RLock()
+    }
+
+    // RUnlock, mutex'in okuma kilidini açar.
+    // Okuma için kilitli olmayan bir mutex'in kilidini açmak panik oluşturur.
+    func (m *RWMutex) RUnlock() {
+        m.mu.RUnlock()
+    }
+
+    // TryLock, mutex'i yazma için kilitlemeyi dener.
+    // Eğer mutex zaten kilitliyse, false döndürür.
+    // Eğer mutex kilitlenebildiyse, true döndürür.
+    func (m *RWMutex) TryLock() bool {
+        return m.mu.TryLock()
+    }
+
+    // TryRLock, mutex'i okuma için kilitlemeyi dener.
+    // Eğer mutex yazma için kilitliyse, false döndürür.
+    // Eğer mutex kilitlenebildiyse, true döndürür.
+    func (m *RWMutex) TryRLock() bool {
+        return m.mu.TryRLock()
+    }
+}

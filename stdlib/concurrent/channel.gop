@@ -1,0 +1,69 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Channel
+package concurrent
+
+// Channel, eşzamanlı goroutine'ler arasında iletişim için kullanılır.
+// Go'nun kanal yapısını temel alır ve GO+'ın şablon desteğiyle genişletilmiştir.
+class Channel<T> {
+    private var ch chan T
+
+    // New, belirtilen kapasiteye sahip yeni bir kanal oluşturur.
+    // Kapasite 0 ise, kanal tamponlanmamış olur.
+    static func New<T>(capacity int) *Channel<T> {
+        c := new Channel<T>()
+        c.ch = make(chan T, capacity)
+        return c
+    }
+
+    // Send, kanala bir değer gönderir.
+    // Eğer kanal doluysa, bir alıcı değeri alana kadar bloke olur.
+    func (c *Channel<T>) Send(value T) {
+        c.ch <- value
+    }
+
+    // Receive, kanaldan bir değer alır.
+    // Eğer kanal boşsa, bir gönderici değer gönderene kadar bloke olur.
+    func (c *Channel<T>) Receive() T {
+        return <-c.ch
+    }
+
+    // TryReceive, kanaldan bir değer almayı dener.
+    // Eğer kanal boşsa, varsayılan değer ve false döndürür.
+    // Eğer değer alınabilirse, değer ve true döndürür.
+    func (c *Channel<T>) TryReceive() (T, bool) {
+        select {
+        case value := <-c.ch:
+            return value, true
+        default:
+            var zero T
+            return zero, false
+        }
+    }
+
+    // TrySend, kanala bir değer göndermeyi dener.
+    // Eğer kanal doluysa, false döndürür.
+    // Eğer değer gönderilebilirse, true döndürür.
+    func (c *Channel<T>) TrySend(value T) bool {
+        select {
+        case c.ch <- value:
+            return true
+        default:
+            return false
+        }
+    }
+
+    // Close, kanalı kapatır.
+    // Kapalı bir kanala değer göndermek panik oluşturur.
+    func (c *Channel<T>) Close() {
+        close(c.ch)
+    }
+
+    // Len, kanaldaki eleman sayısını döndürür.
+    func (c *Channel<T>) Len() int {
+        return len(c.ch)
+    }
+
+    // Cap, kanalın kapasitesini döndürür.
+    func (c *Channel<T>) Cap() int {
+        return cap(c.ch)
+    }
+}

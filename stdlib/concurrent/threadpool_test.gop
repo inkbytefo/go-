@@ -1,0 +1,248 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - ThreadPool Test
+package concurrent
+
+import (
+    "testing"
+    "time"
+    "sync/atomic"
+)
+
+// TestTaskBasic, Task için temel testler içerir.
+func TestTaskBasic(t *testing.T) {
+    // Basit bir görev oluştur
+    task := Task.New(func() interface{} {
+        return 42
+    })
+    
+    // Başlangıçta tamamlanmamış olmalı
+    if task.IsDone() {
+        t.Error("Yeni oluşturulan görev tamamlanmamış olmalı")
+    }
+    
+    // Görevi çalıştır
+    task.execute()
+    
+    // Şimdi tamamlanmış olmalı
+    if !task.IsDone() {
+        t.Error("Çalıştırılan görev tamamlanmış olmalı")
+    }
+    
+    // Sonucu kontrol et
+    result := task.GetResult()
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %v", result)
+    }
+}
+
+// TestTaskError, Task'ın hata durumunu test eder.
+func TestTaskError(t *testing.T) {
+    // Hata fırlatan bir görev oluştur
+    task := Task.New(func() interface{} {
+        throw "test error"
+        return nil
+    })
+    
+    // Görevi çalıştır
+    task.execute()
+    
+    // Şimdi tamamlanmış olmalı
+    if !task.IsDone() {
+        t.Error("Hata fırlatan görev tamamlanmış olmalı")
+    }
+    
+    // Sonucu almaya çalışırken panik oluşmalı
+    defer func() {
+        if r := recover(); r == nil {
+            t.Error("Hata fırlatan görevin sonucunu almak panik oluşturmalı")
+        }
+    }()
+    
+    task.GetResult()
+}
+
+// TestTaskGetResultWithTimeout, GetResultWithTimeout metodunu test eder.
+func TestTaskGetResultWithTimeout(t *testing.T) {
+    // Uzun süren bir görev oluştur
+    task := Task.New(func() interface{} {
+        time.Sleep(100 * time.Millisecond)
+        return 42
+    })
+    
+    // Görevi başlat
+    go task.execute()
+    
+    // Kısa bir zaman aşımı ile sonucu almaya çalış
+    result, ok := task.GetResultWithTimeout(50 * time.Millisecond)
+    
+    // Zaman aşımı oluşmalı
+    if ok {
+        t.Error("Kısa zaman aşımında GetResultWithTimeout false döndürmeli")
+    }
+    
+    if result != nil {
+        t.Errorf("Zaman aşımında sonuç nil olmalı, alınan: %v", result)
+    }
+    
+    // Uzun bir zaman aşımı ile sonucu almaya çalış
+    result, ok = task.GetResultWithTimeout(200 * time.Millisecond)
+    
+    // Sonuç alınmalı
+    if !ok {
+        t.Error("Uzun zaman aşımında GetResultWithTimeout true döndürmeli")
+    }
+    
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %v", result)
+    }
+}
+
+// TestThreadPoolBasic, ThreadPool için temel testler içerir.
+func TestThreadPoolBasic(t *testing.T) {
+    // 2 worker thread'li bir havuz oluştur
+    pool := ThreadPool.New(2)
+    
+    // Worker sayısı 2 olmalı
+    if pool.GetWorkerCount() != 2 {
+        t.Errorf("Beklenen worker sayısı 2, alınan: %d", pool.GetWorkerCount())
+    }
+    
+    // Başlangıçta kapatılmamış olmalı
+    if pool.IsShutdown() {
+        t.Error("Yeni oluşturulan havuz kapatılmamış olmalı")
+    }
+    
+    // Basit bir görev gönder
+    task1 := pool.Submit(func() interface{} {
+        return 42
+    })
+    
+    // Sonucu kontrol et
+    result1 := task1.GetResult()
+    if result1 != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %v", result1)
+    }
+    
+    // Uzun süren bir görev gönder
+    task2 := pool.Submit(func() interface{} {
+        time.Sleep(50 * time.Millisecond)
+        return "hello"
+    })
+    
+    // Sonucu kontrol et
+    result2 := task2.GetResult()
+    if result2 != "hello" {
+        t.Errorf("Beklenen sonuç \"hello\", alınan: %v", result2)
+    }
+    
+    // Havuzu kapat
+    pool.Shutdown()
+    
+    // Şimdi kapatılmış olmalı
+    if !pool.IsShutdown() {
+        t.Error("Shutdown çağrıldıktan sonra havuz kapatılmış olmalı")
+    }
+}
+
+// TestThreadPoolMultipleTasks, ThreadPool'un çoklu görevleri test eder.
+func TestThreadPoolMultipleTasks(t *testing.T) {
+    // 4 worker thread'li bir havuz oluştur
+    pool := ThreadPool.New(4)
+    
+    // Tamamlanan görev sayısını takip etmek için
+    var completedTasks int32
+    
+    // 10 görev gönder
+    tasks := make([]*Task, 10)
+    for i := 0; i < 10; i++ {
+        id := i
+        tasks[i] = pool.Submit(func() interface{} {
+            // Biraz bekle
+            time.Sleep(time.Duration(id*10) * time.Millisecond)
+            
+            // Tamamlanan görev sayısını artır
+            atomic.AddInt32(&completedTasks, 1)
+            
+            return id
+        })
+    }
+    
+    // Tüm görevlerin sonuçlarını kontrol et
+    for i := 0; i < 10; i++ {
+        result := tasks[i].GetResult()
+        if result != i {
+            t.Errorf("Beklenen sonuç %d, alınan: %v", i, result)
+        }
+    }
+    
+    // Tüm görevler tamamlanmış olmalı
+    if atomic.LoadInt32(&completedTasks) != 10 {
+        t.Errorf("Beklenen tamamlanan görev sayısı 10, alınan: %d", atomic.LoadInt32(&completedTasks))
+    }
+    
+    // Havuzu kapat
+    pool.Shutdown()
+}
+
+// TestThreadPoolShutdownNow, ShutdownNow metodunu test eder.
+func TestThreadPoolShutdownNow(t *testing.T) {
+    // 2 worker thread'li bir havuz oluştur
+    pool := ThreadPool.New(2)
+    
+    // Uzun süren görevler gönder
+    for i := 0; i < 10; i++ {
+        pool.Submit(func() interface{} {
+            time.Sleep(100 * time.Millisecond)
+            return nil
+        })
+    }
+    
+    // Hemen kapat
+    pool.ShutdownNow()
+    
+    // Şimdi kapatılmış olmalı
+    if !pool.IsShutdown() {
+        t.Error("ShutdownNow çağrıldıktan sonra havuz kapatılmış olmalı")
+    }
+}
+
+// TestFixedThreadPool, FixedThreadPool fonksiyonunu test eder.
+func TestFixedThreadPool(t *testing.T) {
+    // 3 thread'li bir fixed thread pool oluştur
+    pool := FixedThreadPool(3)
+    
+    // Worker sayısı 3 olmalı
+    if pool.GetWorkerCount() != 3 {
+        t.Errorf("Beklenen worker sayısı 3, alınan: %d", pool.GetWorkerCount())
+    }
+    
+    // Havuzu kapat
+    pool.Shutdown()
+}
+
+// TestSingleThreadExecutor, SingleThreadExecutor fonksiyonunu test eder.
+func TestSingleThreadExecutor(t *testing.T) {
+    // Tek thread'li bir executor oluştur
+    pool := SingleThreadExecutor()
+    
+    // Worker sayısı 1 olmalı
+    if pool.GetWorkerCount() != 1 {
+        t.Errorf("Beklenen worker sayısı 1, alınan: %d", pool.GetWorkerCount())
+    }
+    
+    // Havuzu kapat
+    pool.Shutdown()
+}
+
+// TestCachedThreadPool, CachedThreadPool fonksiyonunu test eder.
+func TestCachedThreadPool(t *testing.T) {
+    // Cached thread pool oluştur
+    pool := CachedThreadPool()
+    
+    // Worker sayısı pozitif olmalı
+    if pool.GetWorkerCount() <= 0 {
+        t.Errorf("Beklenen worker sayısı pozitif, alınan: %d", pool.GetWorkerCount())
+    }
+    
+    // Havuzu kapat
+    pool.Shutdown()
+}

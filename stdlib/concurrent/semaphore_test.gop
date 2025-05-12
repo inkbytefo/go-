@@ -1,0 +1,246 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Semaphore Test
+package concurrent
+
+import (
+    "testing"
+    "time"
+    "sync"
+)
+
+// TestSemaphoreBasic, Semaphore için temel testler içerir.
+func TestSemaphoreBasic(t *testing.T) {
+    // 2 izinli bir semaphore oluştur
+    sem := Semaphore.New(2)
+    
+    // İzin sayısı 2 olmalı
+    if sem.GetCount() != 2 {
+        t.Errorf("Beklenen izin sayısı 2, alınan: %d", sem.GetCount())
+    }
+    
+    // İlk izni al
+    sem.Acquire()
+    
+    // İzin sayısı 1 olmalı
+    if sem.GetCount() != 1 {
+        t.Errorf("Beklenen izin sayısı 1, alınan: %d", sem.GetCount())
+    }
+    
+    // İkinci izni al
+    sem.Acquire()
+    
+    // İzin sayısı 0 olmalı
+    if sem.GetCount() != 0 {
+        t.Errorf("Beklenen izin sayısı 0, alınan: %d", sem.GetCount())
+    }
+    
+    // İzin olmadığında TryAcquire false döndürmeli
+    if sem.TryAcquire() {
+        t.Error("İzin olmadığında TryAcquire false döndürmeli")
+    }
+    
+    // Bir izni serbest bırak
+    sem.Release()
+    
+    // İzin sayısı 1 olmalı
+    if sem.GetCount() != 1 {
+        t.Errorf("Beklenen izin sayısı 1, alınan: %d", sem.GetCount())
+    }
+    
+    // İzin olduğunda TryAcquire true döndürmeli
+    if !sem.TryAcquire() {
+        t.Error("İzin olduğunda TryAcquire true döndürmeli")
+    }
+    
+    // İzin sayısı tekrar 0 olmalı
+    if sem.GetCount() != 0 {
+        t.Errorf("Beklenen izin sayısı 0, alınan: %d", sem.GetCount())
+    }
+    
+    // Birden fazla izni serbest bırak
+    sem.ReleaseMany(3)
+    
+    // İzin sayısı 3 olmalı
+    if sem.GetCount() != 3 {
+        t.Errorf("Beklenen izin sayısı 3, alınan: %d", sem.GetCount())
+    }
+}
+
+// TestSemaphoreConcurrent, Semaphore'un eşzamanlı kullanımını test eder.
+func TestSemaphoreConcurrent(t *testing.T) {
+    // 3 izinli bir semaphore oluştur
+    sem := Semaphore.New(3)
+    
+    // Eşzamanlı erişim sayısını takip etmek için
+    var counter int
+    var mu sync.Mutex
+    var wg sync.WaitGroup
+    
+    // Maksimum eşzamanlı erişim sayısını takip etmek için
+    var maxConcurrent int
+    
+    // 10 goroutine oluştur
+    for i := 0; i < 10; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            
+            // Semaphore'dan izin al
+            sem.Acquire()
+            defer sem.Release()
+            
+            // Kritik bölge
+            mu.Lock()
+            counter++
+            if counter > maxConcurrent {
+                maxConcurrent = counter
+            }
+            mu.Unlock()
+            
+            // Biraz bekle
+            time.Sleep(10 * time.Millisecond)
+            
+            // Kritik bölgeden çık
+            mu.Lock()
+            counter--
+            mu.Unlock()
+        }()
+    }
+    
+    // Tüm goroutine'lerin tamamlanmasını bekle
+    wg.Wait()
+    
+    // Maksimum eşzamanlı erişim sayısı 3 olmalı
+    if maxConcurrent > 3 {
+        t.Errorf("Maksimum eşzamanlı erişim sayısı 3 olmalı, alınan: %d", maxConcurrent)
+    }
+}
+
+// TestSemaphoreTimeout, AcquireWithTimeout metodunu test eder.
+func TestSemaphoreTimeout(t *testing.T) {
+    // 1 izinli bir semaphore oluştur
+    sem := Semaphore.New(1)
+    
+    // İzni al
+    sem.Acquire()
+    
+    // Zaman aşımı ile izin almayı dene (kısa süre)
+    start := time.Now()
+    result := sem.AcquireWithTimeout(50 * time.Millisecond)
+    elapsed := time.Since(start)
+    
+    // Sonuç false olmalı (zaman aşımı)
+    if result {
+        t.Error("Zaman aşımında AcquireWithTimeout false döndürmeli")
+    }
+    
+    // Geçen süre yaklaşık 50ms olmalı
+    if elapsed < 40*time.Millisecond || elapsed > 100*time.Millisecond {
+        t.Errorf("Beklenen zaman aşımı süresi ~50ms, alınan: %v", elapsed)
+    }
+    
+    // İzni serbest bırak
+    sem.Release()
+    
+    // Şimdi izin almayı dene (izin var)
+    result = sem.AcquireWithTimeout(50 * time.Millisecond)
+    
+    // Sonuç true olmalı (izin alındı)
+    if !result {
+        t.Error("İzin olduğunda AcquireWithTimeout true döndürmeli")
+    }
+}
+
+// TestBinarySemaphoreBasic, BinarySemaphore için temel testler içerir.
+func TestBinarySemaphoreBasic(t *testing.T) {
+    // Açık bir binary semaphore oluştur
+    bsem := BinarySemaphore.New(true)
+    
+    // Başlangıçta kilitli olmamalı
+    if bsem.IsLocked() {
+        t.Error("Açık bir binary semaphore başlangıçta kilitli olmamalı")
+    }
+    
+    // Kilitle
+    bsem.Acquire()
+    
+    // Şimdi kilitli olmalı
+    if !bsem.IsLocked() {
+        t.Error("Acquire çağrıldıktan sonra binary semaphore kilitli olmalı")
+    }
+    
+    // TryAcquire false döndürmeli
+    if bsem.TryAcquire() {
+        t.Error("Kilitli bir binary semaphore için TryAcquire false döndürmeli")
+    }
+    
+    // Kilidi aç
+    bsem.Release()
+    
+    // Şimdi kilitli olmamalı
+    if bsem.IsLocked() {
+        t.Error("Release çağrıldıktan sonra binary semaphore kilitli olmamalı")
+    }
+    
+    // TryAcquire true döndürmeli
+    if !bsem.TryAcquire() {
+        t.Error("Açık bir binary semaphore için TryAcquire true döndürmeli")
+    }
+    
+    // Kapalı bir binary semaphore oluştur
+    bsem2 := BinarySemaphore.New(false)
+    
+    // Başlangıçta kilitli olmalı
+    if !bsem2.IsLocked() {
+        t.Error("Kapalı bir binary semaphore başlangıçta kilitli olmalı")
+    }
+}
+
+// TestBinarySemaphoreConcurrent, BinarySemaphore'un eşzamanlı kullanımını test eder.
+func TestBinarySemaphoreConcurrent(t *testing.T) {
+    // Açık bir binary semaphore oluştur
+    bsem := BinarySemaphore.New(true)
+    
+    // Kritik bölgeye giren goroutine sayısını takip etmek için
+    var counter int
+    var mu sync.Mutex
+    var wg sync.WaitGroup
+    
+    // Maksimum eşzamanlı erişim sayısını takip etmek için
+    var maxConcurrent int
+    
+    // 5 goroutine oluştur
+    for i := 0; i < 5; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            
+            // Binary semaphore'u kilitle
+            bsem.Acquire()
+            defer bsem.Release()
+            
+            // Kritik bölge
+            mu.Lock()
+            counter++
+            if counter > maxConcurrent {
+                maxConcurrent = counter
+            }
+            mu.Unlock()
+            
+            // Biraz bekle
+            time.Sleep(10 * time.Millisecond)
+            
+            // Kritik bölgeden çık
+            mu.Lock()
+            counter--
+            mu.Unlock()
+        }()
+    }
+    
+    // Tüm goroutine'lerin tamamlanmasını bekle
+    wg.Wait()
+    
+    // Maksimum eşzamanlı erişim sayısı 1 olmalı
+    if maxConcurrent > 1 {
+        t.Errorf("Maksimum eşzamanlı erişim sayısı 1 olmalı, alınan: %d", maxConcurrent)
+    }
+}

@@ -1,0 +1,267 @@
+// GO+ Standart Kütüphane - Deque Paketi Test
+package deque
+
+import (
+    "testing"
+)
+
+// TestDequeBasic, Deque<int> için temel testler içerir.
+func TestDequeBasic(t *testing.T) {
+    // Yeni bir Deque oluştur
+    d := Deque.New<int>(10)
+    
+    // Başlangıçta boş olmalı
+    if !d.IsEmpty() {
+        t.Error("Yeni oluşturulan deque boş olmalı")
+    }
+    
+    // Boyut 0 olmalı
+    if d.Size() != 0 {
+        t.Errorf("Beklenen boyut 0, alınan: %d", d.Size())
+    }
+    
+    // Kapasite 10 olmalı
+    if d.Capacity() != 10 {
+        t.Errorf("Beklenen kapasite 10, alınan: %d", d.Capacity())
+    }
+    
+    // Sona eleman ekle
+    d.PushBack(1)
+    d.PushBack(2)
+    d.PushBack(3)
+    
+    // Boyut 3 olmalı
+    if d.Size() != 3 {
+        t.Errorf("Beklenen boyut 3, alınan: %d", d.Size())
+    }
+    
+    // Artık boş olmamalı
+    if d.IsEmpty() {
+        t.Error("Eleman eklendikten sonra deque boş olmamalı")
+    }
+    
+    // Başa eleman ekle
+    d.PushFront(0)
+    d.PushFront(-1)
+    
+    // Boyut 5 olmalı
+    if d.Size() != 5 {
+        t.Errorf("Beklenen boyut 5, alınan: %d", d.Size())
+    }
+    
+    // Baştan ve sondan elemanları kontrol et
+    if d.Front() != -1 {
+        t.Errorf("Beklenen ön eleman -1, alınan: %d", d.Front())
+    }
+    
+    if d.Back() != 3 {
+        t.Errorf("Beklenen arka eleman 3, alınan: %d", d.Back())
+    }
+    
+    // Baştan eleman çıkar
+    if d.PopFront() != -1 {
+        t.Errorf("Beklenen çıkarılan eleman -1, alınan: %d", d.PopFront())
+    }
+    
+    // Boyut 4 olmalı
+    if d.Size() != 4 {
+        t.Errorf("Beklenen boyut 4, alınan: %d", d.Size())
+    }
+    
+    // Sondan eleman çıkar
+    if d.PopBack() != 3 {
+        t.Errorf("Beklenen çıkarılan eleman 3, alınan: %d", d.PopBack())
+    }
+    
+    // Boyut 3 olmalı
+    if d.Size() != 3 {
+        t.Errorf("Beklenen boyut 3, alınan: %d", d.Size())
+    }
+    
+    // Kalan elemanları kontrol et
+    expected := []int{0, 1, 2}
+    for i := 0; i < len(expected); i++ {
+        if d.At(i) != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], d.At(i))
+        }
+    }
+    
+    // Elemanı değiştir
+    d.Set(1, 10)
+    if d.At(1) != 10 {
+        t.Errorf("Beklenen eleman 10, alınan: %d", d.At(1))
+    }
+    
+    // Deque'yi temizle
+    d.Clear()
+    
+    // Boyut 0 olmalı
+    if d.Size() != 0 {
+        t.Errorf("Temizlendikten sonra beklenen boyut 0, alınan: %d", d.Size())
+    }
+    
+    // Deque boş olmalı
+    if !d.IsEmpty() {
+        t.Error("Temizlendikten sonra deque boş olmalı")
+    }
+}
+
+// TestDequeGrow, Deque'nin büyüme davranışını test eder.
+func TestDequeGrow(t *testing.T) {
+    // Küçük kapasiteli bir Deque oluştur
+    d := Deque.New<int>(2)
+    
+    // Kapasite 2 olmalı
+    if d.Capacity() != 2 {
+        t.Errorf("Beklenen kapasite 2, alınan: %d", d.Capacity())
+    }
+    
+    // Kapasiteden fazla eleman ekle
+    for i := 0; i < 10; i++ {
+        d.PushBack(i)
+    }
+    
+    // Boyut 10 olmalı
+    if d.Size() != 10 {
+        t.Errorf("Beklenen boyut 10, alınan: %d", d.Size())
+    }
+    
+    // Kapasite en az 10 olmalı
+    if d.Capacity() < 10 {
+        t.Errorf("Beklenen kapasite en az 10, alınan: %d", d.Capacity())
+    }
+    
+    // Elemanları kontrol et
+    for i := 0; i < 10; i++ {
+        if d.At(i) != i {
+            t.Errorf("Beklenen eleman %d, alınan: %d", i, d.At(i))
+        }
+    }
+}
+
+// TestDequeCircular, Deque'nin döngüsel davranışını test eder.
+func TestDequeCircular(t *testing.T) {
+    // Sabit kapasiteli bir Deque oluştur
+    d := Deque.New<int>(5)
+    
+    // Elemanları ekle
+    d.PushBack(1)
+    d.PushBack(2)
+    d.PushBack(3)
+    
+    // Baştan eleman çıkar
+    d.PopFront() // 1 çıkar
+    
+    // Sona eleman ekle
+    d.PushBack(4)
+    d.PushBack(5)
+    
+    // Şu anda deque: [2, 3, 4, 5]
+    
+    // Başa eleman ekle
+    d.PushFront(1)
+    
+    // Şu anda deque: [1, 2, 3, 4, 5]
+    
+    // Elemanları kontrol et
+    expected := []int{1, 2, 3, 4, 5}
+    for i := 0; i < len(expected); i++ {
+        if d.At(i) != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], d.At(i))
+        }
+    }
+    
+    // Sondan eleman çıkar
+    d.PopBack() // 5 çıkar
+    
+    // Baştan eleman çıkar
+    d.PopFront() // 1 çıkar
+    
+    // Şu anda deque: [2, 3, 4]
+    
+    // Elemanları kontrol et
+    expected = []int{2, 3, 4}
+    for i := 0; i < len(expected); i++ {
+        if d.At(i) != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], d.At(i))
+        }
+    }
+}
+
+// TestDequeFromArray, FromArray metodu için testler içerir.
+func TestDequeFromArray(t *testing.T) {
+    // Dizi oluştur
+    arr := []int{1, 2, 3, 4, 5}
+    
+    // Deque oluştur
+    d := Deque.New<int>(10)
+    
+    // Diziyi deque'ye dönüştür
+    d.FromArray(arr)
+    
+    // Boyut 5 olmalı
+    if d.Size() != 5 {
+        t.Errorf("Beklenen boyut 5, alınan: %d", d.Size())
+    }
+    
+    // Elemanları kontrol et
+    for i := 0; i < len(arr); i++ {
+        if d.At(i) != arr[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", arr[i], d.At(i))
+        }
+    }
+    
+    // Diziyi geri al
+    resultArr := d.ToArray()
+    
+    // Diziler eşit olmalı
+    if len(resultArr) != len(arr) {
+        t.Errorf("Beklenen dizi uzunluğu %d, alınan: %d", len(arr), len(resultArr))
+    }
+    
+    for i := 0; i < len(arr); i++ {
+        if resultArr[i] != arr[i] {
+            t.Errorf("Beklenen dizi elemanı %d, alınan: %d", arr[i], resultArr[i])
+        }
+    }
+}
+
+// TestDequeReserve, Reserve metodu için testler içerir.
+func TestDequeReserve(t *testing.T) {
+    // Deque oluştur
+    d := Deque.New<int>(5)
+    
+    // Elemanları ekle
+    d.PushBack(1)
+    d.PushBack(2)
+    d.PushBack(3)
+    
+    // Kapasiteyi artır
+    d.Reserve(10)
+    
+    // Kapasite 10 olmalı
+    if d.Capacity() != 10 {
+        t.Errorf("Beklenen kapasite 10, alınan: %d", d.Capacity())
+    }
+    
+    // Boyut 3 olmalı
+    if d.Size() != 3 {
+        t.Errorf("Beklenen boyut 3, alınan: %d", d.Size())
+    }
+    
+    // Elemanları kontrol et
+    expected := []int{1, 2, 3}
+    for i := 0; i < len(expected); i++ {
+        if d.At(i) != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], d.At(i))
+        }
+    }
+    
+    // Daha küçük kapasiteye ayarlamayı dene
+    d.Reserve(5)
+    
+    // Kapasite hala 10 olmalı (küçültme yapılmamalı)
+    if d.Capacity() != 10 {
+        t.Errorf("Beklenen kapasite 10, alınan: %d", d.Capacity())
+    }
+}

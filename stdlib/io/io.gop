@@ -1,0 +1,135 @@
+// GO+ Standart Kütüphane - IO Paketi
+package io
+
+import (
+    "io" // Go'nun io paketini kullan
+)
+
+// Reader, okuma işlemleri için bir arayüzdür.
+interface Reader {
+    func Read(p []byte) (n int, err error)
+}
+
+// Writer, yazma işlemleri için bir arayüzdür.
+interface Writer {
+    func Write(p []byte) (n int, err error)
+}
+
+// Closer, kapatma işlemleri için bir arayüzdür.
+interface Closer {
+    func Close() error
+}
+
+// Seeker, konumlandırma işlemleri için bir arayüzdür.
+interface Seeker {
+    func Seek(offset int64, whence int) (int64, error)
+}
+
+// ReadWriter, hem okuma hem de yazma işlemleri için bir arayüzdür.
+interface ReadWriter {
+    Reader
+    Writer
+}
+
+// ReadCloser, okuma ve kapatma işlemleri için bir arayüzdür.
+interface ReadCloser {
+    Reader
+    Closer
+}
+
+// WriteCloser, yazma ve kapatma işlemleri için bir arayüzdür.
+interface WriteCloser {
+    Writer
+    Closer
+}
+
+// ReadWriteCloser, okuma, yazma ve kapatma işlemleri için bir arayüzdür.
+interface ReadWriteCloser {
+    Reader
+    Writer
+    Closer
+}
+
+// ReadSeeker, okuma ve konumlandırma işlemleri için bir arayüzdür.
+interface ReadSeeker {
+    Reader
+    Seeker
+}
+
+// WriteSeeker, yazma ve konumlandırma işlemleri için bir arayüzdür.
+interface WriteSeeker {
+    Writer
+    Seeker
+}
+
+// ReadWriteSeeker, okuma, yazma ve konumlandırma işlemleri için bir arayüzdür.
+interface ReadWriteSeeker {
+    Reader
+    Writer
+    Seeker
+}
+
+// SeekStart, Seek işlemi için başlangıç konumunu belirtir.
+const SeekStart = io.SeekStart
+
+// SeekCurrent, Seek işlemi için mevcut konumu belirtir.
+const SeekCurrent = io.SeekCurrent
+
+// SeekEnd, Seek işlemi için son konumu belirtir.
+const SeekEnd = io.SeekEnd
+
+// EOF, dosya sonunu belirtir.
+const EOF = io.EOF
+
+// Copy, src'den dst'ye veri kopyalar.
+func Copy(dst Writer, src Reader) (written int64, err error) {
+    return io.Copy(dst, src)
+}
+
+// CopyN, src'den dst'ye en fazla n bayt veri kopyalar.
+func CopyN(dst Writer, src Reader, n int64) (written int64, err error) {
+    return io.CopyN(dst, src, n)
+}
+
+// ReadAll, r'den tüm veriyi okur.
+func ReadAll(r Reader) ([]byte, error) {
+    return io.ReadAll(r)
+}
+
+// ReadFull, r'den tam olarak len(buf) bayt okur.
+func ReadFull(r Reader, buf []byte) (n int, err error) {
+    return io.ReadFull(r, buf)
+}
+
+// WriteString, s dizesini w'ye yazar.
+func WriteString(w Writer, s string) (n int, err error) {
+    return io.WriteString(w, s)
+}
+
+// NopCloser, bir Reader'ı ReadCloser'a dönüştürür.
+func NopCloser(r Reader) ReadCloser {
+    return io.NopCloser(r)
+}
+
+// LimitReader, r'den en fazla n bayt okur.
+func LimitReader(r Reader, n int64) Reader {
+    return io.LimitReader(r, n)
+}
+
+// MultiReader, birden fazla Reader'ı tek bir Reader olarak birleştirir.
+func MultiReader(readers ...Reader) Reader {
+    return io.MultiReader(readers...)
+}
+
+// MultiWriter, birden fazla Writer'ı tek bir Writer olarak birleştirir.
+func MultiWriter(writers ...Writer) Writer {
+    return io.MultiWriter(writers...)
+}
+
+// TeeReader, r'den okunan veriyi w'ye de yazar.
+func TeeReader(r Reader, w Writer) Reader {
+    return io.TeeReader(r, w)
+}
+
+// Discard, yazılan tüm veriyi atar.
+var Discard Writer = io.Discard

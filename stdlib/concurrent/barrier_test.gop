@@ -1,0 +1,279 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - Barrier Test
+package concurrent
+
+import (
+    "testing"
+    "time"
+    "sync"
+    "sync/atomic"
+)
+
+// TestBarrierBasic, Barrier için temel testler içerir.
+func TestBarrierBasic(t *testing.T) {
+    // 3 goroutine için bir bariyer oluştur
+    b := Barrier.New(3)
+    
+    // Beklenen goroutine sayısı 3 olmalı
+    if b.GetCount() != 3 {
+        t.Errorf("Beklenen goroutine sayısı 3, alınan: %d", b.GetCount())
+    }
+    
+    // Bekleyen goroutine sayısı 0 olmalı
+    if b.GetWaiting() != 0 {
+        t.Errorf("Beklenen bekleyen goroutine sayısı 0, alınan: %d", b.GetWaiting())
+    }
+    
+    // Bariyeri test etmek için
+    var wg sync.WaitGroup
+    var arrived int32 // Bariyere ulaşan goroutine sayısı
+    var passed int32  // Bariyeri geçen goroutine sayısı
+    
+    // 3 goroutine oluştur
+    for i := 0; i < 3; i++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            
+            // Bariyere ulaşmadan önce biraz bekle (farklı süreler)
+            time.Sleep(time.Duration(id*10) * time.Millisecond)
+            
+            // Bariyere ulaştı
+            atomic.AddInt32(&arrived, 1)
+            
+            // Bariyerde bekle
+            b.Wait()
+            
+            // Bariyeri geçti
+            atomic.AddInt32(&passed, 1)
+        }(i)
+    }
+    
+    // Tüm goroutine'lerin tamamlanmasını bekle
+    wg.Wait()
+    
+    // Tüm goroutine'ler bariyere ulaşmış olmalı
+    if arrived != 3 {
+        t.Errorf("Beklenen bariyere ulaşan goroutine sayısı 3, alınan: %d", arrived)
+    }
+    
+    // Tüm goroutine'ler bariyeri geçmiş olmalı
+    if passed != 3 {
+        t.Errorf("Beklenen bariyeri geçen goroutine sayısı 3, alınan: %d", passed)
+    }
+}
+
+// TestBarrierReset, Reset metodunu test eder.
+func TestBarrierReset(t *testing.T) {
+    // 3 goroutine için bir bariyer oluştur
+    b := Barrier.New(3)
+    
+    // Bir goroutine bariyerde beklesin
+    var wg sync.WaitGroup
+    wg.Add(1)
+    
+    go func() {
+        defer wg.Done()
+        
+        // Bariyerde bekle
+        done := make(chan bool)
+        go func() {
+            b.Wait() // Bu, Reset çağrılana kadar bloke olacak
+            done <- true
+        }()
+        
+        // Kısa bir süre bekle
+        time.Sleep(50 * time.Millisecond)
+        
+        // Bekleyen goroutine sayısı 1 olmalı
+        if b.GetWaiting() != 1 {
+            t.Errorf("Beklenen bekleyen goroutine sayısı 1, alınan: %d", b.GetWaiting())
+        }
+        
+        // Bariyeri sıfırla
+        b.Reset()
+        
+        // Goroutine'in devam etmesini bekle
+        select {
+        case <-done:
+            // Başarılı
+        case <-time.After(100 * time.Millisecond):
+            t.Error("Bariyer sıfırlandıktan sonra goroutine devam etmedi")
+        }
+    }()
+    
+    // Goroutine'in tamamlanmasını bekle
+    wg.Wait()
+    
+    // Bekleyen goroutine sayısı 0 olmalı
+    if b.GetWaiting() != 0 {
+        t.Errorf("Beklenen bekleyen goroutine sayısı 0, alınan: %d", b.GetWaiting())
+    }
+}
+
+// TestBarrierSetCount, SetCount metodunu test eder.
+func TestBarrierSetCount(t *testing.T) {
+    // 3 goroutine için bir bariyer oluştur
+    b := Barrier.New(3)
+    
+    // İki goroutine bariyerde beklesin
+    var wg sync.WaitGroup
+    wg.Add(2)
+    
+    for i := 0; i < 2; i++ {
+        go func() {
+            defer wg.Done()
+            
+            // Bariyerde bekle
+            done := make(chan bool)
+            go func() {
+                b.Wait() // Bu, SetCount çağrılana kadar bloke olacak
+                done <- true
+            }()
+            
+            // Kısa bir süre bekle
+            time.Sleep(50 * time.Millisecond)
+            
+            // Bariyer sayısını 2'ye düşür
+            b.SetCount(2)
+            
+            // Goroutine'in devam etmesini bekle
+            select {
+            case <-done:
+                // Başarılı
+            case <-time.After(100 * time.Millisecond):
+                t.Error("Bariyer sayısı değiştirildikten sonra goroutine devam etmedi")
+            }
+        }()
+    }
+    
+    // Goroutine'lerin tamamlanmasını bekle
+    wg.Wait()
+}
+
+// TestBarrierWaitWithTimeout, WaitWithTimeout metodunu test eder.
+func TestBarrierWaitWithTimeout(t *testing.T) {
+    // 3 goroutine için bir bariyer oluştur
+    b := Barrier.New(3)
+    
+    // Zaman aşımı ile bekleyen bir goroutine
+    var wg sync.WaitGroup
+    wg.Add(1)
+    
+    go func() {
+        defer wg.Done()
+        
+        // Kısa bir zaman aşımı ile bekle
+        start := time.Now()
+        result := b.WaitWithTimeout(50 * time.Millisecond)
+        elapsed := time.Since(start)
+        
+        // Sonuç false olmalı (zaman aşımı)
+        if result {
+            t.Error("Zaman aşımında WaitWithTimeout false döndürmeli")
+        }
+        
+        // Geçen süre yaklaşık 50ms olmalı
+        if elapsed < 40*time.Millisecond || elapsed > 100*time.Millisecond {
+            t.Errorf("Beklenen zaman aşımı süresi ~50ms, alınan: %v", elapsed)
+        }
+    }()
+    
+    // Goroutine'in tamamlanmasını bekle
+    wg.Wait()
+    
+    // Bekleyen goroutine sayısı 0 olmalı
+    if b.GetWaiting() != 0 {
+        t.Errorf("Beklenen bekleyen goroutine sayısı 0, alınan: %d", b.GetWaiting())
+    }
+}
+
+// TestCyclicBarrierBasic, CyclicBarrier için temel testler içerir.
+func TestCyclicBarrierBasic(t *testing.T) {
+    // Eylem çalıştırma sayısını takip etmek için
+    var actionCount int32
+    
+    // 3 goroutine için bir döngüsel bariyer oluştur
+    cb := CyclicBarrier.New(3, func() {
+        atomic.AddInt32(&actionCount, 1)
+    })
+    
+    // Beklenen goroutine sayısı 3 olmalı
+    if cb.GetParties() != 3 {
+        t.Errorf("Beklenen goroutine sayısı 3, alınan: %d", cb.GetParties())
+    }
+    
+    // Bekleyen goroutine sayısı 0 olmalı
+    if cb.GetNumberWaiting() != 0 {
+        t.Errorf("Beklenen bekleyen goroutine sayısı 0, alınan: %d", cb.GetNumberWaiting())
+    }
+    
+    // Bariyeri test etmek için
+    var wg sync.WaitGroup
+    
+    // 3 goroutine oluştur, her biri 2 kez bariyeri geçecek
+    for i := 0; i < 3; i++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            
+            // İlk tur
+            time.Sleep(time.Duration(id*10) * time.Millisecond)
+            cb.Wait()
+            
+            // İkinci tur
+            time.Sleep(time.Duration(id*10) * time.Millisecond)
+            cb.Wait()
+        }(i)
+    }
+    
+    // Tüm goroutine'lerin tamamlanmasını bekle
+    wg.Wait()
+    
+    // Eylem 2 kez çalıştırılmış olmalı
+    if actionCount != 2 {
+        t.Errorf("Beklenen eylem çalıştırma sayısı 2, alınan: %d", actionCount)
+    }
+}
+
+// TestCyclicBarrierReset, Reset metodunu test eder.
+func TestCyclicBarrierReset(t *testing.T) {
+    // 3 goroutine için bir döngüsel bariyer oluştur
+    cb := CyclicBarrier.New(3, nil)
+    
+    // Bir goroutine bariyerde beklesin
+    var wg sync.WaitGroup
+    wg.Add(1)
+    
+    go func() {
+        defer wg.Done()
+        
+        // Bariyerde bekle
+        done := make(chan bool)
+        go func() {
+            cb.Wait() // Bu, Reset çağrılana kadar bloke olacak
+            done <- true
+        }()
+        
+        // Kısa bir süre bekle
+        time.Sleep(50 * time.Millisecond)
+        
+        // Bekleyen goroutine sayısı 1 olmalı
+        if cb.GetNumberWaiting() != 1 {
+            t.Errorf("Beklenen bekleyen goroutine sayısı 1, alınan: %d", cb.GetNumberWaiting())
+        }
+        
+        // Bariyeri sıfırla
+        cb.Reset()
+        
+        // Goroutine'in devam etmesini bekle
+        select {
+        case <-done:
+            // Başarılı
+        case <-time.After(100 * time.Millisecond):
+            t.Error("Bariyer sıfırlandıktan sonra goroutine devam etmedi")
+        }
+    }()
+    
+    // Goroutine'in tamamlanmasını bekle
+    wg.Wait()
+}

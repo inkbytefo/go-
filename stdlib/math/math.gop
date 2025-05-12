@@ -1,0 +1,226 @@
+// GO+ Standart Kütüphane - Math Paketi
+package math
+
+import (
+    "math" // Go'nun math paketini kullan
+)
+
+// Pi, π (pi) sabitini temsil eder.
+const Pi = math.Pi
+
+// E, e (Euler sayısı) sabitini temsil eder.
+const E = math.E
+
+// Phi, φ (altın oran) sabitini temsil eder.
+const Phi = math.Phi
+
+// Sqrt2, 2'nin karekökünü temsil eder.
+const Sqrt2 = math.Sqrt2
+
+// SqrtE, e'nin karekökünü temsil eder.
+const SqrtE = math.SqrtE
+
+// SqrtPi, π'nin karekökünü temsil eder.
+const SqrtPi = math.SqrtPi
+
+// SqrtPhi, φ'nin karekökünü temsil eder.
+const SqrtPhi = math.SqrtPhi
+
+// Ln2, 2'nin doğal logaritmasını temsil eder.
+const Ln2 = math.Ln2
+
+// Log2E, e'nin 2 tabanında logaritmasını temsil eder.
+const Log2E = math.Log2E
+
+// Ln10, 10'un doğal logaritmasını temsil eder.
+const Ln10 = math.Ln10
+
+// Log10E, e'nin 10 tabanında logaritmasını temsil eder.
+const Log10E = math.Log10E
+
+// MaxFloat32, bir float32 değişkeninin alabileceği en büyük sonlu değeri temsil eder.
+const MaxFloat32 = math.MaxFloat32
+
+// SmallestNonzeroFloat32, bir float32 değişkeninin alabileceği sıfır olmayan en küçük pozitif değeri temsil eder.
+const SmallestNonzeroFloat32 = math.SmallestNonzeroFloat32
+
+// MaxFloat64, bir float64 değişkeninin alabileceği en büyük sonlu değeri temsil eder.
+const MaxFloat64 = math.MaxFloat64
+
+// SmallestNonzeroFloat64, bir float64 değişkeninin alabileceği sıfır olmayan en küçük pozitif değeri temsil eder.
+const SmallestNonzeroFloat64 = math.SmallestNonzeroFloat64
+
+// Inf, işaretli sonsuzluğu döndürür.
+func Inf(sign int) float64 {
+    return math.Inf(sign)
+}
+
+// NaN, bir "Sayı Değil" (Not-a-Number) değeri döndürür.
+func NaN() float64 {
+    return math.NaN()
+}
+
+// IsNaN, f'nin bir NaN olup olmadığını kontrol eder.
+func IsNaN(f float64) bool {
+    return math.IsNaN(f)
+}
+
+// IsInf, f'nin bir sonsuzluk olup olmadığını kontrol eder.
+func IsInf(f float64, sign int) bool {
+    return math.IsInf(f, sign)
+}
+
+// Abs, x'in mutlak değerini döndürür.
+func Abs(x float64) float64 {
+    return math.Abs(x)
+}
+
+// Acos, x'in ark kosinüsünü radyan cinsinden döndürür.
+func Acos(x float64) float64 {
+    return math.Acos(x)
+}
+
+// Acosh, x'in hiperbolik ark kosinüsünü döndürür.
+func Acosh(x float64) float64 {
+    return math.Acosh(x)
+}
+
+// Asin, x'in ark sinüsünü radyan cinsinden döndürür.
+func Asin(x float64) float64 {
+    return math.Asin(x)
+}
+
+// Asinh, x'in hiperbolik ark sinüsünü döndürür.
+func Asinh(x float64) float64 {
+    return math.Asinh(x)
+}
+
+// Atan, x'in ark tanjantını radyan cinsinden döndürür.
+func Atan(x float64) float64 {
+    return math.Atan(x)
+}
+
+// Atan2, y/x'in ark tanjantını radyan cinsinden döndürür.
+func Atan2(y, x float64) float64 {
+    return math.Atan2(y, x)
+}
+
+// Atanh, x'in hiperbolik ark tanjantını döndürür.
+func Atanh(x float64) float64 {
+    return math.Atanh(x)
+}
+
+// Cbrt, x'in küp kökünü döndürür.
+func Cbrt(x float64) float64 {
+    return math.Cbrt(x)
+}
+
+// Ceil, x'ten büyük veya ona eşit en küçük tamsayıyı döndürür.
+func Ceil(x float64) float64 {
+    return math.Ceil(x)
+}
+
+// Copysign, x'in mutlak değerini y'nin işaretiyle döndürür.
+func Copysign(x, y float64) float64 {
+    return math.Copysign(x, y)
+}
+
+// Cos, x radyanının kosinüsünü döndürür.
+func Cos(x float64) float64 {
+    return math.Cos(x)
+}
+
+// Cosh, x'in hiperbolik kosinüsünü döndürür.
+func Cosh(x float64) float64 {
+    return math.Cosh(x)
+}
+
+// Exp, e^x değerini döndürür.
+func Exp(x float64) float64 {
+    return math.Exp(x)
+}
+
+// Exp2, 2^x değerini döndürür.
+func Exp2(x float64) float64 {
+    return math.Exp2(x)
+}
+
+// Floor, x'ten küçük veya ona eşit en büyük tamsayıyı döndürür.
+func Floor(x float64) float64 {
+    return math.Floor(x)
+}
+
+// Hypot, sqrt(p*p + q*q) değerini taşma veya alttan taşma olmadan döndürür.
+func Hypot(p, q float64) float64 {
+    return math.Hypot(p, q)
+}
+
+// Log, x'in doğal logaritmasını döndürür.
+func Log(x float64) float64 {
+    return math.Log(x)
+}
+
+// Log10, x'in 10 tabanında logaritmasını döndürür.
+func Log10(x float64) float64 {
+    return math.Log10(x)
+}
+
+// Log2, x'in 2 tabanında logaritmasını döndürür.
+func Log2(x float64) float64 {
+    return math.Log2(x)
+}
+
+// Max, x ve y'nin maksimumunu döndürür.
+func Max(x, y float64) float64 {
+    return math.Max(x, y)
+}
+
+// Min, x ve y'nin minimumunu döndürür.
+func Min(x, y float64) float64 {
+    return math.Min(x, y)
+}
+
+// Mod, x/y'nin kalan kısmını döndürür.
+func Mod(x, y float64) float64 {
+    return math.Mod(x, y)
+}
+
+// Pow, x^y değerini döndürür.
+func Pow(x, y float64) float64 {
+    return math.Pow(x, y)
+}
+
+// Round, x'i en yakın tamsayıya yuvarlar.
+func Round(x float64) float64 {
+    return math.Round(x)
+}
+
+// Sin, x radyanının sinüsünü döndürür.
+func Sin(x float64) float64 {
+    return math.Sin(x)
+}
+
+// Sinh, x'in hiperbolik sinüsünü döndürür.
+func Sinh(x float64) float64 {
+    return math.Sinh(x)
+}
+
+// Sqrt, x'in karekökünü döndürür.
+func Sqrt(x float64) float64 {
+    return math.Sqrt(x)
+}
+
+// Tan, x radyanının tanjantını döndürür.
+func Tan(x float64) float64 {
+    return math.Tan(x)
+}
+
+// Tanh, x'in hiperbolik tanjantını döndürür.
+func Tanh(x float64) float64 {
+    return math.Tanh(x)
+}
+
+// Trunc, x'in tam kısmını döndürür.
+func Trunc(x float64) float64 {
+    return math.Trunc(x)
+}

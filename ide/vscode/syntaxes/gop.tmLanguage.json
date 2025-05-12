@@ -1,0 +1,171 @@
+{
+  "name": "GO+",
+  "scopeName": "source.goplus",
+  "fileTypes": ["gop"],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#storage"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#support"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.goplus",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.goplus",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.goplus",
+          "match": "\\b(if|else|for|while|switch|case|default|break|continue|return|goto|try|catch|finally|throw)\\b"
+        },
+        {
+          "name": "keyword.other.goplus",
+          "match": "\\b(package|import|func|interface|map|chan|go|defer|select|this|super)\\b"
+        }
+      ]
+    },
+    "storage": {
+      "patterns": [
+        {
+          "name": "storage.type.goplus",
+          "match": "\\b(var|const|type|struct|class|template|public|private|protected|static|final|abstract|extends|implements)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.goplus",
+          "match": "\\b(bool|byte|int|int8|int16|int32|int64|uint|uint8|uint16|uint32|uint64|float32|float64|complex64|complex128|string|rune|error)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.goplus",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.goplus",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.goplus",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.goplus",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.goplus",
+          "begin": "`",
+          "end": "`"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.goplus",
+          "match": "(\\+|\\-|\\*|\\/|\\%|\\&|\\||\\^|\\!|\\=|\\<|\\>|\\?|\\:|\\.|\\,|\\;)"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.goplus",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.goplus",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.goplus",
+          "match": "\\b(true|false|nil|iota)\\b"
+        },
+        {
+          "name": "constant.numeric.integer.goplus",
+          "match": "\\b([0-9]+)\\b"
+        },
+        {
+          "name": "constant.numeric.float.goplus",
+          "match": "\\b([0-9]+\\.[0-9]+)\\b"
+        },
+        {
+          "name": "constant.numeric.hex.goplus",
+          "match": "\\b(0[xX][0-9a-fA-F]+)\\b"
+        },
+        {
+          "name": "constant.numeric.octal.goplus",
+          "match": "\\b(0[0-7]+)\\b"
+        },
+        {
+          "name": "constant.numeric.binary.goplus",
+          "match": "\\b(0[bB][01]+)\\b"
+        }
+      ]
+    },
+    "support": {
+      "patterns": [
+        {
+          "name": "support.function.goplus",
+          "match": "\\b(append|cap|close|complex|copy|delete|imag|len|make|new|panic|print|println|real|recover)\\b"
+        }
+      ]
+    }
+  }
+}

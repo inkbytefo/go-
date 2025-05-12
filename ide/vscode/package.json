@@ -1,0 +1,221 @@
+{
+  "name": "goplus",
+  "displayName": "GO+ Language Support",
+  "description": "GO+ dili için sözdizimi vurgulama, kod tamamlama, hata ayıklama ve diğer özellikler",
+  "version": "0.1.0",
+  "publisher": "goplus",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Formatters",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:goplus",
+    "onCommand:goplus.startLanguageServer",
+    "onCommand:goplus.stopLanguageServer",
+    "onCommand:goplus.restartLanguageServer",
+    "onCommand:goplus.startDebugging",
+    "onCommand:goplus.formatDocument",
+    "onCommand:goplus.runTests",
+    "onCommand:goplus.runCurrentFile"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "goplus",
+        "aliases": [
+          "GO+",
+          "goplus"
+        ],
+        "extensions": [
+          ".gop"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "goplus",
+        "scopeName": "source.goplus",
+        "path": "./syntaxes/gop.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "GO+",
+      "properties": {
+        "goplus.languageServerPath": {
+          "type": "string",
+          "default": "goplsp",
+          "description": "GO+ dil sunucusu yolu"
+        },
+        "goplus.debuggerPath": {
+          "type": "string",
+          "default": "gopdebug",
+          "description": "GO+ hata ayıklama aracı yolu"
+        },
+        "goplus.formatOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Kaydetme sırasında GO+ dosyalarını biçimlendir"
+        },
+        "goplus.lintOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Kaydetme sırasında GO+ dosyalarını denetle"
+        },
+        "goplus.testOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Kaydetme sırasında GO+ testlerini çalıştır"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "goplus.startLanguageServer",
+        "title": "GO+: Dil Sunucusunu Başlat"
+      },
+      {
+        "command": "goplus.stopLanguageServer",
+        "title": "GO+: Dil Sunucusunu Durdur"
+      },
+      {
+        "command": "goplus.restartLanguageServer",
+        "title": "GO+: Dil Sunucusunu Yeniden Başlat"
+      },
+      {
+        "command": "goplus.startDebugging",
+        "title": "GO+: Hata Ayıklamayı Başlat"
+      },
+      {
+        "command": "goplus.formatDocument",
+        "title": "GO+: Belgeyi Biçimlendir"
+      },
+      {
+        "command": "goplus.runTests",
+        "title": "GO+: Testleri Çalıştır"
+      },
+      {
+        "command": "goplus.runCurrentFile",
+        "title": "GO+: Mevcut Dosyayı Çalıştır"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorLangId == goplus",
+          "command": "goplus.formatDocument",
+          "group": "1_modification"
+        },
+        {
+          "when": "editorLangId == goplus",
+          "command": "goplus.runCurrentFile",
+          "group": "2_execution"
+        },
+        {
+          "when": "editorLangId == goplus",
+          "command": "goplus.startDebugging",
+          "group": "2_execution"
+        }
+      ]
+    },
+    "debuggers": [
+      {
+        "type": "goplus",
+        "label": "GO+ Debugger",
+        "program": "./out/debugAdapter.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Çalıştırılacak GO+ programının yolu",
+                "default": "${file}"
+              },
+              "args": {
+                "type": "array",
+                "description": "Program için komut satırı argümanları",
+                "default": []
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Programın çalışma dizini",
+                "default": "${workspaceFolder}"
+              },
+              "env": {
+                "type": "object",
+                "description": "Programın ortam değişkenleri",
+                "default": {}
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Programın başlangıcında otomatik olarak dur",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "goplus",
+            "request": "launch",
+            "name": "GO+ Programını Çalıştır",
+            "program": "${file}",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "GO+: Programı Çalıştır",
+            "description": "GO+ programını hata ayıklama modunda çalıştır",
+            "body": {
+              "type": "goplus",
+              "request": "launch",
+              "name": "GO+ Programını Çalıştır",
+              "program": "^\"\\${file}\"",
+              "args": [],
+              "cwd": "^\"\\${workspaceFolder}\"",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.60.0",
+    "@types/glob": "^7.1.3",
+    "@types/mocha": "^8.2.2",
+    "@types/node": "14.x",
+    "eslint": "^7.27.0",
+    "@typescript-eslint/eslint-plugin": "^4.26.0",
+    "@typescript-eslint/parser": "^4.26.0",
+    "glob": "^7.1.7",
+    "mocha": "^8.4.0",
+    "typescript": "^4.3.2",
+    "vscode-test": "^1.5.2"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^7.0.0"
+  }
+}

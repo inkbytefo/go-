@@ -1,0 +1,202 @@
+// GO+ Standart Kütüphane - Deque Paketi
+package deque
+
+// Deque, çift uçlu kuyruk implementasyonudur.
+// Hem baştan hem de sondan eleman ekleme ve çıkarma işlemlerini destekler.
+class Deque<T> {
+    private var elements []T
+    private var front int // Ön elemanın indeksi
+    private var back int  // Arka elemanın indeksi + 1
+    private var capacity int
+    private var size int
+
+    // New, belirtilen kapasiteye sahip yeni bir Deque oluşturur.
+    static func New<T>(initialCapacity int) *Deque<T> {
+        if initialCapacity < 1 {
+            initialCapacity = 16 // Varsayılan kapasite
+        }
+        
+        d := new Deque<T>()
+        d.elements = make([]T, initialCapacity)
+        d.front = 0
+        d.back = 0
+        d.capacity = initialCapacity
+        d.size = 0
+        
+        return d
+    }
+
+    // Size, deque'deki eleman sayısını döndürür.
+    func (d *Deque<T>) Size() int {
+        return d.size
+    }
+
+    // Capacity, deque'nin mevcut kapasitesini döndürür.
+    func (d *Deque<T>) Capacity() int {
+        return d.capacity
+    }
+
+    // IsEmpty, deque'nin boş olup olmadığını kontrol eder.
+    func (d *Deque<T>) IsEmpty() bool {
+        return d.size == 0
+    }
+
+    // PushFront, deque'nin başına bir eleman ekler.
+    func (d *Deque<T>) PushFront(element T) {
+        if d.size == d.capacity {
+            d.grow()
+        }
+        
+        // front indeksini bir azalt ve döngüsel olarak ayarla
+        d.front = (d.front - 1 + d.capacity) % d.capacity
+        d.elements[d.front] = element
+        d.size++
+    }
+
+    // PushBack, deque'nin sonuna bir eleman ekler.
+    func (d *Deque<T>) PushBack(element T) {
+        if d.size == d.capacity {
+            d.grow()
+        }
+        
+        d.elements[d.back] = element
+        // back indeksini bir artır ve döngüsel olarak ayarla
+        d.back = (d.back + 1) % d.capacity
+        d.size++
+    }
+
+    // PopFront, deque'nin başındaki elemanı çıkarır ve döndürür.
+    // Eğer deque boşsa, panik oluşturur.
+    func (d *Deque<T>) PopFront() T {
+        if d.size == 0 {
+            throw "deque: PopFront called on empty deque"
+        }
+        
+        element := d.elements[d.front]
+        // front indeksini bir artır ve döngüsel olarak ayarla
+        d.front = (d.front + 1) % d.capacity
+        d.size--
+        
+        return element
+    }
+
+    // PopBack, deque'nin sonundaki elemanı çıkarır ve döndürür.
+    // Eğer deque boşsa, panik oluşturur.
+    func (d *Deque<T>) PopBack() T {
+        if d.size == 0 {
+            throw "deque: PopBack called on empty deque"
+        }
+        
+        // back indeksini bir azalt ve döngüsel olarak ayarla
+        d.back = (d.back - 1 + d.capacity) % d.capacity
+        element := d.elements[d.back]
+        d.size--
+        
+        return element
+    }
+
+    // Front, deque'nin başındaki elemanı döndürür ancak çıkarmaz.
+    // Eğer deque boşsa, panik oluşturur.
+    func (d *Deque<T>) Front() T {
+        if d.size == 0 {
+            throw "deque: Front called on empty deque"
+        }
+        
+        return d.elements[d.front]
+    }
+
+    // Back, deque'nin sonundaki elemanı döndürür ancak çıkarmaz.
+    // Eğer deque boşsa, panik oluşturur.
+    func (d *Deque<T>) Back() T {
+        if d.size == 0 {
+            throw "deque: Back called on empty deque"
+        }
+        
+        // back indeksinin bir önceki elemanı (döngüsel olarak)
+        backIndex := (d.back - 1 + d.capacity) % d.capacity
+        return d.elements[backIndex]
+    }
+
+    // At, belirtilen indeksteki elemanı döndürür.
+    // Eğer indeks geçersizse, panik oluşturur.
+    func (d *Deque<T>) At(index int) T {
+        if index < 0 || index >= d.size {
+            throw "deque: index out of range"
+        }
+        
+        // Fiziksel indeksi hesapla (döngüsel olarak)
+        physicalIndex := (d.front + index) % d.capacity
+        return d.elements[physicalIndex]
+    }
+
+    // Set, belirtilen indeksteki elemanı değiştirir.
+    // Eğer indeks geçersizse, panik oluşturur.
+    func (d *Deque<T>) Set(index int, element T) {
+        if index < 0 || index >= d.size {
+            throw "deque: index out of range"
+        }
+        
+        // Fiziksel indeksi hesapla (döngüsel olarak)
+        physicalIndex := (d.front + index) % d.capacity
+        d.elements[physicalIndex] = element
+    }
+
+    // Clear, deque'deki tüm elemanları kaldırır.
+    func (d *Deque<T>) Clear() {
+        d.front = 0
+        d.back = 0
+        d.size = 0
+    }
+
+    // ToArray, deque'deki elemanları bir dizi olarak döndürür.
+    func (d *Deque<T>) ToArray() []T {
+        result := make([]T, d.size)
+        for i := 0; i < d.size; i++ {
+            physicalIndex := (d.front + i) % d.capacity
+            result[i] = d.elements[physicalIndex]
+        }
+        return result
+    }
+
+    // FromArray, verilen diziyi kullanarak deque'yi oluşturur.
+    func (d *Deque<T>) FromArray(arr []T) {
+        newCapacity := len(arr)
+        if newCapacity < 16 {
+            newCapacity = 16 // Minimum kapasite
+        }
+        
+        d.elements = make([]T, newCapacity)
+        d.capacity = newCapacity
+        d.size = len(arr)
+        d.front = 0
+        d.back = d.size % d.capacity
+        
+        for i := 0; i < len(arr); i++ {
+            d.elements[i] = arr[i]
+        }
+    }
+
+    // Reserve, deque'nin kapasitesini en az belirtilen değere ayarlar.
+    func (d *Deque<T>) Reserve(newCapacity int) {
+        if newCapacity <= d.capacity {
+            return
+        }
+        
+        newElements := make([]T, newCapacity)
+        for i := 0; i < d.size; i++ {
+            physicalIndex := (d.front + i) % d.capacity
+            newElements[i] = d.elements[physicalIndex]
+        }
+        
+        d.elements = newElements
+        d.front = 0
+        d.back = d.size % newCapacity
+        d.capacity = newCapacity
+    }
+
+    // Kapasite yetersiz olduğunda deque'yi büyütür.
+    private func (d *Deque<T>) grow() {
+        newCapacity := d.capacity * 2
+        d.Reserve(newCapacity)
+    }
+}

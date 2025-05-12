@@ -1,0 +1,126 @@
+// GO+ Standart Kütüphane - Vector Paketi
+package vector
+
+// Vector, dinamik boyutlu bir dizi implementasyonudur.
+class Vector<T> {
+    private var elements []T
+    private var size int
+    private var capacity int
+
+    // New, belirtilen kapasiteye sahip yeni bir Vector oluşturur.
+    static func New<T>(initialCapacity int) *Vector<T> {
+        v := new Vector<T>()
+        v.elements = make([]T, initialCapacity)
+        v.size = 0
+        v.capacity = initialCapacity
+        return v
+    }
+
+    // Size, vektördeki eleman sayısını döndürür.
+    func (v *Vector<T>) Size() int {
+        return v.size
+    }
+
+    // Capacity, vektörün mevcut kapasitesini döndürür.
+    func (v *Vector<T>) Capacity() int {
+        return v.capacity
+    }
+
+    // IsEmpty, vektörün boş olup olmadığını kontrol eder.
+    func (v *Vector<T>) IsEmpty() bool {
+        return v.size == 0
+    }
+
+    // At, belirtilen indeksteki elemanı döndürür.
+    // Eğer indeks geçersizse, panik oluşturur.
+    func (v *Vector<T>) At(index int) T {
+        if index < 0 || index >= v.size {
+            throw "vector: index out of range"
+        }
+        return v.elements[index]
+    }
+
+    // Set, belirtilen indeksteki elemanı değiştirir.
+    // Eğer indeks geçersizse, panik oluşturur.
+    func (v *Vector<T>) Set(index int, element T) {
+        if index < 0 || index >= v.size {
+            throw "vector: index out of range"
+        }
+        v.elements[index] = element
+    }
+
+    // PushBack, vektörün sonuna bir eleman ekler.
+    func (v *Vector<T>) PushBack(element T) {
+        if v.size == v.capacity {
+            v.grow()
+        }
+        v.elements[v.size] = element
+        v.size++
+    }
+
+    // PopBack, vektörün sonundaki elemanı kaldırır ve döndürür.
+    // Eğer vektör boşsa, panik oluşturur.
+    func (v *Vector<T>) PopBack() T {
+        if v.size == 0 {
+            throw "vector: PopBack called on empty vector"
+        }
+        v.size--
+        return v.elements[v.size]
+    }
+
+    // Insert, belirtilen indekse bir eleman ekler.
+    // Eğer indeks geçersizse, panik oluşturur.
+    func (v *Vector<T>) Insert(index int, element T) {
+        if index < 0 || index > v.size {
+            throw "vector: index out of range"
+        }
+        if v.size == v.capacity {
+            v.grow()
+        }
+        // Elemanları kaydır
+        for i := v.size; i > index; i-- {
+            v.elements[i] = v.elements[i-1]
+        }
+        v.elements[index] = element
+        v.size++
+    }
+
+    // Erase, belirtilen indeksteki elemanı kaldırır.
+    // Eğer indeks geçersizse, panik oluşturur.
+    func (v *Vector<T>) Erase(index int) {
+        if index < 0 || index >= v.size {
+            throw "vector: index out of range"
+        }
+        // Elemanları kaydır
+        for i := index; i < v.size-1; i++ {
+            v.elements[i] = v.elements[i+1]
+        }
+        v.size--
+    }
+
+    // Clear, vektördeki tüm elemanları kaldırır.
+    func (v *Vector<T>) Clear() {
+        v.size = 0
+    }
+
+    // Reserve, vektörün kapasitesini en az belirtilen değere ayarlar.
+    func (v *Vector<T>) Reserve(newCapacity int) {
+        if newCapacity > v.capacity {
+            newElements := make([]T, newCapacity)
+            for i := 0; i < v.size; i++ {
+                newElements[i] = v.elements[i]
+            }
+            v.elements = newElements
+            v.capacity = newCapacity
+        }
+    }
+
+    // Kapasite yetersiz olduğunda vektörü büyütür.
+    private func (v *Vector<T>) grow() {
+        newCapacity := v.capacity * 2
+        if newCapacity == 0 {
+            newCapacity = 1
+        }
+        v.Reserve(newCapacity)
+    }
+}

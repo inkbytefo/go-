@@ -1,0 +1,244 @@
+// GO+ Standart Kütüphane - Concurrent Paketi - ThreadPool
+package concurrent
+
+import (
+    "sync"
+    "time"
+)
+
+// Task, thread pool'da çalıştırılacak bir görevi temsil eder.
+class Task {
+    private var fn func() interface{} // Çalıştırılacak fonksiyon
+    private var result interface{} // Görevin sonucu
+    private var err interface{} // Görev sırasında oluşan hata
+    private var done bool // Görevin tamamlanıp tamamlanmadığı
+    private var mu sync.Mutex
+    private var cond *sync.Cond
+
+    // New, yeni bir Task oluşturur.
+    static func New(fn func() interface{}) *Task {
+        t := new Task()
+        t.fn = fn
+        t.done = false
+        t.mu = sync.Mutex{}
+        t.cond = sync.NewCond(&t.mu)
+        
+        return t
+    }
+
+    // execute, görevi çalıştırır.
+    func (t *Task) execute() {
+        defer func() {
+            if r := recover(); r != nil {
+                // Panik oluşursa, hatayı kaydet
+                t.mu.Lock()
+                t.err = r
+                t.done = true
+                t.cond.Broadcast()
+                t.mu.Unlock()
+            }
+        }()
+        
+        // Görevi çalıştır
+        result := t.fn()
+        
+        // Sonucu kaydet
+        t.mu.Lock()
+        t.result = result
+        t.done = true
+        t.cond.Broadcast()
+        t.mu.Unlock()
+    }
+
+    // GetResult, görevin sonucunu döndürür.
+    // Eğer görev tamamlanmadıysa, tamamlanana kadar bloke olur.
+    // Eğer görev sırasında bir hata oluşursa, panik oluşturur.
+    func (t *Task) GetResult() interface{} {
+        t.mu.Lock()
+        defer t.mu.Unlock()
+        
+        // Görev tamamlanana kadar bekle
+        for !t.done {
+            t.cond.Wait()
+        }
+        
+        // Eğer hata oluşmuşsa, panik oluştur
+        if t.err != nil {
+            throw t.err
+        }
+        
+        return t.result
+    }
+
+    // GetResultWithTimeout, belirtilen süre içinde görevin sonucunu döndürür.
+    // Eğer süre dolmadan görev tamamlanırsa, sonucu ve true döndürür.
+    // Süre dolarsa, nil ve false döndürür.
+    // Eğer görev sırasında bir hata oluşursa, panik oluşturur.
+    func (t *Task) GetResultWithTimeout(timeout time.Duration) (interface{}, bool) {
+        deadline := time.Now().Add(timeout)
+        
+        t.mu.Lock()
+        defer t.mu.Unlock()
+        
+        // Görev tamamlanana kadar bekle
+        for !t.done {
+            waitTime := time.Until(deadline)
+            if waitTime <= 0 {
+                return nil, false
+            }
+            
+            // Koşullu değişken için zaman aşımı desteği yok, bu yüzden kısa aralıklarla kontrol ediyoruz
+            t.mu.Unlock()
+            time.Sleep(waitTime / 10) // Toplam sürenin 1/10'u kadar bekle
+            t.mu.Lock()
+            
+            if t.done {
+                break
+            }
+            
+            if time.Now().After(deadline) {
+                return nil, false
+            }
+        }
+        
+        // Eğer hata oluşmuşsa, panik oluştur
+        if t.err != nil {
+            throw t.err
+        }
+        
+        return t.result, true
+    }
+
+    // IsDone, görevin tamamlanıp tamamlanmadığını kontrol eder.
+    func (t *Task) IsDone() bool {
+        t.mu.Lock()
+        defer t.mu.Unlock()
+        
+        return t.done
+    }
+}
+
+// ThreadPool, bir görev havuzunu temsil eder.
+// Belirtilen sayıda worker thread oluşturur ve görevleri bu thread'lerde çalıştırır.
+class ThreadPool {
+    private var workers int // Worker thread sayısı
+    private var tasks chan *Task // Görev kanalı
+    private var wg sync.WaitGroup // Worker thread'leri beklemek için
+    private var shutdown bool // Havuzun kapatılıp kapatılmadığı
+    private var mu sync.Mutex
+
+    // New, belirtilen sayıda worker thread'e sahip yeni bir ThreadPool oluşturur.
+    static func New(workers int) *ThreadPool {
+        if workers <= 0 {
+            workers = 1 // En az bir worker thread
+        }
+        
+        tp := new ThreadPool()
+        tp.workers = workers
+        tp.tasks = make(chan *Task, workers*2) // Görev kanalı kapasitesi
+        tp.shutdown = false
+        
+        // Worker thread'leri başlat
+        tp.wg.Add(workers)
+        for i := 0; i < workers; i++ {
+            go tp.worker()
+        }
+        
+        return tp
+    }
+
+    // worker, görevleri çalıştıran bir worker thread'i temsil eder.
+    private func (tp *ThreadPool) worker() {
+        defer tp.wg.Done()
+        
+        for task := range tp.tasks {
+            task.execute()
+        }
+    }
+
+    // Submit, bir görevi havuza ekler ve bir Task döndürür.
+    // Task, görevin sonucunu almak için kullanılabilir.
+    func (tp *ThreadPool) Submit(fn func() interface{}) *Task {
+        tp.mu.Lock()
+        defer tp.mu.Unlock()
+        
+        if tp.shutdown {
+            throw "threadpool: cannot submit task to shutdown pool"
+        }
+        
+        task := Task.New(fn)
+        tp.tasks <- task
+        
+        return task
+    }
+
+    // Shutdown, havuzu kapatır.
+    // Tüm mevcut görevlerin tamamlanmasını bekler, ancak yeni görev kabul etmez.
+    func (tp *ThreadPool) Shutdown() {
+        tp.mu.Lock()
+        
+        if tp.shutdown {
+            tp.mu.Unlock()
+            return
+        }
+        
+        tp.shutdown = true
+        close(tp.tasks) // Görev kanalını kapat
+        
+        tp.mu.Unlock()
+        
+        // Tüm worker thread'lerin tamamlanmasını bekle
+        tp.wg.Wait()
+    }
+
+    // ShutdownNow, havuzu hemen kapatır.
+    // Mevcut görevlerin tamamlanmasını beklemez.
+    func (tp *ThreadPool) ShutdownNow() {
+        tp.mu.Lock()
+        defer tp.mu.Unlock()
+        
+        if tp.shutdown {
+            return
+        }
+        
+        tp.shutdown = true
+        
+        // Görev kanalını temizle ve kapat
+        for len(tp.tasks) > 0 {
+            <-tp.tasks
+        }
+        
+        close(tp.tasks)
+    }
+
+    // GetWorkerCount, havuzdaki worker thread sayısını döndürür.
+    func (tp *ThreadPool) GetWorkerCount() int {
+        return tp.workers
+    }
+
+    // IsShutdown, havuzun kapatılıp kapatılmadığını kontrol eder.
+    func (tp *ThreadPool) IsShutdown() bool {
+        tp.mu.Lock()
+        defer tp.mu.Unlock()
+        
+        return tp.shutdown
+    }
+}
+
+// FixedThreadPool, sabit sayıda thread'e sahip bir thread pool oluşturur.
+func FixedThreadPool(nThreads int) *ThreadPool {
+    return ThreadPool.New(nThreads)
+}
+
+// SingleThreadExecutor, tek bir thread'e sahip bir thread pool oluşturur.
+func SingleThreadExecutor() *ThreadPool {
+    return ThreadPool.New(1)
+}
+
+// CachedThreadPool, ihtiyaca göre thread sayısını ayarlayan bir thread pool oluşturur.
+// Not: Bu implementasyon, gerçek bir cached thread pool değildir.
+// Şu anda sabit sayıda thread kullanır, ancak gelecekte dinamik olarak değiştirilebilir.
+func CachedThreadPool() *ThreadPool {
+    // Şu anda, işlemci sayısının 2 katı kadar thread kullanıyoruz
+    return ThreadPool.New(runtime.NumCPU() * 2)
+}

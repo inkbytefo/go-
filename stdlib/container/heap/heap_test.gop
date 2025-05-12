@@ -1,0 +1,233 @@
+// GO+ Standart Kütüphane - Heap Paketi Test
+package heap
+
+import (
+    "testing"
+)
+
+// TestMinHeapInt, MinHeap<int> için testler içerir.
+func TestMinHeapInt(t *testing.T) {
+    // Yeni bir MinHeap oluştur
+    h := MinHeap.New<int>()
+    
+    // Başlangıçta boş olmalı
+    if !h.IsEmpty() {
+        t.Error("Yeni oluşturulan heap boş olmalı")
+    }
+    
+    // Boyut 0 olmalı
+    if h.Size() != 0 {
+        t.Errorf("Beklenen boyut 0, alınan: %d", h.Size())
+    }
+    
+    // Elemanları ekle
+    h.Push(5)
+    h.Push(3)
+    h.Push(7)
+    h.Push(1)
+    h.Push(9)
+    
+    // Boyut 5 olmalı
+    if h.Size() != 5 {
+        t.Errorf("Beklenen boyut 5, alınan: %d", h.Size())
+    }
+    
+    // Artık boş olmamalı
+    if h.IsEmpty() {
+        t.Error("Eleman eklendikten sonra heap boş olmamalı")
+    }
+    
+    // En küçük eleman 1 olmalı
+    if h.Peek() != 1 {
+        t.Errorf("Beklenen en küçük eleman 1, alınan: %d", h.Peek())
+    }
+    
+    // Elemanları sırayla çıkar ve kontrol et
+    expected := []int{1, 3, 5, 7, 9}
+    for i := 0; i < len(expected); i++ {
+        if h.Pop() != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], h.Pop())
+        }
+    }
+    
+    // Heap boş olmalı
+    if !h.IsEmpty() {
+        t.Error("Tüm elemanlar çıkarıldıktan sonra heap boş olmalı")
+    }
+    
+    // Boyut 0 olmalı
+    if h.Size() != 0 {
+        t.Errorf("Beklenen boyut 0, alınan: %d", h.Size())
+    }
+}
+
+// TestMaxHeapInt, MaxHeap<int> için testler içerir.
+func TestMaxHeapInt(t *testing.T) {
+    // Yeni bir MaxHeap oluştur
+    h := MaxHeap.New<int>()
+    
+    // Başlangıçta boş olmalı
+    if !h.IsEmpty() {
+        t.Error("Yeni oluşturulan heap boş olmalı")
+    }
+    
+    // Boyut 0 olmalı
+    if h.Size() != 0 {
+        t.Errorf("Beklenen boyut 0, alınan: %d", h.Size())
+    }
+    
+    // Elemanları ekle
+    h.Push(5)
+    h.Push(3)
+    h.Push(7)
+    h.Push(1)
+    h.Push(9)
+    
+    // Boyut 5 olmalı
+    if h.Size() != 5 {
+        t.Errorf("Beklenen boyut 5, alınan: %d", h.Size())
+    }
+    
+    // Artık boş olmamalı
+    if h.IsEmpty() {
+        t.Error("Eleman eklendikten sonra heap boş olmamalı")
+    }
+    
+    // En büyük eleman 9 olmalı
+    if h.Peek() != 9 {
+        t.Errorf("Beklenen en büyük eleman 9, alınan: %d", h.Peek())
+    }
+    
+    // Elemanları sırayla çıkar ve kontrol et
+    expected := []int{9, 7, 5, 3, 1}
+    for i := 0; i < len(expected); i++ {
+        if h.Pop() != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], h.Pop())
+        }
+    }
+    
+    // Heap boş olmalı
+    if !h.IsEmpty() {
+        t.Error("Tüm elemanlar çıkarıldıktan sonra heap boş olmalı")
+    }
+    
+    // Boyut 0 olmalı
+    if h.Size() != 0 {
+        t.Errorf("Beklenen boyut 0, alınan: %d", h.Size())
+    }
+}
+
+// TestHeapCustomComparator, özel karşılaştırıcı ile Heap için testler içerir.
+func TestHeapCustomComparator(t *testing.T) {
+    // Kişi yapısı
+    class Person {
+        public var name string
+        public var age int
+        
+        func(name string, age int) {
+            this.name = name
+            this.age = age
+        }
+    }
+    
+    // Yaşa göre sıralayan bir heap oluştur (küçükten büyüğe)
+    h := Heap.New<Person>(func(a, b Person) bool {
+        return a.age < b.age
+    })
+    
+    // Kişileri ekle
+    h.Push(Person("Ali", 30))
+    h.Push(Person("Veli", 25))
+    h.Push(Person("Ayşe", 35))
+    h.Push(Person("Fatma", 20))
+    h.Push(Person("Mehmet", 40))
+    
+    // Boyut 5 olmalı
+    if h.Size() != 5 {
+        t.Errorf("Beklenen boyut 5, alınan: %d", h.Size())
+    }
+    
+    // En genç kişi Fatma olmalı
+    youngest := h.Peek()
+    if youngest.name != "Fatma" || youngest.age != 20 {
+        t.Errorf("Beklenen en genç kişi Fatma (20), alınan: %s (%d)", youngest.name, youngest.age)
+    }
+    
+    // Kişileri yaşa göre sırayla çıkar
+    expectedAges := []int{20, 25, 30, 35, 40}
+    expectedNames := []string{"Fatma", "Veli", "Ali", "Ayşe", "Mehmet"}
+    
+    for i := 0; i < len(expectedAges); i++ {
+        person := h.Pop()
+        if person.age != expectedAges[i] || person.name != expectedNames[i] {
+            t.Errorf("Beklenen kişi %s (%d), alınan: %s (%d)", 
+                     expectedNames[i], expectedAges[i], person.name, person.age)
+        }
+    }
+    
+    // Heap boş olmalı
+    if !h.IsEmpty() {
+        t.Error("Tüm elemanlar çıkarıldıktan sonra heap boş olmalı")
+    }
+}
+
+// TestHeapFromArray, FromArray metodu için testler içerir.
+func TestHeapFromArray(t *testing.T) {
+    // Dizi oluştur
+    arr := []int{5, 3, 7, 1, 9}
+    
+    // Heap oluştur
+    h := Heap.New<int>(func(a, b int) bool {
+        return a < b
+    })
+    
+    // Diziyi heap'e dönüştür
+    h.FromArray(arr)
+    
+    // Boyut 5 olmalı
+    if h.Size() != 5 {
+        t.Errorf("Beklenen boyut 5, alınan: %d", h.Size())
+    }
+    
+    // En küçük eleman 1 olmalı
+    if h.Peek() != 1 {
+        t.Errorf("Beklenen en küçük eleman 1, alınan: %d", h.Peek())
+    }
+    
+    // Elemanları sırayla çıkar ve kontrol et
+    expected := []int{1, 3, 5, 7, 9}
+    for i := 0; i < len(expected); i++ {
+        if h.Pop() != expected[i] {
+            t.Errorf("Beklenen eleman %d, alınan: %d", expected[i], h.Pop())
+        }
+    }
+}
+
+// TestHeapClear, Clear metodu için testler içerir.
+func TestHeapClear(t *testing.T) {
+    // Heap oluştur
+    h := MinHeap.New<int>()
+    
+    // Elemanları ekle
+    h.Push(5)
+    h.Push(3)
+    h.Push(7)
+    
+    // Boyut 3 olmalı
+    if h.Size() != 3 {
+        t.Errorf("Beklenen boyut 3, alınan: %d", h.Size())
+    }
+    
+    // Heap'i temizle
+    h.Clear()
+    
+    // Boyut 0 olmalı
+    if h.Size() != 0 {
+        t.Errorf("Temizlendikten sonra beklenen boyut 0, alınan: %d", h.Size())
+    }
+    
+    // Heap boş olmalı
+    if !h.IsEmpty() {
+        t.Error("Temizlendikten sonra heap boş olmalı")
+    }
+}

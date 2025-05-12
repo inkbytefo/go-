@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GO+ Programlama Dili</title>
+    <style>
+        :root {
+            --primary-color: #00ADD8;
+            --secondary-color: #5DC9E2;
+            --dark-color: #333;
+            --light-color: #f4f4f4;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-color);
+            background-color: var(--light-color);
+        }
+        
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        a:hover {
+            color: var(--secondary-color);
+        }
+        
+        ul {
+            list-style: none;
+        }
+        
+        img {
+            width: 100%;
+        }
+        
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            overflow: hidden;
+        }
+        
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background-color: var(--dark-color);
+            color: #fff;
+            z-index: 10;
+        }
+        
+        .navbar ul {
+            display: flex;
+        }
+        
+        .navbar a {
+            color: #fff;
+            padding: 0.45rem;
+            margin: 0 0.25rem;
+        }
+        
+        .navbar a:hover {
+            color: var(--secondary-color);
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .showcase {
+            background-color: var(--primary-color);
+            color: #fff;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .showcase-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+        }
+        
+        .showcase h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .showcase p {
+            font-size: 1.5rem;
+            max-width: 600px;
+            margin: 1rem 0;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--dark-color);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-right: 0.5rem;
+            outline: none;
+            transition: all 0.2s ease-in;
+        }
+        
+        .btn:hover {
+            background: var(--secondary-color);
+            color: var(--dark-color);
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        
+        .btn-secondary {
+            background: var(--secondary-color);
+            color: var(--dark-color);
+        }
+        
+        .btn-dark {
+            background: var(--dark-color);
+            color: #fff;
+        }
+        
+        .btn-light {
+            background: var(--light-color);
+            color: var(--dark-color);
+        }
+        
+        .section {
+            padding: 4rem 0;
+        }
+        
+        .section-title {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+        
+        .card {
+            background: #fff;
+            padding: 1.5rem;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+        
+        .card i {
+            margin-right: 0.5rem;
+        }
+        
+        .code-example {
+            background: var(--dark-color);
+            color: #fff;
+            padding: 1.5rem;
+            border-radius: 5px;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+        
+        .code-example pre {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .footer {
+            background: var(--dark-color);
+            color: #fff;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        .footer a {
+            color: var(--secondary-color);
+        }
+        
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                align-items: center;
+                padding: 0.5rem;
+            }
+            
+            .navbar ul {
+                margin-top: 0.5rem;
+            }
+            
+            .showcase h1 {
+                font-size: 3rem;
+            }
+            
+            .showcase p {
+                font-size: 1.2rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1 class="logo">GO+</h1>
+        <ul>
+            <li><a href="#features">Özellikler</a></li>
+            <li><a href="#examples">Örnekler</a></li>
+            <li><a href="#docs">Belgeler</a></li>
+            <li><a href="#download">İndir</a></li>
+            <li><a href="#community">Topluluk</a></li>
+        </ul>
+    </nav>
+
+    <section class="showcase">
+        <div class="container showcase-inner">
+            <h1>GO+ Programlama Dili</h1>
+            <p>Go'nun sadeliği ve hızı, C++'ın güçlü özellikleriyle birleşti.</p>
+            <div>
+                <a href="#download" class="btn btn-light">İndir</a>
+                <a href="#docs" class="btn btn-dark">Belgelere Göz At</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="section">
+        <div class="container">
+            <h2 class="section-title">Özellikler</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Sınıflar ve Kalıtım</h3>
+                    <p>GO+, C++ benzeri sınıf ve kalıtım desteği ile nesne yönelimli programlamayı kolaylaştırır.</p>
+                </div>
+                <div class="card">
+                    <h3>Şablonlar</h3>
+                    <p>Jenerik programlama için şablon desteği ile tip güvenli ve yeniden kullanılabilir kod yazın.</p>
+                </div>
+                <div class="card">
+                    <h3>İstisna İşleme</h3>
+                    <p>Try-catch-finally yapıları ile hata yönetimini daha etkili hale getirin.</p>
+                </div>
+                <div class="card">
+                    <h3>Eşzamanlılık</h3>
+                    <p>Go'nun güçlü eşzamanlılık modeli ile paralel programlama yapın.</p>
+                </div>
+                <div class="card">
+                    <h3>Performans</h3>
+                    <p>LLVM tabanlı optimizasyonlar ile yüksek performanslı uygulamalar geliştirin.</p>
+                </div>
+                <div class="card">
+                    <h3>Ekosistem</h3>
+                    <p>Zengin standart kütüphane ve geliştirme araçları ile verimli çalışın.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="examples" class="section">
+        <div class="container">
+            <h2 class="section-title">Kod Örnekleri</h2>
+            
+            <h3>Merhaba Dünya</h3>
+            <div class="code-example">
+                <pre>
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Merhaba, GO+!")
+}
+                </pre>
+            </div>
+
+            <h3>Sınıf Tanımlama</h3>
+            <div class="code-example">
+                <pre>
+package main
+
+import "fmt"
+
+class Person {
+    private:
+        string name
+        int age
+    
+    public:
+        Person(string name, int age) {
+            this.name = name
+            this.age = age
+        }
+        
+        string getName() {
+            return this.name
+        }
+        
+        int getAge() {
+            return this.age
+        }
+        
+        void birthday() {
+            this.age++
+        }
+}
+
+func main() {
+    person := Person("Ahmet", 30)
+    fmt.Println("İsim:", person.getName())
+    fmt.Println("Yaş:", person.getAge())
+    
+    person.birthday()
+    fmt.Println("Yeni yaş:", person.getAge())
+}
+                </pre>
+            </div>
+
+            <h3>Şablon Kullanımı</h3>
+            <div class="code-example">
+                <pre>
+package main
+
+import "fmt"
+
+template &lt;typename T&gt;
+class Stack {
+    private:
+        []T items
+    
+    public:
+        void push(T item) {
+            this.items = append(this.items, item)
+        }
+        
+        T pop() {
+            if len(this.items) == 0 {
+                panic("Stack boş")
+            }
+            
+            n := len(this.items) - 1
+            item := this.items[n]
+            this.items = this.items[:n]
+            return item
+        }
+        
+        bool isEmpty() {
+            return len(this.items) == 0
+        }
+}
+
+func main() {
+    intStack := Stack&lt;int&gt;{}
+    intStack.push(1)
+    intStack.push(2)
+    intStack.push(3)
+    
+    fmt.Println(intStack.pop())  // 3
+    fmt.Println(intStack.pop())  // 2
+    fmt.Println(intStack.pop())  // 1
+    
+    stringStack := Stack&lt;string&gt;{}
+    stringStack.push("Merhaba")
+    stringStack.push("GO+")
+    
+    fmt.Println(stringStack.pop())  // GO+
+    fmt.Println(stringStack.pop())  // Merhaba
+}
+                </pre>
+            </div>
+
+            <h3>İstisna İşleme</h3>
+            <div class="code-example">
+                <pre>
+package main
+
+import "fmt"
+
+func divide(a, b int) int {
+    if b == 0 {
+        throw "Sıfıra bölme hatası"
+    }
+    return a / b
+}
+
+func main() {
+    try {
+        result := divide(10, 2)
+        fmt.Println("Sonuç:", result)
+        
+        result = divide(10, 0)
+        fmt.Println("Bu satır çalışmayacak")
+    } catch (e) {
+        fmt.Println("Hata yakalandı:", e)
+    } finally {
+        fmt.Println("İşlem tamamlandı")
+    }
+}
+                </pre>
+            </div>
+        </div>
+    </section>
+
+    <section id="docs" class="section">
+        <div class="container">
+            <h2 class="section-title">Belgeler</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Başlangıç Rehberi</h3>
+                    <p>GO+ dilini öğrenmeye başlamak için adım adım rehber.</p>
+                    <a href="#" class="btn btn-primary">Oku</a>
+                </div>
+                <div class="card">
+                    <h3>Dil Referansı</h3>
+                    <p>GO+ dilinin sözdizimi ve semantiği hakkında detaylı bilgi.</p>
+                    <a href="#" class="btn btn-primary">Oku</a>
+                </div>
+                <div class="card">
+                    <h3>Standart Kütüphane</h3>
+                    <p>GO+ standart kütüphanesindeki paketler ve fonksiyonlar.</p>
+                    <a href="#" class="btn btn-primary">Oku</a>
+                </div>
+                <div class="card">
+                    <h3>Öğreticiler</h3>
+                    <p>Çeşitli konularda adım adım öğreticiler.</p>
+                    <a href="#" class="btn btn-primary">Oku</a>
+                </div>
+                <div class="card">
+                    <h3>En İyi Uygulamalar</h3>
+                    <p>GO+ ile etkili ve verimli kod yazma teknikleri.</p>
+                    <a href="#" class="btn btn-primary">Oku</a>
+                </div>
+                <div class="card">
+                    <h3>SSS</h3>
+                    <p>Sık sorulan sorular ve cevapları.</p>
+                    <a href="#" class="btn btn-primary">Oku</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="section">
+        <div class="container">
+            <h2 class="section-title">İndir</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Windows</h3>
+                    <p>Windows için GO+ derleyicisi ve araçları.</p>
+                    <a href="#" class="btn btn-primary">İndir</a>
+                </div>
+                <div class="card">
+                    <h3>macOS</h3>
+                    <p>macOS için GO+ derleyicisi ve araçları.</p>
+                    <a href="#" class="btn btn-primary">İndir</a>
+                </div>
+                <div class="card">
+                    <h3>Linux</h3>
+                    <p>Linux için GO+ derleyicisi ve araçları.</p>
+                    <a href="#" class="btn btn-primary">İndir</a>
+                </div>
+            </div>
+            <div class="code-example">
+                <pre>
+# GO+ derleyicisini kurmak için:
+git clone https://github.com/goplus/goplus.git
+cd goplus
+go build -o goplus ./cmd/goplus
+                </pre>
+            </div>
+        </div>
+    </section>
+
+    <section id="community" class="section">
+        <div class="container">
+            <h2 class="section-title">Topluluk</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>GitHub</h3>
+                    <p>GO+ kaynak koduna katkıda bulunun.</p>
+                    <a href="#" class="btn btn-primary">GitHub</a>
+                </div>
+                <div class="card">
+                    <h3>Forum</h3>
+                    <p>GO+ topluluğu ile tartışın ve sorular sorun.</p>
+                    <a href="#" class="btn btn-primary">Forum</a>
+                </div>
+                <div class="card">
+                    <h3>Discord</h3>
+                    <p>Discord sunucumuza katılın ve gerçek zamanlı sohbet edin.</p>
+                    <a href="#" class="btn btn-primary">Discord</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2023 GO+ Programlama Dili. Tüm hakları saklıdır.</p>
+            <p>GO+ açık kaynaklı bir projedir. <a href="#">Katkıda bulunmak</a> için GitHub'da bize katılın.</p>
+        </div>
+    </footer>
+</body>
+</html>

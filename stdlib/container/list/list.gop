@@ -1,0 +1,114 @@
+// GO+ Standart Kütüphane - List Paketi
+package list
+
+// Element, çift bağlı liste için bir düğümü temsil eder.
+class Element<T> {
+    public var Value T
+    private var next *Element<T>
+    private var prev *Element<T>
+    private var list *List<T>
+
+    // Next, sonraki elemanı döndürür veya liste sonundaysa nil döndürür.
+    func (e *Element<T>) Next() *Element<T> {
+        if p := e.next; e.list != nil && p != e.list.root {
+            return p
+        }
+        return nil
+    }
+
+    // Prev, önceki elemanı döndürür veya liste başındaysa nil döndürür.
+    func (e *Element<T>) Prev() *Element<T> {
+        if p := e.prev; e.list != nil && p != e.list.root {
+            return p
+        }
+        return nil
+    }
+}
+
+// List, çift bağlı bir liste implementasyonudur.
+class List<T> {
+    private var root Element<T> // sentinel list element, only &root, root.prev, and root.next are used
+    private var len int // current list length excluding (this) sentinel element
+
+    // Init, listeyi sıfırlar ve kendisini döndürür.
+    func (l *List<T>) Init() *List<T> {
+        l.root.next = &l.root
+        l.root.prev = &l.root
+        l.len = 0
+        return l
+    }
+
+    // New, yeni bir boş liste oluşturur.
+    static func New<T>() *List<T> {
+        return new List<T>().Init()
+    }
+
+    // Len, liste uzunluğunu döndürür.
+    func (l *List<T>) Len() int {
+        return l.len
+    }
+
+    // Front, listenin ilk elemanını döndürür veya liste boşsa nil döndürür.
+    func (l *List<T>) Front() *Element<T> {
+        if l.len == 0 {
+            return nil
+        }
+        return l.root.next
+    }
+
+    // Back, listenin son elemanını döndürür veya liste boşsa nil döndürür.
+    func (l *List<T>) Back() *Element<T> {
+        if l.len == 0 {
+            return nil
+        }
+        return l.root.prev
+    }
+
+    // insert, e'den sonra v değerine sahip yeni bir eleman ekler ve eklenen elemanı döndürür.
+    private func (l *List<T>) insert(e *Element<T>, v T) *Element<T> {
+        n := new Element<T>()
+        n.Value = v
+        n.prev = e
+        n.next = e.next
+        e.next.prev = n
+        e.next = n
+        n.list = l
+        l.len++
+        return n
+    }
+
+    // PushFront, listenin başına v değerine sahip yeni bir eleman ekler ve eklenen elemanı döndürür.
+    func (l *List<T>) PushFront(v T) *Element<T> {
+        return l.insert(&l.root, v)
+    }
+
+    // PushBack, listenin sonuna v değerine sahip yeni bir eleman ekler ve eklenen elemanı döndürür.
+    func (l *List<T>) PushBack(v T) *Element<T> {
+        return l.insert(l.root.prev, v)
+    }
+
+    // remove, e elemanını listeden kaldırır ve değerini döndürür.
+    private func (l *List<T>) remove(e *Element<T>) T {
+        e.prev.next = e.next
+        e.next.prev = e.prev
+        e.next = nil // avoid memory leaks
+        e.prev = nil // avoid memory leaks
+        e.list = nil
+        l.len--
+        return e.Value
+    }
+
+    // Remove, e elemanını listeden kaldırır ve değerini döndürür.
+    // Eleman listeye ait değilse, panik oluşturur.
+    func (l *List<T>) Remove(e *Element<T>) T {
+        if e.list != l {
+            throw "list: Remove called with element not in list"
+        }
+        return l.remove(e)
+    }
+
+    // Clear, listedeki tüm elemanları kaldırır.
+    func (l *List<T>) Clear() {
+        l.Init()
+    }
+}
