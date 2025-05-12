@@ -1,10 +1,10 @@
-# GO+ Projesine Katkıda Bulunma Rehberi
+# GO-Minus Projesine Katkıda Bulunma Rehberi
 
-GO+ projesine katkıda bulunmak istediğiniz için teşekkür ederiz! Bu belge, katkıda bulunma sürecini anlamanıza yardımcı olacaktır.
+GO-Minus projesine katkıda bulunmak istediğiniz için teşekkür ederiz! Bu belge, katkıda bulunma sürecini anlamanıza yardımcı olacaktır.
 
 ## Katkıda Bulunma Yolları
 
-GO+ projesine çeşitli şekillerde katkıda bulunabilirsiniz:
+GO-Minus projesine çeşitli şekillerde katkıda bulunabilirsiniz:
 
 1. **Kod Katkıları**: Yeni özellikler ekleyebilir, hataları düzeltebilir veya performans iyileştirmeleri yapabilirsiniz.
 2. **Belgelendirme**: Belgelendirmeyi iyileştirebilir, örnekler ekleyebilir veya öğreticiler yazabilirsiniz.
@@ -15,12 +15,12 @@ GO+ projesine çeşitli şekillerde katkıda bulunabilirsiniz:
 
 ## Geliştirme Ortamı Kurulumu
 
-GO+ projesini geliştirmek için aşağıdaki adımları izleyin:
+GO-Minus projesini geliştirmek için aşağıdaki adımları izleyin:
 
 1. Depoyu klonlayın:
    ```bash
-   git clone https://github.com/goplus/goplus.git
-   cd goplus
+   git clone https://github.com/gominus/gominus.git
+   cd gominus
    ```
 
 2. Bağımlılıkları yükleyin:
@@ -30,7 +30,7 @@ GO+ projesini geliştirmek için aşağıdaki adımları izleyin:
 
 3. Derleyiciyi derleyin:
    ```bash
-   go build -o goplus ./cmd/goplus
+   go build -o gominus ./cmd/gominus
    ```
 
 4. Testleri çalıştırın:
@@ -42,7 +42,7 @@ GO+ projesini geliştirmek için aşağıdaki adımları izleyin:
 
 ### Dallanma Modeli
 
-GO+ projesi, [GitHub Flow](https://guides.github.com/introduction/flow/) dallanma modelini kullanır:
+GO-Minus projesi, [GitHub Flow](https://guides.github.com/introduction/flow/) dallanma modelini kullanır:
 
 1. Ana depoyu forklayın
 2. Özellik dalı oluşturun (`git checkout -b feature/amazing-feature`)
@@ -52,10 +52,10 @@ GO+ projesi, [GitHub Flow](https://guides.github.com/introduction/flow/) dallanm
 
 ### Kod Stili
 
-GO+ projesi, aşağıdaki kod stili kurallarını takip eder:
+GO-Minus projesi, aşağıdaki kod stili kurallarını takip eder:
 
 - Go için [Effective Go](https://golang.org/doc/effective_go.html) ve [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments) belgelerindeki kurallar geçerlidir.
-- GO+ için ek olarak:
+- GO-Minus için ek olarak:
   - Sınıf isimleri PascalCase kullanır
   - Metot isimleri camelCase kullanır
   - Özel üyeler için `private:` erişim belirleyicisi kullanılır
@@ -108,7 +108,7 @@ Tip alanı aşağıdakilerden biri olabilir:
 
 Bir hata raporu gönderirken, lütfen aşağıdaki bilgileri sağlayın:
 
-1. GO+ sürümü
+1. GO-Minus sürümü
 2. İşletim sistemi ve sürümü
 3. Hatayı yeniden oluşturmak için adımlar
 4. Beklenen davranış
@@ -126,7 +126,7 @@ Bir özellik isteği gönderirken, lütfen aşağıdaki bilgileri sağlayın:
 
 ## Belgelendirme Katkıları
 
-Belgelendirme katkıları, GO+ projesinin kullanıcılar tarafından daha iyi anlaşılmasına yardımcı olur. Belgelendirme katkıları şunları içerebilir:
+Belgelendirme katkıları, GO-Minus projesinin kullanıcılar tarafından daha iyi anlaşılmasına yardımcı olur. Belgelendirme katkıları şunları içerebilir:
 
 1. API belgelendirmesi
 2. Öğreticiler ve kılavuzlar
@@ -136,16 +136,16 @@ Belgelendirme katkıları, GO+ projesinin kullanıcılar tarafından daha iyi an
 
 ## Lisans
 
-GO+ projesi, [MIT Lisansı](LICENSE) altında lisanslanmıştır. Katkıda bulunarak, katkılarınızın aynı lisans altında yayınlanmasını kabul etmiş olursunuz.
+GO-Minus projesi, [MIT Lisansı](LICENSE) altında lisanslanmıştır. Katkıda bulunarak, katkılarınızın aynı lisans altında yayınlanmasını kabul etmiş olursunuz.
 
 ## İletişim
 
 Sorularınız veya geri bildirimleriniz için:
 
-- GitHub Issues: [https://github.com/goplus/goplus/issues](https://github.com/goplus/goplus/issues)
-- Discord: [GO+ Discord Sunucusu](https://discord.gg/goplus)
-- Forum: [GO+ Forum](https://forum.goplus.org)
+- GitHub Issues: [https://github.com/gominus/gominus/issues](https://github.com/gominus/gominus/issues)
+- Discord: [GO-Minus Discord Sunucusu](https://discord.gg/gominus)
+- Forum: [GO-Minus Forum](https://forum.gominus.org)
 
 ## Teşekkürler
 
-GO+ projesine katkıda bulunduğunuz için tekrar teşekkür ederiz! Katkılarınız, GO+ dilinin gelişmesine ve büyümesine yardımcı olacaktır.
+GO-Minus projesine katkıda bulunduğunuz için tekrar teşekkür ederiz! Katkılarınız, GO-Minus dilinin gelişmesine ve büyümesine yardımcı olacaktır.

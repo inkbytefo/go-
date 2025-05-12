@@ -1,6 +1,6 @@
-# GO+ JetBrains Eklentisi
+# GO-Minus JetBrains Eklentisi
 
-GO+ JetBrains Eklentisi, GO+ programlama dili için IntelliJ IDEA, GoLand, PyCharm, WebStorm, PhpStorm, Rider ve diğer JetBrains IDE'leri için destek sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme, hata ayıklama gibi özellikler sunar.
+GO-Minus JetBrains Eklentisi, GO-Minus programlama dili için IntelliJ IDEA, GoLand, PyCharm, WebStorm, PhpStorm, Rider ve diğer JetBrains IDE'leri için destek sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme, hata ayıklama gibi özellikler sunar.
 
 ## Özellikler
 
@@ -21,8 +21,8 @@ GO+ JetBrains Eklentisi, GO+ programlama dili için IntelliJ IDEA, GoLand, PyCha
 
 ### Ön Koşullar
 
-- GO+ derleyicisi ve araçları yüklü olmalıdır.
-- `goplsp` (GO+ Dil Sunucusu) ve `gopdebug` (GO+ Hata Ayıklama Aracı) PATH ortam değişkeninizde bulunmalıdır.
+- GO-Minus derleyicisi ve araçları yüklü olmalıdır.
+- `gomlsp` (GO-Minus Dil Sunucusu) ve `gomdebug` (GO-Minus Hata Ayıklama Aracı) PATH ortam değişkeninizde bulunmalıdır.
 
 ### JetBrains Marketplace'den Kurulum
 

@@ -1,6 +1,6 @@
-# GO+ Emacs Eklentisi
+# GO-Minus Emacs Eklentisi
 
-GO+ Emacs Eklentisi, GO+ programlama dili için Emacs desteği sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme gibi özellikler sunar.
+GO-Minus Emacs Eklentisi, GO-Minus programlama dili için Emacs desteği sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme gibi özellikler sunar.
 
 ## Özellikler
 
@@ -17,8 +17,8 @@ GO+ Emacs Eklentisi, GO+ programlama dili için Emacs desteği sağlar. Bu eklen
 
 ### Ön Koşullar
 
-- GO+ derleyicisi ve araçları yüklü olmalıdır.
-- `goplsp` (GO+ Dil Sunucusu) PATH ortam değişkeninizde bulunmalıdır.
+- GO-Minus derleyicisi ve araçları yüklü olmalıdır.
+- `gomlsp` (GO-Minus Dil Sunucusu) PATH ortam değişkeninizde bulunmalıdır.
 - Emacs 25.1+
 - (İsteğe bağlı) lsp-mode ve company-mode
 

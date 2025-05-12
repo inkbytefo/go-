@@ -1,4 +1,4 @@
-module goplus
+module gominus
 
 go 1.24.1
 

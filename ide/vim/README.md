@@ -1,6 +1,6 @@
-# GO+ Vim/Neovim Eklentisi
+# GO-Minus Vim/Neovim Eklentisi
 
-GO+ Vim/Neovim Eklentisi, GO+ programlama dili için Vim ve Neovim desteği sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme gibi özellikler sunar.
+GO-Minus Vim/Neovim Eklentisi, GO-Minus programlama dili için Vim ve Neovim desteği sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme gibi özellikler sunar.
 
 ## Özellikler
 
@@ -16,8 +16,8 @@ GO+ Vim/Neovim Eklentisi, GO+ programlama dili için Vim ve Neovim desteği sağ
 
 ### Ön Koşullar
 
-- GO+ derleyicisi ve araçları yüklü olmalıdır.
-- `goplsp` (GO+ Dil Sunucusu) PATH ortam değişkeninizde bulunmalıdır.
+- GO-Minus derleyicisi ve araçları yüklü olmalıdır.
+- `gomlsp` (GO-Minus Dil Sunucusu) PATH ortam değişkeninizde bulunmalıdır.
 - Vim 8.0+ veya Neovim 0.4.0+
 - (İsteğe bağlı) coc.nvim veya vim-lsp gibi bir LSP istemcisi
 
@@ -25,7 +25,7 @@ GO+ Vim/Neovim Eklentisi, GO+ programlama dili için Vim ve Neovim desteği sağ
 
 ```vim
 " vimrc veya init.vim dosyanıza ekleyin
-Plug 'goplus/vim-goplus'
+Plug 'gominus/vim-gominus'
 
 " coc.nvim kullanıyorsanız
 Plug 'neoclide/coc.nvim', {'branch': 'release'}

@@ -1,10 +1,10 @@
-# GO+ Dili Geliştirme İlerleme Raporu
+# GO-Minus Dili Geliştirme İlerleme Raporu
 
-Bu belge, GO+ programlama dilinin geliştirme sürecini takip etmek için kullanılmaktadır. Tamamlanan görevler, devam eden çalışmalar ve gelecek planlar burada belgelenecektir.
+Bu belge, GO-Minus programlama dilinin geliştirme sürecini takip etmek için kullanılmaktadır. Tamamlanan görevler, devam eden çalışmalar ve gelecek planlar burada belgelenecektir.
 
 ## Proje Genel Bakış
 
-GO+ dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle (sınıflar, şablonlar, istisna işleme vb.) genişletilmiş bir dil olarak tasarlanmıştır. GO+ dosyaları `.gop` uzantısını kullanır.
+GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle (sınıflar, şablonlar, istisna işleme vb.) genişletilmiş bir dil olarak tasarlanmıştır. GO-Minus dosyaları `.gom` uzantısını kullanır.
 
 ## Tamamlanan Görevler
 
@@ -271,11 +271,16 @@ GO+ dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri öze
 
 ## Notlar ve Kararlar
 
-- GO+ dosyaları `.gop` uzantısını kullanacak.
-- GO+ derleyicisi geliştirme aşamasında Go ile yazılacak.
-- GO+ dili, Go'nun tüm özelliklerini destekleyecek ve C++ benzeri özelliklerle genişletilecek.
+- GO-Minus dosyaları `.gom` uzantısını kullanacak.
+- GO-Minus derleyicisi geliştirme aşamasında Go ile yazılacak.
+- GO-Minus dili, Go'nun tüm özelliklerini destekleyecek ve C++ benzeri özelliklerle genişletilecek.
 
 ## Son Güncelleme
 
 Tarih: 2023-12-20
 Durum: Temel altyapı, semantik analiz, ara kod üretimi, IDE entegrasyonu ve ekosistem geliştirmesi tamamlandı. Standart kütüphane genişletme çalışmaları kapsamında Container paketi (Heap, Deque) ve Concurrent paketi (Semaphore, Barrier, ThreadPool, Future/Promise) implementasyonları tamamlandı. LLVM entegrasyonu ve kod üretimi, IO paketi genişletme, hata ayıklama desteği, performans optimizasyonları, belgelendirme ve örnekler üzerinde çalışmalar devam ediyor.
+
+## Proje İsim Değişikliği
+
+Tarih: 2024-05-15
+Durum: Proje adı "GO+" dan "GO-Minus" olarak değiştirildi. Dosya uzantısı `.gop` yerine `.gom` olarak güncellendi. Tüm dokümantasyon ve kod tabanı bu değişikliğe göre güncellendi.

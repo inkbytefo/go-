@@ -1,10 +1,10 @@
-# GO+ Programlama Dili
+# GO-Minus Programlama Dili
 
-GO+ (GO Plus), Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle (sınıflar, şablonlar, istisna işleme vb.) genişletilmiş bir programlama dilidir. GO+ dosyaları `.gop` uzantısını kullanır.
+GO-Minus, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle (sınıflar, şablonlar, istisna işleme vb.) genişletilmiş bir programlama dilidir. GO-Minus dosyaları `.gom` uzantısını kullanır.
 
 ## 🎯 Amaç
 
-GO+ dilinin temel amacı, Go'nun sadeliği, hızlı derleme süreleri ve güçlü eşzamanlılık modelini, C++'ın düşük seviyeli sistem kontrolü, performans optimizasyonları, şablon metaprogramlama (basitleştirilmiş) ve zengin OOP yetenekleriyle birleştirmektir. Hem yüksek performanslı sistem programlama hem de hızlı uygulama geliştirme için "tatlı noktayı" bulmayı hedefler.
+GO-Minus dilinin temel amacı, Go'nun sadeliği, hızlı derleme süreleri ve güçlü eşzamanlılık modelini, C++'ın düşük seviyeli sistem kontrolü, performans optimizasyonları, şablon metaprogramlama (basitleştirilmiş) ve zengin OOP yetenekleriyle birleştirmektir. Hem yüksek performanslı sistem programlama hem de hızlı uygulama geliştirme için "tatlı noktayı" bulmayı hedefler.
 
 ## ✨ Özellikler
 
@@ -23,42 +23,42 @@ GO+ dilinin temel amacı, Go'nun sadeliği, hızlı derleme süreleri ve güçl�
 ### Kurulum
 
 ```bash
-# GO+ derleyicisini klonlayın
-git clone https://github.com/goplus/goplus.git
-cd goplus
+# GO-Minus derleyicisini klonlayın
+git clone https://github.com/gominus/gominus.git
+cd gominus
 
-# GO+ derleyicisini derleyin
-go build -o goplus ./cmd/goplus
+# GO-Minus derleyicisini derleyin
+go build -o gominus ./cmd/gominus
 
 # Derleyiciyi PATH'e ekleyin
 # Windows için:
-# copy goplus.exe C:\Windows\System32\
+# copy gominus.exe C:\Windows\System32\
 # Linux/macOS için:
-# sudo cp goplus /usr/local/bin/
+# sudo cp gominus /usr/local/bin/
 ```
 
 ### Merhaba Dünya
 
 ```go
-// main.gop
+// main.gom
 package main
 
 import "fmt"
 
 func main() {
-    fmt.Println("Merhaba, GO+!")
+    fmt.Println("Merhaba, GO-Minus!")
 }
 ```
 
 ```bash
 # Programı derleyin ve çalıştırın
-goplus run main.gop
+gominus run main.gom
 ```
 
 ### Sınıf Örneği
 
 ```go
-// person.gop
+// person.gom
 package main
 
 import "fmt"
@@ -67,21 +67,21 @@ class Person {
     private:
         string name
         int age
-    
+
     public:
         Person(string name, int age) {
             this.name = name
             this.age = age
         }
-        
+
         string getName() {
             return this.name
         }
-        
+
         int getAge() {
             return this.age
         }
-        
+
         void birthday() {
             this.age++
         }
@@ -91,7 +91,7 @@ func main() {
     person := Person("Ahmet", 30)
     fmt.Println("İsim:", person.getName())
     fmt.Println("Yaş:", person.getAge())
-    
+
     person.birthday()
     fmt.Println("Yeni yaş:", person.getAge())
 }
@@ -99,28 +99,28 @@ func main() {
 
 ```bash
 # Programı derleyin ve çalıştırın
-goplus run person.gop
+gominus run person.gom
 ```
 
 ## 🛠️ Geliştirme Araçları
 
-GO+ dili, aşağıdaki geliştirme araçlarını sağlar:
+GO-Minus dili, aşağıdaki geliştirme araçlarını sağlar:
 
-- **goppm**: GO+ Paket Yöneticisi
-- **goptest**: GO+ Test Aracı
-- **gopdoc**: GO+ Belgelendirme Aracı
-- **gopfmt**: GO+ Kod Biçimlendirme Aracı
-- **goplsp**: GO+ Dil Sunucusu
-- **gopdebug**: GO+ Hata Ayıklama Aracı
+- **gompm**: GO-Minus Paket Yöneticisi
+- **gomtest**: GO-Minus Test Aracı
+- **gomdoc**: GO-Minus Belgelendirme Aracı
+- **gomfmt**: GO-Minus Kod Biçimlendirme Aracı
+- **gomlsp**: GO-Minus Dil Sunucusu
+- **gomdebug**: GO-Minus Hata Ayıklama Aracı
 
 ## 🔌 IDE Entegrasyonu
 
-GO+ dili, aşağıdaki IDE'ler için eklentiler sağlar:
+GO-Minus dili, aşağıdaki IDE'ler için eklentiler sağlar:
 
-- **VS Code**: [GO+ VS Code Eklentisi](ide/vscode/README.md)
-- **JetBrains IDEs**: [GO+ JetBrains Eklentisi](ide/jetbrains/README.md)
-- **Vim/Neovim**: [GO+ Vim Eklentisi](ide/vim/README.md)
-- **Emacs**: [GO+ Emacs Eklentisi](ide/emacs/README.md)
+- **VS Code**: [GO-Minus VS Code Eklentisi](ide/vscode/README.md)
+- **JetBrains IDEs**: [GO-Minus JetBrains Eklentisi](ide/jetbrains/README.md)
+- **Vim/Neovim**: [GO-Minus Vim Eklentisi](ide/vim/README.md)
+- **Emacs**: [GO-Minus Emacs Eklentisi](ide/emacs/README.md)
 
 ## 📚 Belgelendirme
 
@@ -133,19 +133,19 @@ GO+ dili, aşağıdaki IDE'ler için eklentiler sağlar:
 
 ## 👥 Topluluk
 
-- [GitHub](https://github.com/goplus/goplus)
+- [GitHub](https://github.com/gominus/gominus)
 - [Web Sitesi](website/index.html)
-- [Discord](https://discord.gg/goplus)
-- [Forum](https://forum.goplus.org)
+- [Discord](https://discord.gg/gominus)
+- [Forum](https://forum.gominus.org)
 
 ## 🤝 Katkıda Bulunma
 
-GO+ projesine katkıda bulunmak için, lütfen [katkı sağlama rehberini](CONTRIBUTING.md) okuyun. Tüm katkıda bulunanlar, [davranış kurallarımıza](CODE_OF_CONDUCT.md) uymayı kabul etmiş sayılır.
+GO-Minus projesine katkıda bulunmak için, lütfen [katkı sağlama rehberini](CONTRIBUTING.md) okuyun. Tüm katkıda bulunanlar, [davranış kurallarımıza](CODE_OF_CONDUCT.md) uymayı kabul etmiş sayılır.
 
 ## 📋 İlerleme
 
-GO+ dilinin geliştirme sürecini takip etmek için [ilerleme raporunu](progress.md) inceleyebilirsiniz.
+GO-Minus dilinin geliştirme sürecini takip etmek için [ilerleme raporunu](progress.md) inceleyebilirsiniz.
 
 ## 📄 Lisans
 
-GO+ dili, [MIT Lisansı](LICENSE) altında lisanslanmıştır.
+GO-Minus dili, [MIT Lisansı](LICENSE) altında lisanslanmıştır.

@@ -1,6 +1,6 @@
-# GO+ Dil Sunucusu (goplsp)
+# GO-Minus Dil Sunucusu (gomlsp)
 
-GO+ Dil Sunucusu, GO+ programlama dili için Language Server Protocol (LSP) implementasyonudur. Bu sunucu, çeşitli IDE ve metin düzenleyicileri ile entegrasyon sağlayarak kod tamamlama, hata işaretleme, tanıma gitme, yeniden adlandırma gibi akıllı düzenleme özelliklerini destekler.
+GO-Minus Dil Sunucusu, GO-Minus programlama dili için Language Server Protocol (LSP) implementasyonudur. Bu sunucu, çeşitli IDE ve metin düzenleyicileri ile entegrasyon sağlayarak kod tamamlama, hata işaretleme, tanıma gitme, yeniden adlandırma gibi akıllı düzenleme özelliklerini destekler.
 
 ## Özellikler
 
@@ -17,10 +17,10 @@ GO+ Dil Sunucusu, GO+ programlama dili için Language Server Protocol (LSP) impl
 
 ## Kurulum
 
-GO+ Dil Sunucusu'nu kurmak için, GO+ derleyicisini kurduktan sonra aşağıdaki komutu çalıştırabilirsiniz:
+GO-Minus Dil Sunucusu'nu kurmak için, GO-Minus derleyicisini kurduktan sonra aşağıdaki komutu çalıştırabilirsiniz:
 
 ```bash
-go build -o goplsp ./tools/goplsp
+go build -o gomlsp ./tools/gomlsp
 ```
 
 Oluşturulan çalıştırılabilir dosyayı PATH ortam değişkeninizin bulunduğu bir dizine kopyalayabilirsiniz.

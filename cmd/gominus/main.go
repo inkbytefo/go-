@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"goplus/internal/codegen"
-	"goplus/internal/irgen"
-	"goplus/internal/lexer"
-	"goplus/internal/optimizer"
-	"goplus/internal/parser"
-	"goplus/internal/semantic"
+	"gominus/internal/codegen"
+	"gominus/internal/irgen"
+	"gominus/internal/lexer"
+	"gominus/internal/optimizer"
+	"gominus/internal/parser"
+	"gominus/internal/semantic"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,7 +37,7 @@ func main() {
 
 	// Sürüm bilgisini göster
 	if *showVersion {
-		fmt.Println("GO+ Derleyicisi v0.1.0")
+		fmt.Println("GO-Minus Derleyicisi v0.1.0")
 		os.Exit(0)
 	}
 
@@ -226,14 +226,14 @@ func printErrors(title string, errors []string) {
 }
 
 func printHelp() {
-	fmt.Println("Kullanım: goplus [bayraklar] <dosya.gop>")
+	fmt.Println("Kullanım: gominus [bayraklar] <dosya.gom>")
 	fmt.Println("\nBayraklar:")
 	flag.PrintDefaults()
 	fmt.Println("\nÖrnekler:")
-	fmt.Println("  goplus test.gop                    # LLVM IR üret (test.ll)")
-	fmt.Println("  goplus -O2 test.gop                # Optimize edilmiş LLVM IR üret (test.ll)")
-	fmt.Println("  goplus -output-format=s test.gop   # Assembly kodu üret (test.s)")
-	fmt.Println("  goplus -output-format=o test.gop   # Nesne dosyası üret (test.o)")
-	fmt.Println("  goplus -output-format=exe test.gop # Çalıştırılabilir dosya üret (test veya test.exe)")
-	fmt.Println("  goplus -o output.exe -output-format=exe test.gop # Belirtilen isimle çalıştırılabilir dosya üret")
+	fmt.Println("  gominus test.gom                    # LLVM IR üret (test.ll)")
+	fmt.Println("  gominus -O2 test.gom                # Optimize edilmiş LLVM IR üret (test.ll)")
+	fmt.Println("  gominus -output-format=s test.gom   # Assembly kodu üret (test.s)")
+	fmt.Println("  gominus -output-format=o test.gom   # Nesne dosyası üret (test.o)")
+	fmt.Println("  gominus -output-format=exe test.gom # Çalıştırılabilir dosya üret (test veya test.exe)")
+	fmt.Println("  gominus -o output.exe -output-format=exe test.gom # Belirtilen isimle çalıştırılabilir dosya üret")
 }

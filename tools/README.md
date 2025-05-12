@@ -1,133 +1,133 @@
-# GO+ Geliştirme Araçları
+# GO-Minus Geliştirme Araçları
 
-Bu dizin, GO+ programlama dili için geliştirme araçlarını içerir. Bu araçlar, GO+ ile geliştirme yaparken kullanılabilecek çeşitli yardımcı programları içerir.
+Bu dizin, GO-Minus programlama dili için geliştirme araçlarını içerir. Bu araçlar, GO-Minus ile geliştirme yaparken kullanılabilecek çeşitli yardımcı programları içerir.
 
 ## Araçlar
 
-### goppm - GO+ Paket Yöneticisi
+### gompm - GO-Minus Paket Yöneticisi
 
-GO+ paketlerini yönetmek için kullanılan bir araçtır. Paket yükleme, kaldırma, güncelleme ve arama işlemlerini gerçekleştirir.
+GO-Minus paketlerini yönetmek için kullanılan bir araçtır. Paket yükleme, kaldırma, güncelleme ve arama işlemlerini gerçekleştirir.
 
 ```bash
-# Yeni bir GO+ projesi başlat
-goppm -init myproject
+# Yeni bir GO-Minus projesi başlat
+gompm -init myproject
 
 # Paket yükle
-goppm -install fmt strings
+gompm -install fmt strings
 
 # Paket kaldır
-goppm -uninstall fmt
+gompm -uninstall fmt
 
 # Paketleri güncelle
-goppm -update
+gompm -update
 
 # Yüklü paketleri listele
-goppm -list
+gompm -list
 
 # Paket ara
-goppm -search json
+gompm -search json
 ```
 
-### goptest - GO+ Test Aracı
+### gomtest - GO-Minus Test Aracı
 
-GO+ kodunu test etmek için kullanılan bir araçtır. Test dosyalarını bulur, testleri çalıştırır ve sonuçları raporlar.
+GO-Minus kodunu test etmek için kullanılan bir araçtır. Test dosyalarını bulur, testleri çalıştırır ve sonuçları raporlar.
 
 ```bash
 # Mevcut dizindeki testleri çalıştır
-goptest
+gomtest
 
 # Ayrıntılı çıktı ile testleri çalıştır
-goptest -v
+gomtest -v
 
 # Alt dizinlerdeki testleri de çalıştır
-goptest -r
+gomtest -r
 
 # Belirli bir test desenine uyan testleri çalıştır
-goptest -pattern=TestAdd
+gomtest -pattern=TestAdd
 
 # Benchmark testlerini çalıştır
-goptest -bench
+gomtest -bench
 
 # Kod kapsama analizi yap
-goptest -cover
+gomtest -cover
 
 # Belirtilen dizinlerdeki testleri çalıştır
-goptest ./pkg ./internal
+gomtest ./pkg ./internal
 ```
 
-### gopdoc - GO+ Belgelendirme Aracı
+### gomdoc - GO-Minus Belgelendirme Aracı
 
-GO+ kodunu belgelendirmek için kullanılan bir araçtır. Kod içindeki yorumları ve yapıları analiz ederek belgelendirme oluşturur.
+GO-Minus kodunu belgelendirmek için kullanılan bir araçtır. Kod içindeki yorumları ve yapıları analiz ederek belgelendirme oluşturur.
 
 ```bash
 # Mevcut dizindeki paketi belgele
-gopdoc
+gomdoc
 
 # HTML formatında belgelendirme oluştur
-gopdoc -html
+gomdoc -html
 
 # Markdown formatında belgelendirme oluştur
-gopdoc -markdown
+gomdoc -markdown
 
 # Belgelendirmeyi belirli bir dizine kaydet
-gopdoc -output=docs
+gomdoc -output=docs
 
 # Belgelendirme sunucusu başlat
-gopdoc -server
+gomdoc -server
 
 # Belgelendirme sunucusunu belirli bir portta başlat
-gopdoc -server -port=8080
+gomdoc -server -port=8080
 
 # Belirtilen paketleri belgele
-gopdoc ./pkg ./internal
+gomdoc ./pkg ./internal
 ```
 
-### gopfmt - GO+ Kod Biçimlendirme Aracı
+### gomfmt - GO-Minus Kod Biçimlendirme Aracı
 
-GO+ kodunu standart bir biçimde düzenlemek için kullanılan bir araçtır. Kod stilini tutarlı hale getirir.
+GO-Minus kodunu standart bir biçimde düzenlemek için kullanılan bir araçtır. Kod stilini tutarlı hale getirir.
 
 ```bash
-# Mevcut dizindeki GO+ dosyalarını biçimlendir
-gopfmt
+# Mevcut dizindeki GO-Minus dosyalarını biçimlendir
+gomfmt
 
 # Değişiklikleri dosyalara yaz
-gopfmt -w
+gomfmt -w
 
 # Değişiklikleri diff formatında göster
-gopfmt -d
+gomfmt -d
 
 # Biçimlendirilmesi gereken dosyaları listele
-gopfmt -l
+gomfmt -l
 
 # Alt dizinlerdeki dosyaları da biçimlendir
-gopfmt -r
+gomfmt -r
 
 # Kodu basitleştir
-gopfmt -s
+gomfmt -s
 
 # Belirtilen dosyaları biçimlendir
-gopfmt file1.gop file2.gop
+gomfmt file1.gom file2.gom
 
 # Belirtilen dizinlerdeki dosyaları biçimlendir
-gopfmt ./pkg ./internal
+gomfmt ./pkg ./internal
 ```
 
 ## Kurulum
 
-GO+ geliştirme araçlarını kurmak için, GO+ derleyicisini kurduktan sonra aşağıdaki komutları çalıştırabilirsiniz:
+GO-Minus geliştirme araçlarını kurmak için, GO-Minus derleyicisini kurduktan sonra aşağıdaki komutları çalıştırabilirsiniz:
 
 ```bash
-# GO+ paket yöneticisini kur
-go build -o goppm ./tools/goppm
+# GO-Minus paket yöneticisini kur
+go build -o gompm ./tools/gompm
 
-# GO+ test aracını kur
-go build -o goptest ./tools/goptest
+# GO-Minus test aracını kur
+go build -o gomtest ./tools/gomtest
 
-# GO+ belgelendirme aracını kur
-go build -o gopdoc ./tools/gopdoc
+# GO-Minus belgelendirme aracını kur
+go build -o gomdoc ./tools/gomdoc
 
-# GO+ kod biçimlendirme aracını kur
-go build -o gopfmt ./tools/gopfmt
+# GO-Minus kod biçimlendirme aracını kur
+go build -o gomfmt ./tools/gomfmt
 ```
 
 Oluşturulan çalıştırılabilir dosyaları PATH ortam değişkeninizin bulunduğu bir dizine kopyalayabilirsiniz.
