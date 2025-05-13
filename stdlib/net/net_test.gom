@@ -1,0 +1,285 @@
+// GO-Minus Standart Kütüphane - Net Paketi Test
+package net
+
+import (
+    "testing"
+    "time"
+)
+
+// TestIPAddr, IP adresi işlemlerini test eder.
+func TestIPAddr(t *testing.T) {
+    // IP adresi ayrıştır
+    ipAddr, err := IPAddr.Parse("192.168.1.1")
+    if err != nil {
+        t.Fatalf("IP adresi ayrıştırma hatası: %v", err)
+    }
+    
+    // IP adresini kontrol et
+    if ipAddr.String() != "192.168.1.1" {
+        t.Errorf("Beklenen IP adresi 192.168.1.1, alınan: %s", ipAddr.String())
+    }
+    
+    // Ağ adını kontrol et
+    if ipAddr.Network() != "ip" {
+        t.Errorf("Beklenen ağ adı ip, alınan: %s", ipAddr.Network())
+    }
+    
+    // IP özelliklerini kontrol et
+    if ipAddr.IsLoopback() {
+        t.Errorf("192.168.1.1 loopback olmamalı")
+    }
+    
+    if !ipAddr.IsGlobalUnicast() {
+        t.Errorf("192.168.1.1 global unicast olmalı")
+    }
+    
+    if ipAddr.IsMulticast() {
+        t.Errorf("192.168.1.1 multicast olmamalı")
+    }
+    
+    // IPv4 dönüşümünü kontrol et
+    ip4 := ipAddr.To4()
+    if ip4 == nil {
+        t.Errorf("192.168.1.1 IPv4 adresine dönüştürülemedi")
+    }
+    
+    // IPv6 dönüşümünü kontrol et
+    ip6 := ipAddr.To16()
+    if ip6 == nil {
+        t.Errorf("192.168.1.1 IPv6 adresine dönüştürülemedi")
+    }
+    
+    // Loopback IP adresi
+    loopbackIP, err := IPAddr.Parse("127.0.0.1")
+    if err != nil {
+        t.Fatalf("Loopback IP adresi ayrıştırma hatası: %v", err)
+    }
+    
+    if !loopbackIP.IsLoopback() {
+        t.Errorf("127.0.0.1 loopback olmalı")
+    }
+}
+
+// TestTCPAddr, TCP adresi işlemlerini test eder.
+func TestTCPAddr(t *testing.T) {
+    // TCP adresi ayrıştır
+    tcpAddr, err := TCPAddr.Parse("192.168.1.1:8080")
+    if err != nil {
+        t.Fatalf("TCP adresi ayrıştırma hatası: %v", err)
+    }
+    
+    // TCP adresini kontrol et
+    if tcpAddr.String() != "192.168.1.1:8080" {
+        t.Errorf("Beklenen TCP adresi 192.168.1.1:8080, alınan: %s", tcpAddr.String())
+    }
+    
+    // Ağ adını kontrol et
+    if tcpAddr.Network() != "tcp" {
+        t.Errorf("Beklenen ağ adı tcp, alınan: %s", tcpAddr.Network())
+    }
+    
+    // IP adresini kontrol et
+    ip := tcpAddr.IP()
+    ipStr := IPAddr.New(ip).String()
+    if ipStr != "192.168.1.1" {
+        t.Errorf("Beklenen IP adresi 192.168.1.1, alınan: %s", ipStr)
+    }
+    
+    // Port numarasını kontrol et
+    if tcpAddr.Port() != 8080 {
+        t.Errorf("Beklenen port numarası 8080, alınan: %d", tcpAddr.Port())
+    }
+}
+
+// TestUDPAddr, UDP adresi işlemlerini test eder.
+func TestUDPAddr(t *testing.T) {
+    // UDP adresi ayrıştır
+    udpAddr, err := UDPAddr.Parse("192.168.1.1:8053")
+    if err != nil {
+        t.Fatalf("UDP adresi ayrıştırma hatası: %v", err)
+    }
+    
+    // UDP adresini kontrol et
+    if udpAddr.String() != "192.168.1.1:8053" {
+        t.Errorf("Beklenen UDP adresi 192.168.1.1:8053, alınan: %s", udpAddr.String())
+    }
+    
+    // Ağ adını kontrol et
+    if udpAddr.Network() != "udp" {
+        t.Errorf("Beklenen ağ adı udp, alınan: %s", udpAddr.Network())
+    }
+    
+    // IP adresini kontrol et
+    ip := udpAddr.IP()
+    ipStr := IPAddr.New(ip).String()
+    if ipStr != "192.168.1.1" {
+        t.Errorf("Beklenen IP adresi 192.168.1.1, alınan: %s", ipStr)
+    }
+    
+    // Port numarasını kontrol et
+    if udpAddr.Port() != 8053 {
+        t.Errorf("Beklenen port numarası 8053, alınan: %d", udpAddr.Port())
+    }
+}
+
+// TestTCPEcho, TCP echo sunucusu ve istemcisi oluşturarak test eder.
+func TestTCPEcho(t *testing.T) {
+    // TCP dinleyici oluştur
+    listener, err := Listen("tcp", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("TCP dinleyici oluşturma hatası: %v", err)
+    }
+    defer listener.Close()
+    
+    // Dinleyici adresini al
+    addr := listener.Addr().String()
+    
+    // Echo sunucusu başlat
+    go func() {
+        conn, err := listener.Accept()
+        if err != nil {
+            t.Errorf("Bağlantı kabul hatası: %v", err)
+            return
+        }
+        defer conn.Close()
+        
+        // Veri oku
+        buffer := make([]byte, 1024)
+        n, err := conn.Read(buffer)
+        if err != nil {
+            t.Errorf("Okuma hatası: %v", err)
+            return
+        }
+        
+        // Veriyi geri gönder
+        _, err = conn.Write(buffer[:n])
+        if err != nil {
+            t.Errorf("Yazma hatası: %v", err)
+            return
+        }
+    }()
+    
+    // İstemci bağlantısı kur
+    conn, err := Dial("tcp", addr)
+    if err != nil {
+        t.Fatalf("TCP bağlantı hatası: %v", err)
+    }
+    defer conn.Close()
+    
+    // Test mesajı gönder
+    message := "Merhaba, TCP sunucu!"
+    _, err = conn.Write([]byte(message))
+    if err != nil {
+        t.Fatalf("Yazma hatası: %v", err)
+    }
+    
+    // Yanıt al
+    buffer := make([]byte, 1024)
+    n, err := conn.Read(buffer)
+    if err != nil {
+        t.Fatalf("Okuma hatası: %v", err)
+    }
+    
+    // Yanıtı kontrol et
+    response := string(buffer[:n])
+    if response != message {
+        t.Errorf("Beklenen yanıt %s, alınan: %s", message, response)
+    }
+}
+
+// TestUDPEcho, UDP echo sunucusu ve istemcisi oluşturarak test eder.
+func TestUDPEcho(t *testing.T) {
+    // UDP adresi oluştur
+    addr, err := UDPAddr.Parse("127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("UDP adresi ayrıştırma hatası: %v", err)
+    }
+    
+    // UDP dinleyici oluştur
+    conn, err := ListenUDP("udp", addr)
+    if err != nil {
+        t.Fatalf("UDP dinleyici oluşturma hatası: %v", err)
+    }
+    defer conn.Close()
+    
+    // Dinleyici adresini al
+    serverAddr := conn.LocalAddr().String()
+    
+    // Echo sunucusu başlat
+    go func() {
+        buffer := make([]byte, 1024)
+        n, clientAddr, err := conn.ReadFromUDP(buffer)
+        if err != nil {
+            t.Errorf("Okuma hatası: %v", err)
+            return
+        }
+        
+        // Veriyi geri gönder
+        _, err = conn.WriteToUDP(buffer[:n], clientAddr)
+        if err != nil {
+            t.Errorf("Yazma hatası: %v", err)
+            return
+        }
+    }()
+    
+    // İstemci bağlantısı kur
+    clientConn, err := Dial("udp", serverAddr)
+    if err != nil {
+        t.Fatalf("UDP bağlantı hatası: %v", err)
+    }
+    defer clientConn.Close()
+    
+    // Test mesajı gönder
+    message := "Merhaba, UDP sunucu!"
+    _, err = clientConn.Write([]byte(message))
+    if err != nil {
+        t.Fatalf("Yazma hatası: %v", err)
+    }
+    
+    // Yanıt al
+    buffer := make([]byte, 1024)
+    clientConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+    n, err := clientConn.Read(buffer)
+    if err != nil {
+        t.Fatalf("Okuma hatası: %v", err)
+    }
+    
+    // Yanıtı kontrol et
+    response := string(buffer[:n])
+    if response != message {
+        t.Errorf("Beklenen yanıt %s, alınan: %s", message, response)
+    }
+}
+
+// TestLookup, ana bilgisayar adı ve port çözümleme işlemlerini test eder.
+func TestLookup(t *testing.T) {
+    // Ana bilgisayar adı çözümleme
+    addrs, err := LookupHost("localhost")
+    if err != nil {
+        t.Fatalf("Ana bilgisayar adı çözümleme hatası: %v", err)
+    }
+    
+    if len(addrs) == 0 {
+        t.Errorf("localhost için IP adresi bulunamadı")
+    }
+    
+    // IP adresi çözümleme
+    ips, err := LookupIP("localhost")
+    if err != nil {
+        t.Fatalf("IP adresi çözümleme hatası: %v", err)
+    }
+    
+    if len(ips) == 0 {
+        t.Errorf("localhost için IP adresi bulunamadı")
+    }
+    
+    // Port çözümleme
+    port, err := LookupPort("tcp", "http")
+    if err != nil {
+        t.Fatalf("Port çözümleme hatası: %v", err)
+    }
+    
+    if port != 80 {
+        t.Errorf("Beklenen HTTP port numarası 80, alınan: %d", port)
+    }
+}

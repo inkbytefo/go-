@@ -1,0 +1,146 @@
+// GO-Minus Standart Kütüphane - Regex Paketi Test
+package regex
+
+import (
+    "testing"
+)
+
+// TestRegexMatch, düzenli ifade eşleştirme işlemlerini test eder.
+func TestRegexMatch(t *testing.T) {
+    // Basit eşleştirme
+    pattern := "hello"
+    text := "hello world"
+    
+    regex := Compile(pattern)
+    if !regex.Match(text) {
+        t.Errorf("'%s' metni '%s' deseniyle eşleşmeli", text, pattern)
+    }
+    
+    // Eşleşmeyen metin
+    text = "world"
+    if regex.Match(text) {
+        t.Errorf("'%s' metni '%s' deseniyle eşleşmemeli", text, pattern)
+    }
+    
+    // Büyük/küçük harf duyarlı eşleştirme
+    text = "Hello world"
+    if regex.Match(text) {
+        t.Errorf("'%s' metni büyük/küçük harf duyarlı olarak '%s' deseniyle eşleşmemeli", text, pattern)
+    }
+    
+    // Büyük/küçük harf duyarsız eşleştirme
+    regex = CompileIgnoreCase(pattern)
+    if !regex.Match(text) {
+        t.Errorf("'%s' metni büyük/küçük harf duyarsız olarak '%s' deseniyle eşleşmeli", text, pattern)
+    }
+}
+
+// TestRegexFindAll, düzenli ifade ile tüm eşleşmeleri bulma işlemlerini test eder.
+func TestRegexFindAll(t *testing.T) {
+    // Basit arama
+    pattern := "a"
+    text := "banana"
+    
+    regex := Compile(pattern)
+    matches := regex.FindAll(text)
+    
+    if len(matches) != 3 {
+        t.Errorf("'%s' metninde '%s' deseni için beklenen eşleşme sayısı 3, alınan: %d", text, pattern, len(matches))
+    }
+    
+    // Kelime arama
+    pattern = "an"
+    matches = regex.FindAll(text)
+    
+    if len(matches) != 2 {
+        t.Errorf("'%s' metninde '%s' deseni için beklenen eşleşme sayısı 2, alınan: %d", text, pattern, len(matches))
+    }
+}
+
+// TestRegexReplace, düzenli ifade ile metin değiştirme işlemlerini test eder.
+func TestRegexReplace(t *testing.T) {
+    // Basit değiştirme
+    pattern := "world"
+    text := "hello world"
+    replacement := "GO-Minus"
+    
+    regex := Compile(pattern)
+    result := regex.Replace(text, replacement)
+    
+    expected := "hello GO-Minus"
+    if result != expected {
+        t.Errorf("Beklenen sonuç '%s', alınan: '%s'", expected, result)
+    }
+    
+    // Çoklu değiştirme
+    pattern = "a"
+    text = "banana"
+    replacement = "o"
+    
+    regex = Compile(pattern)
+    result = regex.Replace(text, replacement)
+    
+    expected = "bonono"
+    if result != expected {
+        t.Errorf("Beklenen sonuç '%s', alınan: '%s'", expected, result)
+    }
+}
+
+// TestRegexSplit, düzenli ifade ile metin bölme işlemlerini test eder.
+func TestRegexSplit(t *testing.T) {
+    // Basit bölme
+    pattern := ","
+    text := "apple,banana,orange"
+    
+    regex := Compile(pattern)
+    parts := regex.Split(text)
+    
+    if len(parts) != 3 {
+        t.Errorf("Beklenen parça sayısı 3, alınan: %d", len(parts))
+    }
+    
+    if parts[0] != "apple" || parts[1] != "banana" || parts[2] != "orange" {
+        t.Errorf("Bölme sonuçları doğru değil: %v", parts)
+    }
+}
+
+// TestRegexHelperFunctions, yardımcı fonksiyonları test eder.
+func TestRegexHelperFunctions(t *testing.T) {
+    // Match
+    pattern := "hello"
+    text := "hello world"
+    
+    if !Match(pattern, text) {
+        t.Errorf("Match('%s', '%s') true döndürmeli", pattern, text)
+    }
+    
+    // MatchIgnoreCase
+    pattern = "hello"
+    text = "Hello World"
+    
+    if !MatchIgnoreCase(pattern, text) {
+        t.Errorf("MatchIgnoreCase('%s', '%s') true döndürmeli", pattern, text)
+    }
+    
+    // Replace
+    pattern = "world"
+    text = "hello world"
+    replacement := "GO-Minus"
+    
+    result := Replace(pattern, text, replacement)
+    expected := "hello GO-Minus"
+    
+    if result != expected {
+        t.Errorf("Replace('%s', '%s', '%s') için beklenen sonuç '%s', alınan: '%s'", pattern, text, replacement, expected, result)
+    }
+    
+    // Split
+    pattern = ","
+    text = "apple,banana,orange"
+    
+    parts := Split(pattern, text)
+    
+    if len(parts) != 3 {
+        t.Errorf("Split('%s', '%s') için beklenen parça sayısı 3, alınan: %d", pattern, text, len(parts))
+    }
+}

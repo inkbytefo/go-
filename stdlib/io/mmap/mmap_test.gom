@@ -1,0 +1,207 @@
+// GO-Minus Standart Kütüphane - IO Paketi - Memory-mapped IO Test
+package mmap
+
+import (
+    "os"
+    "testing"
+)
+
+// TestBasicMapping, temel belleğe eşleme işlemlerini test eder.
+func TestBasicMapping(t *testing.T) {
+    // Test dosyası oluştur
+    filename := "test_mmap.bin"
+    file, err := os.Create(filename)
+    if err != nil {
+        t.Fatalf("Dosya oluşturma hatası: %v", err)
+    }
+    
+    // Test verisi yaz
+    testData := make([]byte, 4096)
+    for i := 0; i < len(testData); i++ {
+        testData[i] = byte(i % 256)
+    }
+    
+    _, err = file.Write(testData)
+    if err != nil {
+        file.Close()
+        os.Remove(filename)
+        t.Fatalf("Dosya yazma hatası: %v", err)
+    }
+    
+    file.Close()
+    
+    // Dosyayı aç
+    file, err = os.OpenFile(filename, os.O_RDWR, 0)
+    if err != nil {
+        os.Remove(filename)
+        t.Fatalf("Dosya açma hatası: %v", err)
+    }
+    defer func() {
+        file.Close()
+        os.Remove(filename)
+    }()
+    
+    // Dosyayı belleğe eşle
+    mmapFile, err := Map(file, PROT_READ|PROT_WRITE, MAP_SHARED)
+    if err != nil {
+        t.Fatalf("Belleğe eşleme hatası: %v", err)
+    }
+    defer mmapFile.Close()
+    
+    // Dosya boyutunu kontrol et
+    if mmapFile.Len() != int64(len(testData)) {
+        t.Errorf("Beklenen dosya boyutu %d, alınan: %d", len(testData), mmapFile.Len())
+    }
+    
+    // Belleğe eşlenmiş dosyadan oku
+    readData := make([]byte, len(testData))
+    n, err := mmapFile.ReadAt(readData, 0)
+    if err != nil {
+        t.Fatalf("Okuma hatası: %v", err)
+    }
+    
+    if n != len(testData) {
+        t.Errorf("Beklenen okuma boyutu %d, alınan: %d", len(testData), n)
+    }
+    
+    // Okunan veriyi kontrol et
+    for i := 0; i < len(testData); i++ {
+        if readData[i] != testData[i] {
+            t.Errorf("Veri uyuşmazlığı pozisyon %d: beklenen %d, alınan: %d", i, testData[i], readData[i])
+            break
+        }
+    }
+    
+    // Belleğe eşlenmiş dosyaya yaz
+    writeData := []byte{0xFF, 0xFE, 0xFD, 0xFC, 0xFB}
+    n, err = mmapFile.WriteAt(writeData, 100)
+    if err != nil {
+        t.Fatalf("Yazma hatası: %v", err)
+    }
+    
+    if n != len(writeData) {
+        t.Errorf("Beklenen yazma boyutu %d, alınan: %d", len(writeData), n)
+    }
+    
+    // Değişiklikleri diske yaz
+    err = mmapFile.Flush()
+    if err != nil {
+        t.Fatalf("Flush hatası: %v", err)
+    }
+    
+    // Değişiklikleri kontrol et
+    checkData := make([]byte, len(writeData))
+    n, err = mmapFile.ReadAt(checkData, 100)
+    if err != nil {
+        t.Fatalf("Okuma hatası: %v", err)
+    }
+    
+    for i := 0; i < len(writeData); i++ {
+        if checkData[i] != writeData[i] {
+            t.Errorf("Veri uyuşmazlığı pozisyon %d: beklenen %d, alınan: %d", i, writeData[i], checkData[i])
+            break
+        }
+    }
+}
+
+// TestRegionMapping, dosyanın belirli bir bölgesini belleğe eşlemeyi test eder.
+func TestRegionMapping(t *testing.T) {
+    // Test dosyası oluştur
+    filename := "test_mmap_region.bin"
+    file, err := os.Create(filename)
+    if err != nil {
+        t.Fatalf("Dosya oluşturma hatası: %v", err)
+    }
+    
+    // Test verisi yaz
+    testData := make([]byte, 8192)
+    for i := 0; i < len(testData); i++ {
+        testData[i] = byte(i % 256)
+    }
+    
+    _, err = file.Write(testData)
+    if err != nil {
+        file.Close()
+        os.Remove(filename)
+        t.Fatalf("Dosya yazma hatası: %v", err)
+    }
+    
+    file.Close()
+    
+    // Dosyayı aç
+    file, err = os.OpenFile(filename, os.O_RDWR, 0)
+    if err != nil {
+        os.Remove(filename)
+        t.Fatalf("Dosya açma hatası: %v", err)
+    }
+    defer func() {
+        file.Close()
+        os.Remove(filename)
+    }()
+    
+    // Dosyanın belirli bir bölgesini belleğe eşle
+    offset := int64(1024)
+    length := int64(4096)
+    
+    mmapFile, err := MapRegion(file, length, PROT_READ|PROT_WRITE, MAP_SHARED, offset)
+    if err != nil {
+        t.Fatalf("Belleğe eşleme hatası: %v", err)
+    }
+    defer mmapFile.Close()
+    
+    // Dosya boyutunu kontrol et
+    if mmapFile.Len() != length {
+        t.Errorf("Beklenen dosya boyutu %d, alınan: %d", length, mmapFile.Len())
+    }
+    
+    // Belleğe eşlenmiş bölgeden oku
+    readData := make([]byte, 100)
+    n, err := mmapFile.ReadAt(readData, 0)
+    if err != nil {
+        t.Fatalf("Okuma hatası: %v", err)
+    }
+    
+    if n != len(readData) {
+        t.Errorf("Beklenen okuma boyutu %d, alınan: %d", len(readData), n)
+    }
+    
+    // Okunan veriyi kontrol et
+    for i := 0; i < len(readData); i++ {
+        expectedByte := testData[int(offset)+i]
+        if readData[i] != expectedByte {
+            t.Errorf("Veri uyuşmazlığı pozisyon %d: beklenen %d, alınan: %d", i, expectedByte, readData[i])
+            break
+        }
+    }
+    
+    // Belleğe eşlenmiş bölgeye yaz
+    writeData := []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE}
+    n, err = mmapFile.WriteAt(writeData, 100)
+    if err != nil {
+        t.Fatalf("Yazma hatası: %v", err)
+    }
+    
+    if n != len(writeData) {
+        t.Errorf("Beklenen yazma boyutu %d, alınan: %d", len(writeData), n)
+    }
+    
+    // Değişiklikleri diske yaz
+    err = mmapFile.Flush()
+    if err != nil {
+        t.Fatalf("Flush hatası: %v", err)
+    }
+    
+    // Değişiklikleri kontrol et
+    checkData := make([]byte, len(writeData))
+    n, err = mmapFile.ReadAt(checkData, 100)
+    if err != nil {
+        t.Fatalf("Okuma hatası: %v", err)
+    }
+    
+    for i := 0; i < len(writeData); i++ {
+        if checkData[i] != writeData[i] {
+            t.Errorf("Veri uyuşmazlığı pozisyon %d: beklenen %d, alınan: %d", i, writeData[i], checkData[i])
+            break
+        }
+    }
+}

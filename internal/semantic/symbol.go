@@ -2,7 +2,7 @@ package semantic
 
 import (
 	"fmt"
-	"goplus/internal/token"
+	"gominus/internal/token"
 )
 
 // SymbolType, bir sembolün tipini temsil eder.

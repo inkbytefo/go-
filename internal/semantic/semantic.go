@@ -1,16 +1,19 @@
 package semantic
 
 import (
-	"fmt"
-	"goplus/internal/ast"
-	"goplus/internal/token"
+	"gominus/internal/ast"
+	"gominus/internal/token"
 )
 
 // Analyzer, semantik analiz işlemlerini gerçekleştirir.
 type Analyzer struct {
-	errors       []string
-	currentScope *Scope
-	globalScope  *Scope
+	errorReporter *ErrorReporter
+	currentScope  *Scope
+	globalScope   *Scope
+	packageName   string
+	imports       []string
+	typeInference bool // Tip çıkarımı etkin mi?
+	inferencer    *TypeInference
 }
 
 // New, yeni bir Analyzer oluşturur.
@@ -18,11 +21,27 @@ func New() *Analyzer {
 	globalScope := NewScope(nil)
 	globalScope.IsGlobal = true
 
-	return &Analyzer{
-		errors:       []string{},
-		currentScope: globalScope,
-		globalScope:  globalScope,
+	a := &Analyzer{
+		errorReporter: NewErrorReporter(),
+		currentScope:  globalScope,
+		globalScope:   globalScope,
+		packageName:   "",
+		imports:       []string{},
+		typeInference: true, // Varsayılan olarak tip çıkarımı etkin
 	}
+
+	a.inferencer = NewTypeInference(a)
+	return a
+}
+
+// EnableTypeInference, tip çıkarımını etkinleştirir.
+func (a *Analyzer) EnableTypeInference() {
+	a.typeInference = true
+}
+
+// DisableTypeInference, tip çıkarımını devre dışı bırakır.
+func (a *Analyzer) DisableTypeInference() {
+	a.typeInference = false
 }
 
 // Analyze, bir AST'yi analiz eder.
@@ -38,7 +57,22 @@ func (a *Analyzer) Analyze(program *ast.Program) {
 
 // Errors, analiz sırasında karşılaşılan hataları döndürür.
 func (a *Analyzer) Errors() []string {
-	return a.errors
+	return a.errorReporter.GetAllMessages()
+}
+
+// HasErrors, hata olup olmadığını kontrol eder.
+func (a *Analyzer) HasErrors() bool {
+	return a.errorReporter.HasErrors()
+}
+
+// HasWarnings, uyarı olup olmadığını kontrol eder.
+func (a *Analyzer) HasWarnings() bool {
+	return a.errorReporter.HasWarnings()
+}
+
+// PrintErrors, tüm hataları yazdırır.
+func (a *Analyzer) PrintErrors() {
+	a.errorReporter.PrintAllMessages()
 }
 
 // collectDeclarations, tüm fonksiyon ve sınıf tanımlarını toplar.
@@ -172,6 +206,12 @@ func (a *Analyzer) analyzeStatement(stmt ast.Statement) Type {
 
 // analyzeExpression, bir ifadeyi analiz eder.
 func (a *Analyzer) analyzeExpression(expr ast.Expression) Type {
+	// Tip çıkarımı etkinse, inferencer'ı kullan
+	if a.typeInference {
+		return a.inferencer.InferType(expr)
+	}
+
+	// Tip çıkarımı etkin değilse, manuel analiz yap
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		return a.analyzeIdentifier(e)
@@ -215,9 +255,18 @@ func (a *Analyzer) analyzeExpression(expr ast.Expression) Type {
 }
 
 // reportError, bir hata rapor eder.
-func (a *Analyzer) reportError(tok token.Token, format string, args ...interface{}) {
-	msg := fmt.Sprintf("Satır %d, Sütun %d: %s", tok.Line, tok.Column, fmt.Sprintf(format, args...))
-	a.errors = append(a.errors, msg)
+func (a *Analyzer) reportError(tok token.Token, format string, args ...interface{}) *SemanticError {
+	return a.errorReporter.ReportError(tok, format, args...)
+}
+
+// reportWarning, bir uyarı rapor eder.
+func (a *Analyzer) reportWarning(tok token.Token, format string, args ...interface{}) *SemanticError {
+	return a.errorReporter.ReportWarning(tok, format, args...)
+}
+
+// reportInfo, bir bilgi rapor eder.
+func (a *Analyzer) reportInfo(tok token.Token, format string, args ...interface{}) *SemanticError {
+	return a.errorReporter.ReportInfo(tok, format, args...)
 }
 
 // Temel analiz fonksiyonları

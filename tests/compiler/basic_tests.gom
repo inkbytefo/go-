@@ -1,0 +1,295 @@
+// GO-Minus Derleyici Temel Testleri
+package main
+
+import "fmt"
+
+// Temel değişken tanımlamaları ve işlemler
+func testBasicVariables() {
+    // Değişken tanımlamaları
+    var a int = 10
+    var b int = 20
+    var c = 30 // Tip çıkarımı
+    d := 40    // Kısa değişken tanımı
+
+    // Aritmetik işlemler
+    sum := a + b
+    diff := c - d
+    prod := a * b
+    quot := c / a
+    mod := d % a
+
+    // Sonuçları yazdır
+    fmt.Println("Değişkenler:", a, b, c, d)
+    fmt.Println("Toplam:", sum)
+    fmt.Println("Fark:", diff)
+    fmt.Println("Çarpım:", prod)
+    fmt.Println("Bölüm:", quot)
+    fmt.Println("Mod:", mod)
+}
+
+// Kontrol yapıları
+func testControlStructures() {
+    // If-else
+    x := 10
+    if x > 5 {
+        fmt.Println("x 5'ten büyük")
+    } else if x < 5 {
+        fmt.Println("x 5'ten küçük")
+    } else {
+        fmt.Println("x 5'e eşit")
+    }
+
+    // For döngüsü
+    sum := 0
+    for i := 1; i <= 10; i++ {
+        sum += i
+    }
+    fmt.Println("1'den 10'a kadar olan sayıların toplamı:", sum)
+
+    // While benzeri for döngüsü
+    i := 0
+    for i < 5 {
+        fmt.Println("i:", i)
+        i++
+    }
+
+    // Range ile for döngüsü
+    numbers := []int{1, 2, 3, 4, 5}
+    for index, value := range numbers {
+        fmt.Printf("numbers[%d] = %d\n", index, value)
+    }
+}
+
+// Fonksiyonlar
+func add(a, b int) int {
+    return a + b
+}
+
+func swap(a, b int) (int, int) {
+    return b, a
+}
+
+func testFunctions() {
+    // Fonksiyon çağrısı
+    result := add(10, 20)
+    fmt.Println("10 + 20 =", result)
+
+    // Çoklu dönüş değeri
+    a, b := swap(10, 20)
+    fmt.Println("swap(10, 20) =", a, b)
+
+    // Anonim fonksiyon
+    square := func(x int) int {
+        return x * x
+    }
+    fmt.Println("5 karesi =", square(5))
+}
+
+// Diziler ve dilimler
+func testArraysAndSlices() {
+    // Dizi
+    var arr [5]int = [5]int{1, 2, 3, 4, 5}
+    fmt.Println("Dizi:", arr)
+
+    // Dilim
+    slice := []int{1, 2, 3, 4, 5}
+    fmt.Println("Dilim:", slice)
+
+    // Dilim ekleme
+    slice = append(slice, 6)
+    fmt.Println("Ekleme sonrası dilim:", slice)
+
+    // Dilim dilimleme
+    subSlice := slice[1:4]
+    fmt.Println("Alt dilim:", subSlice)
+}
+
+// Haritalar
+func testMaps() {
+    // Harita oluşturma
+    m := make(map[string]int)
+    
+    // Değer ekleme
+    m["bir"] = 1
+    m["iki"] = 2
+    m["üç"] = 3
+    
+    // Değer okuma
+    fmt.Println("m[\"bir\"] =", m["bir"])
+    
+    // Değer varlığını kontrol etme
+    value, exists := m["dört"]
+    if exists {
+        fmt.Println("m[\"dört\"] =", value)
+    } else {
+        fmt.Println("m[\"dört\"] mevcut değil")
+    }
+    
+    // Haritayı yazdırma
+    fmt.Println("Harita:", m)
+    
+    // Değer silme
+    delete(m, "iki")
+    fmt.Println("Silme sonrası harita:", m)
+}
+
+// Yapılar
+type Person struct {
+    Name string
+    Age  int
+}
+
+func (p Person) Greet() string {
+    return fmt.Sprintf("Merhaba, ben %s. %d yaşındayım.", p.Name, p.Age)
+}
+
+func testStructs() {
+    // Yapı oluşturma
+    p := Person{Name: "Ahmet", Age: 30}
+    fmt.Println("Kişi:", p)
+    
+    // Yapı alanlarına erişim
+    fmt.Println("İsim:", p.Name)
+    fmt.Println("Yaş:", p.Age)
+    
+    // Metot çağrısı
+    fmt.Println(p.Greet())
+}
+
+// Arayüzler
+type Greeter interface {
+    Greet() string
+}
+
+type Dog struct {
+    Name string
+}
+
+func (d Dog) Greet() string {
+    return fmt.Sprintf("Hav hav! Ben %s.", d.Name)
+}
+
+func testInterfaces() {
+    // Farklı türleri aynı arayüzle kullanma
+    var g Greeter
+    
+    g = Person{Name: "Ahmet", Age: 30}
+    fmt.Println(g.Greet())
+    
+    g = Dog{Name: "Karabaş"}
+    fmt.Println(g.Greet())
+}
+
+// GO-Minus sınıfları
+class Animal {
+    private:
+        string name
+        int age
+    
+    public:
+        Animal(string name, int age) {
+            this.name = name
+            this.age = age
+        }
+        
+        string getName() {
+            return this.name
+        }
+        
+        int getAge() {
+            return this.age
+        }
+        
+        string makeSound() {
+            return "..."
+        }
+}
+
+class Cat extends Animal {
+    public:
+        Cat(string name, int age) {
+            super(name, age)
+        }
+        
+        string makeSound() {
+            return "Miyav!"
+        }
+}
+
+func testClasses() {
+    // Sınıf örnekleri oluşturma
+    animal := Animal("Hayvan", 5)
+    cat := Cat("Tekir", 3)
+    
+    // Metotları çağırma
+    fmt.Printf("%s (%d): %s\n", animal.getName(), animal.getAge(), animal.makeSound())
+    fmt.Printf("%s (%d): %s\n", cat.getName(), cat.getAge(), cat.makeSound())
+}
+
+// Şablonlar
+template<T>
+func max(a, b T) T {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+func testTemplates() {
+    // Farklı türlerle şablon fonksiyonu kullanma
+    fmt.Println("max(10, 20) =", max(10, 20))
+    fmt.Println("max(3.14, 2.71) =", max(3.14, 2.71))
+    fmt.Println("max(\"abc\", \"def\") =", max("abc", "def"))
+}
+
+// İstisna işleme
+func divide(a, b int) int {
+    try {
+        if b == 0 {
+            throw "Sıfıra bölme hatası"
+        }
+        return a / b
+    } catch e {
+        fmt.Println("Hata:", e)
+        return 0
+    } finally {
+        fmt.Println("İşlem tamamlandı")
+    }
+}
+
+func testExceptionHandling() {
+    fmt.Println("10 / 2 =", divide(10, 2))
+    fmt.Println("10 / 0 =", divide(10, 0))
+}
+
+func main() {
+    fmt.Println("=== Temel Değişkenler ===")
+    testBasicVariables()
+    
+    fmt.Println("\n=== Kontrol Yapıları ===")
+    testControlStructures()
+    
+    fmt.Println("\n=== Fonksiyonlar ===")
+    testFunctions()
+    
+    fmt.Println("\n=== Diziler ve Dilimler ===")
+    testArraysAndSlices()
+    
+    fmt.Println("\n=== Haritalar ===")
+    testMaps()
+    
+    fmt.Println("\n=== Yapılar ===")
+    testStructs()
+    
+    fmt.Println("\n=== Arayüzler ===")
+    testInterfaces()
+    
+    fmt.Println("\n=== Sınıflar ===")
+    testClasses()
+    
+    fmt.Println("\n=== Şablonlar ===")
+    testTemplates()
+    
+    fmt.Println("\n=== İstisna İşleme ===")
+    testExceptionHandling()
+}

@@ -1,0 +1,438 @@
+// GO-Minus Standart Kütüphane - Net Paketi
+package net
+
+import (
+    "io"
+    "net"
+    "time"
+)
+
+// Addr, bir ağ adresi arayüzünü temsil eder.
+interface Addr {
+    func Network() string
+    func String() string
+}
+
+// Conn, bir ağ bağlantısı arayüzünü temsil eder.
+interface Conn {
+    func Read(b []byte) (n int, err error)
+    func Write(b []byte) (n int, err error)
+    func Close() error
+    func LocalAddr() Addr
+    func RemoteAddr() Addr
+    func SetDeadline(t time.Time) error
+    func SetReadDeadline(t time.Time) error
+    func SetWriteDeadline(t time.Time) error
+}
+
+// Listener, bir ağ dinleyicisi arayüzünü temsil eder.
+interface Listener {
+    func Accept() (Conn, error)
+    func Close() error
+    func Addr() Addr
+}
+
+// IPAddr, bir IP adresini temsil eder.
+class IPAddr {
+    private:
+        net.IPAddr goIPAddr
+    
+    public:
+        // New, yeni bir IPAddr oluşturur.
+        static func New(ip []byte) *IPAddr {
+            goIP := net.IP(ip)
+            goIPAddr := net.IPAddr{IP: goIP}
+            return &IPAddr{goIPAddr: goIPAddr}
+        }
+        
+        // Parse, bir IP adresi dizesini ayrıştırır.
+        static func Parse(s string) (*IPAddr, error) {
+            goIP, err := net.ParseIP(s)
+            if err != nil {
+                return nil, err
+            }
+            
+            goIPAddr := net.IPAddr{IP: goIP}
+            return &IPAddr{goIPAddr: goIPAddr}, nil
+        }
+        
+        // Network, ağ adı döndürür.
+        func (a *IPAddr) Network() string {
+            return a.goIPAddr.Network()
+        }
+        
+        // String, IP adresini bir dize olarak döndürür.
+        func (a *IPAddr) String() string {
+            return a.goIPAddr.String()
+        }
+        
+        // IsLoopback, IP adresinin loopback olup olmadığını kontrol eder.
+        func (a *IPAddr) IsLoopback() bool {
+            return a.goIPAddr.IP.IsLoopback()
+        }
+        
+        // IsGlobalUnicast, IP adresinin global unicast olup olmadığını kontrol eder.
+        func (a *IPAddr) IsGlobalUnicast() bool {
+            return a.goIPAddr.IP.IsGlobalUnicast()
+        }
+        
+        // IsMulticast, IP adresinin multicast olup olmadığını kontrol eder.
+        func (a *IPAddr) IsMulticast() bool {
+            return a.goIPAddr.IP.IsMulticast()
+        }
+        
+        // IsUnspecified, IP adresinin belirtilmemiş olup olmadığını kontrol eder.
+        func (a *IPAddr) IsUnspecified() bool {
+            return a.goIPAddr.IP.IsUnspecified()
+        }
+        
+        // To4, IPv4 adresini döndürür veya IPv4 değilse nil döndürür.
+        func (a *IPAddr) To4() []byte {
+            ip4 := a.goIPAddr.IP.To4()
+            if ip4 == nil {
+                return nil
+            }
+            return []byte(ip4)
+        }
+        
+        // To16, IPv6 adresini döndürür.
+        func (a *IPAddr) To16() []byte {
+            ip6 := a.goIPAddr.IP.To16()
+            return []byte(ip6)
+        }
+}
+
+// TCPAddr, bir TCP adresini temsil eder.
+class TCPAddr {
+    private:
+        net.TCPAddr goTCPAddr
+    
+    public:
+        // New, yeni bir TCPAddr oluşturur.
+        static func New(ip []byte, port int) *TCPAddr {
+            goIP := net.IP(ip)
+            goTCPAddr := net.TCPAddr{IP: goIP, Port: port}
+            return &TCPAddr{goTCPAddr: goTCPAddr}
+        }
+        
+        // Parse, bir TCP adresi dizesini ayrıştırır.
+        static func Parse(s string) (*TCPAddr, error) {
+            goTCPAddr, err := net.ResolveTCPAddr("tcp", s)
+            if err != nil {
+                return nil, err
+            }
+            
+            return &TCPAddr{goTCPAddr: *goTCPAddr}, nil
+        }
+        
+        // Network, ağ adı döndürür.
+        func (a *TCPAddr) Network() string {
+            return a.goTCPAddr.Network()
+        }
+        
+        // String, TCP adresini bir dize olarak döndürür.
+        func (a *TCPAddr) String() string {
+            return a.goTCPAddr.String()
+        }
+        
+        // IP, IP adresini döndürür.
+        func (a *TCPAddr) IP() []byte {
+            return []byte(a.goTCPAddr.IP)
+        }
+        
+        // Port, port numarasını döndürür.
+        func (a *TCPAddr) Port() int {
+            return a.goTCPAddr.Port
+        }
+}
+
+// UDPAddr, bir UDP adresini temsil eder.
+class UDPAddr {
+    private:
+        net.UDPAddr goUDPAddr
+    
+    public:
+        // New, yeni bir UDPAddr oluşturur.
+        static func New(ip []byte, port int) *UDPAddr {
+            goIP := net.IP(ip)
+            goUDPAddr := net.UDPAddr{IP: goIP, Port: port}
+            return &UDPAddr{goUDPAddr: goUDPAddr}
+        }
+        
+        // Parse, bir UDP adresi dizesini ayrıştırır.
+        static func Parse(s string) (*UDPAddr, error) {
+            goUDPAddr, err := net.ResolveUDPAddr("udp", s)
+            if err != nil {
+                return nil, err
+            }
+            
+            return &UDPAddr{goUDPAddr: *goUDPAddr}, nil
+        }
+        
+        // Network, ağ adı döndürür.
+        func (a *UDPAddr) Network() string {
+            return a.goUDPAddr.Network()
+        }
+        
+        // String, UDP adresini bir dize olarak döndürür.
+        func (a *UDPAddr) String() string {
+            return a.goUDPAddr.String()
+        }
+        
+        // IP, IP adresini döndürür.
+        func (a *UDPAddr) IP() []byte {
+            return []byte(a.goUDPAddr.IP)
+        }
+        
+        // Port, port numarasını döndürür.
+        func (a *UDPAddr) Port() int {
+            return a.goUDPAddr.Port
+        }
+}
+
+// TCPConn, bir TCP bağlantısını temsil eder.
+class TCPConn {
+    private:
+        net.TCPConn goTCPConn
+    
+    public:
+        // Read, bağlantıdan veri okur.
+        func (c *TCPConn) Read(b []byte) (n int, err error) {
+            return c.goTCPConn.Read(b)
+        }
+        
+        // Write, bağlantıya veri yazar.
+        func (c *TCPConn) Write(b []byte) (n int, err error) {
+            return c.goTCPConn.Write(b)
+        }
+        
+        // Close, bağlantıyı kapatır.
+        func (c *TCPConn) Close() error {
+            return c.goTCPConn.Close()
+        }
+        
+        // LocalAddr, yerel adresi döndürür.
+        func (c *TCPConn) LocalAddr() Addr {
+            goAddr := c.goTCPConn.LocalAddr()
+            goTCPAddr := goAddr.(*net.TCPAddr)
+            return &TCPAddr{goTCPAddr: *goTCPAddr}
+        }
+        
+        // RemoteAddr, uzak adresi döndürür.
+        func (c *TCPConn) RemoteAddr() Addr {
+            goAddr := c.goTCPConn.RemoteAddr()
+            goTCPAddr := goAddr.(*net.TCPAddr)
+            return &TCPAddr{goTCPAddr: *goTCPAddr}
+        }
+        
+        // SetDeadline, bağlantı için son tarih ayarlar.
+        func (c *TCPConn) SetDeadline(t time.Time) error {
+            return c.goTCPConn.SetDeadline(t.goTime)
+        }
+        
+        // SetReadDeadline, okuma işlemi için son tarih ayarlar.
+        func (c *TCPConn) SetReadDeadline(t time.Time) error {
+            return c.goTCPConn.SetReadDeadline(t.goTime)
+        }
+        
+        // SetWriteDeadline, yazma işlemi için son tarih ayarlar.
+        func (c *TCPConn) SetWriteDeadline(t time.Time) error {
+            return c.goTCPConn.SetWriteDeadline(t.goTime)
+        }
+        
+        // SetNoDelay, Nagle algoritmasını devre dışı bırakır.
+        func (c *TCPConn) SetNoDelay(noDelay bool) error {
+            return c.goTCPConn.SetNoDelay(noDelay)
+        }
+        
+        // SetKeepAlive, keep-alive özelliğini etkinleştirir.
+        func (c *TCPConn) SetKeepAlive(keepalive bool) error {
+            return c.goTCPConn.SetKeepAlive(keepalive)
+        }
+        
+        // SetKeepAlivePeriod, keep-alive periyodunu ayarlar.
+        func (c *TCPConn) SetKeepAlivePeriod(d time.Duration) error {
+            return c.goTCPConn.SetKeepAlivePeriod(d.goDuration)
+        }
+}
+
+// UDPConn, bir UDP bağlantısını temsil eder.
+class UDPConn {
+    private:
+        net.UDPConn goUDPConn
+    
+    public:
+        // Read, bağlantıdan veri okur.
+        func (c *UDPConn) Read(b []byte) (n int, err error) {
+            return c.goUDPConn.Read(b)
+        }
+        
+        // Write, bağlantıya veri yazar.
+        func (c *UDPConn) Write(b []byte) (n int, err error) {
+            return c.goUDPConn.Write(b)
+        }
+        
+        // Close, bağlantıyı kapatır.
+        func (c *UDPConn) Close() error {
+            return c.goUDPConn.Close()
+        }
+        
+        // LocalAddr, yerel adresi döndürür.
+        func (c *UDPConn) LocalAddr() Addr {
+            goAddr := c.goUDPConn.LocalAddr()
+            goUDPAddr := goAddr.(*net.UDPAddr)
+            return &UDPAddr{goUDPAddr: *goUDPAddr}
+        }
+        
+        // RemoteAddr, uzak adresi döndürür.
+        func (c *UDPConn) RemoteAddr() Addr {
+            goAddr := c.goUDPConn.RemoteAddr()
+            goUDPAddr := goAddr.(*net.UDPAddr)
+            return &UDPAddr{goUDPAddr: *goUDPAddr}
+        }
+        
+        // SetDeadline, bağlantı için son tarih ayarlar.
+        func (c *UDPConn) SetDeadline(t time.Time) error {
+            return c.goUDPConn.SetDeadline(t.goTime)
+        }
+        
+        // SetReadDeadline, okuma işlemi için son tarih ayarlar.
+        func (c *UDPConn) SetReadDeadline(t time.Time) error {
+            return c.goUDPConn.SetReadDeadline(t.goTime)
+        }
+        
+        // SetWriteDeadline, yazma işlemi için son tarih ayarlar.
+        func (c *UDPConn) SetWriteDeadline(t time.Time) error {
+            return c.goUDPConn.SetWriteDeadline(t.goTime)
+        }
+        
+        // ReadFromUDP, belirli bir UDP adresinden veri okur.
+        func (c *UDPConn) ReadFromUDP(b []byte) (n int, addr *UDPAddr, err error) {
+            n, goAddr, err := c.goUDPConn.ReadFromUDP(b)
+            if err != nil {
+                return 0, nil, err
+            }
+            
+            return n, &UDPAddr{goUDPAddr: *goAddr}, nil
+        }
+        
+        // WriteToUDP, belirli bir UDP adresine veri yazar.
+        func (c *UDPConn) WriteToUDP(b []byte, addr *UDPAddr) (n int, err error) {
+            return c.goUDPConn.WriteToUDP(b, &addr.goUDPAddr)
+        }
+}
+
+// TCPListener, bir TCP dinleyicisini temsil eder.
+class TCPListener {
+    private:
+        net.TCPListener goTCPListener
+    
+    public:
+        // Accept, bir bağlantı kabul eder.
+        func (l *TCPListener) Accept() (Conn, error) {
+            goConn, err := l.goTCPListener.Accept()
+            if err != nil {
+                return nil, err
+            }
+            
+            goTCPConn := goConn.(*net.TCPConn)
+            return &TCPConn{goTCPConn: *goTCPConn}, nil
+        }
+        
+        // Close, dinleyiciyi kapatır.
+        func (l *TCPListener) Close() error {
+            return l.goTCPListener.Close()
+        }
+        
+        // Addr, dinleyici adresini döndürür.
+        func (l *TCPListener) Addr() Addr {
+            goAddr := l.goTCPListener.Addr()
+            goTCPAddr := goAddr.(*net.TCPAddr)
+            return &TCPAddr{goTCPAddr: *goTCPAddr}
+        }
+        
+        // SetDeadline, kabul işlemi için son tarih ayarlar.
+        func (l *TCPListener) SetDeadline(t time.Time) error {
+            return l.goTCPListener.SetDeadline(t.goTime)
+        }
+}
+
+// Dial, belirtilen ağ ve adresle bir bağlantı kurar.
+func Dial(network string, address string) (Conn, error) {
+    goConn, err := net.Dial(network, address)
+    if err != nil {
+        return nil, err
+    }
+    
+    switch network {
+    case "tcp", "tcp4", "tcp6":
+        goTCPConn := goConn.(*net.TCPConn)
+        return &TCPConn{goTCPConn: *goTCPConn}, nil
+    case "udp", "udp4", "udp6":
+        goUDPConn := goConn.(*net.UDPConn)
+        return &UDPConn{goUDPConn: *goUDPConn}, nil
+    default:
+        return nil, error("Desteklenmeyen ağ türü: " + network)
+    }
+}
+
+// DialTimeout, belirtilen ağ ve adresle bir bağlantı kurar ve zaman aşımı ayarlar.
+func DialTimeout(network string, address string, timeout time.Duration) (Conn, error) {
+    goConn, err := net.DialTimeout(network, address, timeout.goDuration)
+    if err != nil {
+        return nil, err
+    }
+    
+    switch network {
+    case "tcp", "tcp4", "tcp6":
+        goTCPConn := goConn.(*net.TCPConn)
+        return &TCPConn{goTCPConn: *goTCPConn}, nil
+    case "udp", "udp4", "udp6":
+        goUDPConn := goConn.(*net.UDPConn)
+        return &UDPConn{goUDPConn: *goUDPConn}, nil
+    default:
+        return nil, error("Desteklenmeyen ağ türü: " + network)
+    }
+}
+
+// Listen, belirtilen ağ ve adresle bir dinleyici oluşturur.
+func Listen(network string, address string) (Listener, error) {
+    switch network {
+    case "tcp", "tcp4", "tcp6":
+        goListener, err := net.Listen(network, address)
+        if err != nil {
+            return nil, err
+        }
+        
+        goTCPListener := goListener.(*net.TCPListener)
+        return &TCPListener{goTCPListener: *goTCPListener}, nil
+    default:
+        return nil, error("Desteklenmeyen ağ türü: " + network)
+    }
+}
+
+// LookupHost, bir ana bilgisayar adını IP adreslerine çözer.
+func LookupHost(host string) ([]string, error) {
+    return net.LookupHost(host)
+}
+
+// LookupIP, bir ana bilgisayar adını IP adreslerine çözer.
+func LookupIP(host string) ([]*IPAddr, error) {
+    goIPs, err := net.LookupIP(host)
+    if err != nil {
+        return nil, err
+    }
+    
+    ipAddrs := make([]*IPAddr, len(goIPs))
+    for i, goIP := range goIPs {
+        goIPAddr := net.IPAddr{IP: goIP}
+        ipAddrs[i] = &IPAddr{goIPAddr: goIPAddr}
+    }
+    
+    return ipAddrs, nil
+}
+
+// LookupPort, bir servis adını port numarasına çözer.
+func LookupPort(network string, service string) (int, error) {
+    return net.LookupPort(network, service)
+}

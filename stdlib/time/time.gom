@@ -1,0 +1,331 @@
+// GO-Minus Standart Kütüphane - Time Paketi
+package time
+
+import (
+    "time" // Go'nun time paketini kullan
+)
+
+// Time, bir zaman noktasını temsil eder.
+class Time {
+    private:
+        time.Time goTime
+    
+    public:
+        // New, belirtilen zaman değerleriyle yeni bir Time oluşturur.
+        static func New(year int, month int, day int, hour int, min int, sec int, nsec int, loc *Location) Time {
+            goTime := time.Date(year, time.Month(month), day, hour, min, sec, nsec, loc.goLoc)
+            t := Time{goTime: goTime}
+            return t
+        }
+        
+        // Now, şu anki zamanı döndürür.
+        static func Now() Time {
+            goTime := time.Now()
+            t := Time{goTime: goTime}
+            return t
+        }
+        
+        // Unix, Unix zaman damgasından bir Time oluşturur.
+        static func Unix(sec int64, nsec int64) Time {
+            goTime := time.Unix(sec, nsec)
+            t := Time{goTime: goTime}
+            return t
+        }
+        
+        // Parse, belirtilen düzende bir zaman dizesini ayrıştırır.
+        static func Parse(layout string, value string) (Time, error) {
+            goTime, err := time.Parse(layout, value)
+            if err != nil {
+                return Time{}, err
+            }
+            
+            t := Time{goTime: goTime}
+            return t, nil
+        }
+        
+        // Year, yılı döndürür.
+        func (t Time) Year() int {
+            return t.goTime.Year()
+        }
+        
+        // Month, ayı döndürür (1-12).
+        func (t Time) Month() int {
+            return int(t.goTime.Month())
+        }
+        
+        // Day, ayın gününü döndürür.
+        func (t Time) Day() int {
+            return t.goTime.Day()
+        }
+        
+        // Hour, saati döndürür (0-23).
+        func (t Time) Hour() int {
+            return t.goTime.Hour()
+        }
+        
+        // Minute, dakikayı döndürür (0-59).
+        func (t Time) Minute() int {
+            return t.goTime.Minute()
+        }
+        
+        // Second, saniyeyi döndürür (0-59).
+        func (t Time) Second() int {
+            return t.goTime.Second()
+        }
+        
+        // Nanosecond, nanosaniyeyi döndürür (0-999999999).
+        func (t Time) Nanosecond() int {
+            return t.goTime.Nanosecond()
+        }
+        
+        // Weekday, haftanın gününü döndürür (0-6, 0 = Pazar).
+        func (t Time) Weekday() int {
+            return int(t.goTime.Weekday())
+        }
+        
+        // YearDay, yılın gününü döndürür (1-365/366).
+        func (t Time) YearDay() int {
+            return t.goTime.YearDay()
+        }
+        
+        // Location, zaman dilimini döndürür.
+        func (t Time) Location() *Location {
+            goLoc := t.goTime.Location()
+            return &Location{goLoc: goLoc}
+        }
+        
+        // UTC, UTC zaman dilimindeki zamanı döndürür.
+        func (t Time) UTC() Time {
+            goTime := t.goTime.UTC()
+            return Time{goTime: goTime}
+        }
+        
+        // Local, yerel zaman dilimindeki zamanı döndürür.
+        func (t Time) Local() Time {
+            goTime := t.goTime.Local()
+            return Time{goTime: goTime}
+        }
+        
+        // In, belirtilen zaman dilimindeki zamanı döndürür.
+        func (t Time) In(loc *Location) Time {
+            goTime := t.goTime.In(loc.goLoc)
+            return Time{goTime: goTime}
+        }
+        
+        // Unix, Unix zaman damgasını döndürür (1 Ocak 1970 UTC'den bu yana geçen saniye sayısı).
+        func (t Time) Unix() int64 {
+            return t.goTime.Unix()
+        }
+        
+        // UnixNano, Unix zaman damgasını nanosaniye cinsinden döndürür.
+        func (t Time) UnixNano() int64 {
+            return t.goTime.UnixNano()
+        }
+        
+        // Format, zamanı belirtilen düzende biçimlendirir.
+        func (t Time) Format(layout string) string {
+            return t.goTime.Format(layout)
+        }
+        
+        // String, zamanı RFC3339 formatında bir dize olarak döndürür.
+        func (t Time) String() string {
+            return t.goTime.Format(time.RFC3339)
+        }
+        
+        // Add, belirtilen süreyi ekler.
+        func (t Time) Add(d Duration) Time {
+            goTime := t.goTime.Add(d.goDuration)
+            return Time{goTime: goTime}
+        }
+        
+        // Sub, iki zaman arasındaki farkı döndürür.
+        func (t Time) Sub(u Time) Duration {
+            goDuration := t.goTime.Sub(u.goTime)
+            return Duration{goDuration: goDuration}
+        }
+        
+        // AddDate, belirtilen yıl, ay ve gün sayısını ekler.
+        func (t Time) AddDate(years int, months int, days int) Time {
+            goTime := t.goTime.AddDate(years, months, days)
+            return Time{goTime: goTime}
+        }
+        
+        // Before, t'nin u'dan önce olup olmadığını kontrol eder.
+        func (t Time) Before(u Time) bool {
+            return t.goTime.Before(u.goTime)
+        }
+        
+        // After, t'nin u'dan sonra olup olmadığını kontrol eder.
+        func (t Time) After(u Time) bool {
+            return t.goTime.After(u.goTime)
+        }
+        
+        // Equal, t'nin u'ya eşit olup olmadığını kontrol eder.
+        func (t Time) Equal(u Time) bool {
+            return t.goTime.Equal(u.goTime)
+        }
+}
+
+// Duration, iki zaman noktası arasındaki süreyi temsil eder.
+class Duration {
+    private:
+        time.Duration goDuration
+    
+    public:
+        // New, nanosaniye cinsinden bir süre oluşturur.
+        static func New(nanoseconds int64) Duration {
+            goDuration := time.Duration(nanoseconds)
+            return Duration{goDuration: goDuration}
+        }
+        
+        // Nanoseconds, süreyi nanosaniye cinsinden döndürür.
+        func (d Duration) Nanoseconds() int64 {
+            return d.goDuration.Nanoseconds()
+        }
+        
+        // Microseconds, süreyi mikrosaniye cinsinden döndürür.
+        func (d Duration) Microseconds() int64 {
+            return d.goDuration.Microseconds()
+        }
+        
+        // Milliseconds, süreyi milisaniye cinsinden döndürür.
+        func (d Duration) Milliseconds() int64 {
+            return d.goDuration.Milliseconds()
+        }
+        
+        // Seconds, süreyi saniye cinsinden döndürür.
+        func (d Duration) Seconds() float64 {
+            return d.goDuration.Seconds()
+        }
+        
+        // Minutes, süreyi dakika cinsinden döndürür.
+        func (d Duration) Minutes() float64 {
+            return d.goDuration.Minutes()
+        }
+        
+        // Hours, süreyi saat cinsinden döndürür.
+        func (d Duration) Hours() float64 {
+            return d.goDuration.Hours()
+        }
+        
+        // String, süreyi bir dize olarak döndürür.
+        func (d Duration) String() string {
+            return d.goDuration.String()
+        }
+}
+
+// Location, bir zaman dilimini temsil eder.
+class Location {
+    private:
+        time.Location goLoc
+    
+    public:
+        // LoadLocation, belirtilen isimle bir zaman dilimi yükler.
+        static func LoadLocation(name string) (*Location, error) {
+            goLoc, err := time.LoadLocation(name)
+            if err != nil {
+                return nil, err
+            }
+            
+            loc := new Location()
+            loc.goLoc = *goLoc
+            return loc, nil
+        }
+        
+        // FixedZone, belirtilen isim ve ofsetle sabit bir zaman dilimi oluşturur.
+        static func FixedZone(name string, offset int) *Location {
+            goLoc := time.FixedZone(name, offset)
+            loc := new Location()
+            loc.goLoc = *goLoc
+            return loc
+        }
+        
+        // String, zaman diliminin adını döndürür.
+        func (l *Location) String() string {
+            return l.goLoc.String()
+        }
+}
+
+// Zaman sabitleri
+const (
+    Nanosecond  = 1
+    Microsecond = 1000 * Nanosecond
+    Millisecond = 1000 * Microsecond
+    Second      = 1000 * Millisecond
+    Minute      = 60 * Second
+    Hour        = 60 * Minute
+)
+
+// Tarih/saat biçimlendirme düzenleri
+const (
+    ANSIC       = "Mon Jan _2 15:04:05 2006"
+    UnixDate    = "Mon Jan _2 15:04:05 MST 2006"
+    RubyDate    = "Mon Jan 02 15:04:05 -0700 2006"
+    RFC822      = "02 Jan 06 15:04 MST"
+    RFC822Z     = "02 Jan 06 15:04 -0700"
+    RFC850      = "Monday, 02-Jan-06 15:04:05 MST"
+    RFC1123     = "Mon, 02 Jan 2006 15:04:05 MST"
+    RFC1123Z    = "Mon, 02 Jan 2006 15:04:05 -0700"
+    RFC3339     = "2006-01-02T15:04:05Z07:00"
+    RFC3339Nano = "2006-01-02T15:04:05.999999999Z07:00"
+    Kitchen     = "3:04PM"
+    Stamp       = "Jan _2 15:04:05"
+    StampMilli  = "Jan _2 15:04:05.000"
+    StampMicro  = "Jan _2 15:04:05.000000"
+    StampNano   = "Jan _2 15:04:05.000000000"
+    DateTime    = "2006-01-02 15:04:05"
+    DateOnly    = "2006-01-02"
+    TimeOnly    = "15:04:05"
+)
+
+// Yardımcı fonksiyonlar
+
+// Sleep, belirtilen süre kadar bekler.
+func Sleep(d Duration) {
+    time.Sleep(d.goDuration)
+}
+
+// After, belirtilen süre sonra bir değer gönderen bir kanal döndürür.
+func After(d Duration) <-chan Time {
+    ch := make(chan Time)
+    go func() {
+        time.Sleep(d.goDuration)
+        ch <- Now()
+        close(ch)
+    }()
+    return ch
+}
+
+// Tick, belirtilen aralıklarla bir değer gönderen bir kanal döndürür.
+func Tick(d Duration) <-chan Time {
+    ch := make(chan Time)
+    go func() {
+        ticker := time.NewTicker(d.goDuration)
+        for t := range ticker.C {
+            ch <- Time{goTime: t}
+        }
+    }()
+    return ch
+}
+
+// Since, belirtilen zamandan bu yana geçen süreyi döndürür.
+func Since(t Time) Duration {
+    goDuration := time.Since(t.goTime)
+    return Duration{goDuration: goDuration}
+}
+
+// Until, belirtilen zamana kadar kalan süreyi döndürür.
+func Until(t Time) Duration {
+    goDuration := time.Until(t.goTime)
+    return Duration{goDuration: goDuration}
+}
+
+// ParseDuration, bir süre dizesini ayrıştırır.
+func ParseDuration(s string) (Duration, error) {
+    goDuration, err := time.ParseDuration(s)
+    if err != nil {
+        return Duration{}, err
+    }
+    
+    return Duration{goDuration: goDuration}, nil
+}

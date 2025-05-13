@@ -2,7 +2,7 @@ package ast
 
 import (
 	"bytes"
-	"goplus/internal/token"
+	"gominus/internal/token"
 	"strings"
 )
 

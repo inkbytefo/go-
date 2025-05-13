@@ -1,0 +1,82 @@
+// GO-Minus Standart Kütüphane - IO Paketi - Memory-mapped IO (Unix/Linux)
+package mmap
+
+import (
+    "os"
+    "syscall"
+    "unsafe"
+)
+
+// Unix/Linux API sabitleri
+const (
+    // mmap bayrakları
+    MAP_ANON     = 0x1000
+    MAP_FILE     = 0x0000
+    MAP_FIXED    = 0x0010
+    
+    // msync bayrakları
+    MS_ASYNC     = 0x0001
+    MS_SYNC      = 0x0004
+    MS_INVALIDATE = 0x0002
+)
+
+// Unix/Linux için mmap implementasyonu
+func mmapUnix(fd uintptr, offset int64, length int64, prot int, flags int) (unsafe.Pointer, error) {
+    // Koruma bayraklarını Unix/Linux'a dönüştür
+    var mmapFlags int
+    
+    if flags & MAP_PRIVATE != 0 {
+        mmapFlags |= syscall.MAP_PRIVATE
+    } else {
+        mmapFlags |= syscall.MAP_SHARED
+    }
+    
+    // Dosyayı belleğe eşle
+    addr, _, errno := syscall.Syscall6(
+        syscall.SYS_MMAP,
+        0, // NULL
+        uintptr(length),
+        uintptr(prot),
+        uintptr(mmapFlags),
+        fd,
+        uintptr(offset),
+    )
+    
+    if errno != 0 {
+        return nil, os.NewSyscallError("mmap", errno)
+    }
+    
+    return unsafe.Pointer(addr), nil
+}
+
+// Unix/Linux için munmap implementasyonu
+func munmapUnix(addr unsafe.Pointer, length int64) error {
+    _, _, errno := syscall.Syscall(
+        syscall.SYS_MUNMAP,
+        uintptr(addr),
+        uintptr(length),
+        0,
+    )
+    
+    if errno != 0 {
+        return os.NewSyscallError("munmap", errno)
+    }
+    
+    return nil
+}
+
+// Unix/Linux için msync implementasyonu
+func msyncUnix(addr unsafe.Pointer, length int64) error {
+    _, _, errno := syscall.Syscall(
+        syscall.SYS_MSYNC,
+        uintptr(addr),
+        uintptr(length),
+        MS_SYNC,
+    )
+    
+    if errno != 0 {
+        return os.NewSyscallError("msync", errno)
+    }
+    
+    return nil
+}

@@ -1,0 +1,225 @@
+// GO-Minus Standart Kütüphane - Trie Paketi
+package trie
+
+// TrieNode, bir trie düğümünü temsil eder.
+class TrieNode<T> {
+    private:
+        map[rune]TrieNode<T> children
+        bool isEndOfWord
+        T value
+        bool hasValue
+
+    public:
+        // New, yeni bir TrieNode oluşturur.
+        static func New<T>() *TrieNode<T> {
+            node := new TrieNode<T>()
+            node.children = make(map[rune]TrieNode<T>)
+            node.isEndOfWord = false
+            node.hasValue = false
+            return node
+        }
+
+        // IsEndOfWord, düğümün bir kelimenin sonu olup olmadığını döndürür.
+        func (n *TrieNode<T>) IsEndOfWord() bool {
+            return n.isEndOfWord
+        }
+
+        // SetEndOfWord, düğümü bir kelimenin sonu olarak işaretler.
+        func (n *TrieNode<T>) SetEndOfWord(isEnd bool) {
+            n.isEndOfWord = isEnd
+        }
+
+        // GetValue, düğümün değerini döndürür.
+        func (n *TrieNode<T>) GetValue() (T, bool) {
+            return n.value, n.hasValue
+        }
+
+        // SetValue, düğüme bir değer atar.
+        func (n *TrieNode<T>) SetValue(value T) {
+            n.value = value
+            n.hasValue = true
+        }
+
+        // GetChild, belirtilen karaktere sahip alt düğümü döndürür.
+        func (n *TrieNode<T>) GetChild(ch rune) (*TrieNode<T>, bool) {
+            child, exists := n.children[ch]
+            return &child, exists
+        }
+
+        // AddChild, belirtilen karaktere sahip yeni bir alt düğüm ekler.
+        func (n *TrieNode<T>) AddChild(ch rune) *TrieNode<T> {
+            child := TrieNode.New<T>()
+            n.children[ch] = *child
+            return child
+        }
+
+        // RemoveChild, belirtilen karaktere sahip alt düğümü kaldırır.
+        func (n *TrieNode<T>) RemoveChild(ch rune) {
+            delete(n.children, ch)
+        }
+
+        // HasChildren, düğümün alt düğümleri olup olmadığını kontrol eder.
+        func (n *TrieNode<T>) HasChildren() bool {
+            return len(n.children) > 0
+        }
+
+        // GetChildren, düğümün tüm alt düğümlerini döndürür.
+        func (n *TrieNode<T>) GetChildren() map[rune]TrieNode<T> {
+            return n.children
+        }
+}
+
+// Trie, bir önek ağacını temsil eder.
+class Trie<T> {
+    private:
+        TrieNode<T> root
+
+    public:
+        // New, yeni bir Trie oluşturur.
+        static func New<T>() *Trie<T> {
+            t := new Trie<T>()
+            t.root = *TrieNode.New<T>()
+            return t
+        }
+
+        // Insert, trie'ye bir kelime ve değer ekler.
+        func (t *Trie<T>) Insert(word string, value T) {
+            node := &t.root
+
+            for _, ch := range word {
+                child, exists := node.GetChild(ch)
+                if !exists {
+                    child = node.AddChild(ch)
+                }
+                node = child
+            }
+
+            node.SetEndOfWord(true)
+            node.SetValue(value)
+        }
+
+        // Search, trie'de bir kelimeyi arar.
+        func (t *Trie<T>) Search(word string) (T, bool) {
+            node := t.findNode(word)
+            if node == nil || !node.IsEndOfWord() {
+                var zero T
+                return zero, false
+            }
+            return node.GetValue()
+        }
+
+        // StartsWith, trie'de belirtilen önekle başlayan kelimeler olup olmadığını kontrol eder.
+        func (t *Trie<T>) StartsWith(prefix string) bool {
+            return t.findNode(prefix) != nil
+        }
+
+        // Delete, trie'den bir kelimeyi siler.
+        func (t *Trie<T>) Delete(word string) bool {
+            return t.deleteHelper(&t.root, word, 0)
+        }
+
+        // findNode, belirtilen kelimeye karşılık gelen düğümü bulur.
+        private func (t *Trie<T>) findNode(word string) *TrieNode<T> {
+            node := &t.root
+
+            for _, ch := range word {
+                child, exists := node.GetChild(ch)
+                if !exists {
+                    return nil
+                }
+                node = child
+            }
+
+            return node
+        }
+
+        // deleteHelper, trie'den bir kelimeyi silmek için yardımcı fonksiyon.
+        private func (t *Trie<T>) deleteHelper(node *TrieNode<T>, word string, index int) bool {
+            if index == len(word) {
+                if !node.IsEndOfWord() {
+                    return false
+                }
+                node.SetEndOfWord(false)
+                return true
+            }
+
+            ch := rune(word[index])
+            child, exists := node.GetChild(ch)
+            if !exists {
+                return false
+            }
+
+            shouldDeleteChild := t.deleteHelper(child, word, index+1)
+
+            if shouldDeleteChild && !child.IsEndOfWord() && !child.HasChildren() {
+                node.RemoveChild(ch)
+            }
+
+            return shouldDeleteChild
+        }
+
+        // GetAllWords, trie'deki tüm kelimeleri ve değerlerini döndürür.
+        func (t *Trie<T>) GetAllWords() map[string]T {
+            result := make(map[string]T)
+            t.collectWords(&t.root, "", result)
+            return result
+        }
+
+        // collectWords, trie'deki tüm kelimeleri toplamak için yardımcı fonksiyon.
+        private func (t *Trie<T>) collectWords(node *TrieNode<T>, prefix string, result map[string]T) {
+            if node.IsEndOfWord() {
+                value, _ := node.GetValue()
+                result[prefix] = value
+            }
+
+            for ch, child := range node.GetChildren() {
+                t.collectWords(&child, prefix+string(ch), result)
+            }
+        }
+
+        // GetWordsWithPrefix, belirtilen önekle başlayan tüm kelimeleri ve değerlerini döndürür.
+        func (t *Trie<T>) GetWordsWithPrefix(prefix string) map[string]T {
+            result := make(map[string]T)
+            node := t.findNode(prefix)
+            
+            if node != nil {
+                if node.IsEndOfWord() {
+                    value, _ := node.GetValue()
+                    result[prefix] = value
+                }
+                
+                t.collectWords(node, prefix, result)
+            }
+            
+            return result
+        }
+
+        // Size, trie'deki kelime sayısını döndürür.
+        func (t *Trie<T>) Size() int {
+            return t.countWords(&t.root)
+        }
+
+        // countWords, trie'deki kelime sayısını saymak için yardımcı fonksiyon.
+        private func (t *Trie<T>) countWords(node *TrieNode<T>) int {
+            count := 0
+            if node.IsEndOfWord() {
+                count++
+            }
+
+            for _, child := range node.GetChildren() {
+                count += t.countWords(&child)
+            }
+
+            return count
+        }
+
+        // Clear, trie'yi temizler.
+        func (t *Trie<T>) Clear() {
+            t.root = *TrieNode.New<T>()
+        }
+
+        // IsEmpty, trie'nin boş olup olmadığını kontrol eder.
+        func (t *Trie<T>) IsEmpty() bool {
+            return !t.root.HasChildren()
+        }
+}

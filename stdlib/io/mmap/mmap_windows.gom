@@ -1,0 +1,101 @@
+// GO-Minus Standart Kütüphane - IO Paketi - Memory-mapped IO (Windows)
+package mmap
+
+import (
+    "os"
+    "syscall"
+    "unsafe"
+)
+
+// Windows API sabitleri
+const (
+    FILE_MAP_READ      = 0x0004
+    FILE_MAP_WRITE     = 0x0002
+    FILE_MAP_COPY      = 0x0001
+    FILE_MAP_EXECUTE   = 0x0020
+    
+    PAGE_READONLY      = 0x02
+    PAGE_READWRITE     = 0x04
+    PAGE_WRITECOPY     = 0x08
+    PAGE_EXECUTE_READ  = 0x20
+    PAGE_EXECUTE_READWRITE = 0x40
+)
+
+// Windows için mmap implementasyonu
+func mmapWindows(fd uintptr, offset int64, length int64, prot int, flags int) (unsafe.Pointer, error) {
+    // Koruma bayraklarını Windows'a dönüştür
+    var flProtect uint32
+    var dwDesiredAccess uint32
+    
+    // Koruma bayraklarını ayarla
+    if prot & PROT_WRITE != 0 {
+        if flags & MAP_PRIVATE != 0 {
+            flProtect = PAGE_WRITECOPY
+            dwDesiredAccess = FILE_MAP_COPY
+        } else {
+            flProtect = PAGE_READWRITE
+            dwDesiredAccess = FILE_MAP_WRITE
+        }
+    } else if prot & PROT_EXEC != 0 {
+        if prot & PROT_READ != 0 {
+            flProtect = PAGE_EXECUTE_READ
+            dwDesiredAccess = FILE_MAP_EXECUTE | FILE_MAP_READ
+        } else {
+            flProtect = PAGE_EXECUTE_READWRITE
+            dwDesiredAccess = FILE_MAP_EXECUTE
+        }
+    } else {
+        flProtect = PAGE_READONLY
+        dwDesiredAccess = FILE_MAP_READ
+    }
+    
+    // Dosya eşleme nesnesi oluştur
+    h, err := syscall.CreateFileMapping(syscall.Handle(fd), nil, flProtect, uint32(length>>32), uint32(length&0xffffffff), nil)
+    if err != nil {
+        return nil, os.NewSyscallError("CreateFileMapping", err)
+    }
+    
+    if h == 0 {
+        return nil, MMapError("CreateFileMapping başarısız", 6)
+    }
+    
+    // Dosyayı belleğe eşle
+    offsetHigh := uint32(offset >> 32)
+    offsetLow := uint32(offset & 0xffffffff)
+    
+    addr, err := syscall.MapViewOfFile(h, dwDesiredAccess, offsetHigh, offsetLow, uintptr(length))
+    if err != nil {
+        syscall.CloseHandle(h)
+        return nil, os.NewSyscallError("MapViewOfFile", err)
+    }
+    
+    if addr == 0 {
+        syscall.CloseHandle(h)
+        return nil, MMapError("MapViewOfFile başarısız", 7)
+    }
+    
+    // Dosya eşleme nesnesini kapat (görünüm hala geçerli)
+    syscall.CloseHandle(h)
+    
+    return unsafe.Pointer(addr), nil
+}
+
+// Windows için munmap implementasyonu
+func munmapWindows(addr unsafe.Pointer, length int64) error {
+    err := syscall.UnmapViewOfFile(uintptr(addr))
+    if err != nil {
+        return os.NewSyscallError("UnmapViewOfFile", err)
+    }
+    
+    return nil
+}
+
+// Windows için msync implementasyonu
+func msyncWindows(addr unsafe.Pointer, length int64) error {
+    err := syscall.FlushViewOfFile(uintptr(addr), uintptr(length))
+    if err != nil {
+        return os.NewSyscallError("FlushViewOfFile", err)
+    }
+    
+    return nil
+}

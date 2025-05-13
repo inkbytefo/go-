@@ -1,0 +1,173 @@
+// GO-Minus Standart Kütüphane - IO Paketi - Buffered Test
+package buffered
+
+import (
+    "bytes"
+    "io"
+    "strings"
+    "testing"
+)
+
+// TestBufferedReader, BufferedReader için testler içerir.
+func TestBufferedReader(t *testing.T) {
+    // Test verisi
+    data := "Hello, World!\nThis is a test.\nAnother line."
+    reader := strings.NewReader(data)
+    
+    // BufferedReader oluştur
+    br := BufferedReader.New(reader, 8) // Küçük tampon boyutu
+    
+    // Read testi
+    buf := make([]byte, 5)
+    n, err := br.Read(buf)
+    if err != nil {
+        t.Errorf("Read hatası: %v", err)
+    }
+    if n != 5 {
+        t.Errorf("Beklenen okuma boyutu 5, alınan: %d", n)
+    }
+    if string(buf) != "Hello" {
+        t.Errorf("Beklenen veri 'Hello', alınan: %s", string(buf))
+    }
+    
+    // ReadByte testi
+    b, err := br.ReadByte()
+    if err != nil {
+        t.Errorf("ReadByte hatası: %v", err)
+    }
+    if b != ',' {
+        t.Errorf("Beklenen byte ',', alınan: %c", b)
+    }
+    
+    // Kalan veriyi atla
+    buf = make([]byte, 7)
+    br.Read(buf) // " World!\n" oku
+    
+    // ReadLine testi
+    line, err := br.ReadLine()
+    if err != nil {
+        t.Errorf("ReadLine hatası: %v", err)
+    }
+    if line != "This is a test." {
+        t.Errorf("Beklenen satır 'This is a test.', alınan: %s", line)
+    }
+    
+    // Son satırı oku
+    line, err = br.ReadLine()
+    if err != nil {
+        t.Errorf("ReadLine hatası: %v", err)
+    }
+    if line != "Another line." {
+        t.Errorf("Beklenen satır 'Another line.', alınan: %s", line)
+    }
+    
+    // EOF testi
+    _, err = br.ReadLine()
+    if err != io.EOF {
+        t.Errorf("Beklenen hata io.EOF, alınan: %v", err)
+    }
+}
+
+// TestBufferedWriter, BufferedWriter için testler içerir.
+func TestBufferedWriter(t *testing.T) {
+    // Hedef buffer
+    var buf bytes.Buffer
+    
+    // BufferedWriter oluştur
+    bw := BufferedWriter.New(&buf, 8) // Küçük tampon boyutu
+    
+    // Write testi
+    n, err := bw.Write([]byte("Hello"))
+    if err != nil {
+        t.Errorf("Write hatası: %v", err)
+    }
+    if n != 5 {
+        t.Errorf("Beklenen yazma boyutu 5, alınan: %d", n)
+    }
+    
+    // Tampon henüz boşaltılmadı
+    if buf.String() != "" {
+        t.Errorf("Tampon erken boşaltıldı")
+    }
+    
+    // WriteByte testi
+    err = bw.WriteByte(',')
+    if err != nil {
+        t.Errorf("WriteByte hatası: %v", err)
+    }
+    
+    // WriteString testi
+    n, err = bw.WriteString(" World!")
+    if err != nil {
+        t.Errorf("WriteString hatası: %v", err)
+    }
+    if n != 7 {
+        t.Errorf("Beklenen yazma boyutu 7, alınan: %d", n)
+    }
+    
+    // Tampon doldu ve otomatik olarak boşaltıldı
+    if buf.String() != "Hello, W" {
+        t.Errorf("Beklenen veri 'Hello, W', alınan: %s", buf.String())
+    }
+    
+    // Flush testi
+    err = bw.Flush()
+    if err != nil {
+        t.Errorf("Flush hatası: %v", err)
+    }
+    
+    // Tüm veri yazıldı
+    if buf.String() != "Hello, World!" {
+        t.Errorf("Beklenen veri 'Hello, World!', alınan: %s", buf.String())
+    }
+    
+    // Close testi
+    err = bw.Close()
+    if err != nil {
+        t.Errorf("Close hatası: %v", err)
+    }
+}
+
+// TestLargeData, büyük veri için testler içerir.
+func TestLargeData(t *testing.T) {
+    // Büyük veri oluştur
+    var data strings.Builder
+    for i := 0; i < 10000; i++ {
+        data.WriteString("Line ")
+        data.WriteString(string(i))
+        data.WriteString("\n")
+    }
+    
+    // BufferedReader ve BufferedWriter oluştur
+    reader := strings.NewReader(data.String())
+    br := BufferedReader.New(reader, 4096)
+    
+    var buf bytes.Buffer
+    bw := BufferedWriter.New(&buf, 4096)
+    
+    // Veriyi oku ve yaz
+    var line string
+    var err error
+    
+    for {
+        line, err = br.ReadLine()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            t.Errorf("ReadLine hatası: %v", err)
+            break
+        }
+        
+        bw.WriteString(line)
+        bw.WriteByte('\n')
+    }
+    
+    // Tamponu boşalt
+    bw.Flush()
+    
+    // Veri boyutları eşit olmalı
+    if buf.Len() != len(data.String()) {
+        t.Errorf("Beklenen veri boyutu %d, alınan: %d", len(data.String()), buf.Len())
+    }
+}

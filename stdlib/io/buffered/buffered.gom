@@ -1,0 +1,261 @@
+// GO-Minus Standart Kütüphane - IO Paketi - Buffered
+package buffered
+
+import (
+    "io"
+)
+
+// BufferedReader, bir Reader'ı tamponlayan bir okuyucudur.
+class BufferedReader {
+    private:
+        io.Reader reader
+        byte[] buffer
+        int bufferSize
+        int readPos
+        int writePos
+        bool eof
+
+    public:
+        // New, belirtilen boyutta bir tampon ile yeni bir BufferedReader oluşturur.
+        static func New(reader io.Reader, bufferSize int) *BufferedReader {
+            if bufferSize <= 0 {
+                bufferSize = 4096 // Varsayılan tampon boyutu
+            }
+            
+            br := new BufferedReader()
+            br.reader = reader
+            br.buffer = make([]byte, bufferSize)
+            br.bufferSize = bufferSize
+            br.readPos = 0
+            br.writePos = 0
+            br.eof = false
+            
+            return br
+        }
+
+        // Read, tampondan veri okur.
+        func (br *BufferedReader) Read(p []byte) (n int, err error) {
+            // Tampon boşsa, doldur
+            if br.readPos >= br.writePos {
+                if br.eof {
+                    return 0, io.EOF
+                }
+                
+                br.fill()
+                
+                if br.readPos >= br.writePos {
+                    return 0, io.EOF
+                }
+            }
+            
+            // Tampondan veri kopyala
+            n = copy(p, br.buffer[br.readPos:br.writePos])
+            br.readPos += n
+            
+            return n, nil
+        }
+
+        // ReadByte, tampondan bir byte okur.
+        func (br *BufferedReader) ReadByte() (byte, error) {
+            // Tampon boşsa, doldur
+            if br.readPos >= br.writePos {
+                if br.eof {
+                    return 0, io.EOF
+                }
+                
+                br.fill()
+                
+                if br.readPos >= br.writePos {
+                    return 0, io.EOF
+                }
+            }
+            
+            // Tampondan bir byte oku
+            b := br.buffer[br.readPos]
+            br.readPos++
+            
+            return b, nil
+        }
+
+        // ReadLine, tampondan bir satır okur.
+        func (br *BufferedReader) ReadLine() (string, error) {
+            var line []byte
+            
+            for {
+                // Tampon boşsa, doldur
+                if br.readPos >= br.writePos {
+                    if br.eof {
+                        if len(line) > 0 {
+                            return string(line), nil
+                        }
+                        return "", io.EOF
+                    }
+                    
+                    br.fill()
+                    
+                    if br.readPos >= br.writePos {
+                        if len(line) > 0 {
+                            return string(line), nil
+                        }
+                        return "", io.EOF
+                    }
+                }
+                
+                // Satır sonu karakteri ara
+                i := br.readPos
+                for i < br.writePos {
+                    if br.buffer[i] == '\n' {
+                        // Satır sonu bulundu
+                        line = append(line, br.buffer[br.readPos:i]...)
+                        br.readPos = i + 1
+                        
+                        // Satır sonundaki CR karakterini kaldır
+                        if len(line) > 0 && line[len(line)-1] == '\r' {
+                            line = line[:len(line)-1]
+                        }
+                        
+                        return string(line), nil
+                    }
+                    i++
+                }
+                
+                // Satır sonu bulunamadı, tampondaki tüm veriyi ekle
+                line = append(line, br.buffer[br.readPos:br.writePos]...)
+                br.readPos = br.writePos
+            }
+        }
+
+        // fill, tamponu doldurur.
+        private func (br *BufferedReader) fill() {
+            // Tampon boşsa, sıfırla
+            if br.readPos >= br.writePos {
+                br.readPos = 0
+                br.writePos = 0
+            }
+            
+            // Tampon doluysa, genişlet
+            if br.writePos >= len(br.buffer) {
+                // Tamponu genişlet
+                newBuffer := make([]byte, len(br.buffer)*2)
+                copy(newBuffer, br.buffer)
+                br.buffer = newBuffer
+            }
+            
+            // Tamponu doldur
+            n, err := br.reader.Read(br.buffer[br.writePos:])
+            br.writePos += n
+            
+            if err == io.EOF {
+                br.eof = true
+            } else if err != nil {
+                // Diğer hatalar için ne yapılacağı?
+            }
+        }
+
+        // Close, BufferedReader'ı kapatır.
+        func (br *BufferedReader) Close() error {
+            if closer, ok := br.reader.(io.Closer); ok {
+                return closer.Close()
+            }
+            return nil
+        }
+}
+
+// BufferedWriter, bir Writer'ı tamponlayan bir yazıcıdır.
+class BufferedWriter {
+    private:
+        io.Writer writer
+        byte[] buffer
+        int bufferSize
+        int count
+
+    public:
+        // New, belirtilen boyutta bir tampon ile yeni bir BufferedWriter oluşturur.
+        static func New(writer io.Writer, bufferSize int) *BufferedWriter {
+            if bufferSize <= 0 {
+                bufferSize = 4096 // Varsayılan tampon boyutu
+            }
+            
+            bw := new BufferedWriter()
+            bw.writer = writer
+            bw.buffer = make([]byte, bufferSize)
+            bw.bufferSize = bufferSize
+            bw.count = 0
+            
+            return bw
+        }
+
+        // Write, tampona veri yazar.
+        func (bw *BufferedWriter) Write(p []byte) (n int, err error) {
+            n = len(p)
+            
+            // Tampon doluysa, boşalt
+            if bw.count + n >= bw.bufferSize {
+                if err := bw.Flush(); err != nil {
+                    return 0, err
+                }
+                
+                // Veri tampon boyutundan büyükse, doğrudan yaz
+                if n >= bw.bufferSize {
+                    return bw.writer.Write(p)
+                }
+            }
+            
+            // Tampona veri kopyala
+            copy(bw.buffer[bw.count:], p)
+            bw.count += n
+            
+            return n, nil
+        }
+
+        // WriteByte, tampona bir byte yazar.
+        func (bw *BufferedWriter) WriteByte(b byte) error {
+            // Tampon doluysa, boşalt
+            if bw.count >= bw.bufferSize {
+                if err := bw.Flush(); err != nil {
+                    return err
+                }
+            }
+            
+            // Tampona bir byte yaz
+            bw.buffer[bw.count] = b
+            bw.count++
+            
+            return nil
+        }
+
+        // WriteString, tampona bir string yazar.
+        func (bw *BufferedWriter) WriteString(s string) (n int, err error) {
+            return bw.Write([]byte(s))
+        }
+
+        // Flush, tamponu boşaltır.
+        func (bw *BufferedWriter) Flush() error {
+            if bw.count == 0 {
+                return nil
+            }
+            
+            n, err := bw.writer.Write(bw.buffer[:bw.count])
+            bw.count -= n
+            
+            // Tüm veri yazılamadıysa, kalan veriyi tamponda kaydır
+            if bw.count > 0 {
+                copy(bw.buffer, bw.buffer[n:bw.count+n])
+            }
+            
+            return err
+        }
+
+        // Close, BufferedWriter'ı kapatır.
+        func (bw *BufferedWriter) Close() error {
+            err := bw.Flush()
+            
+            if closer, ok := bw.writer.(io.Closer); ok {
+                if err2 := closer.Close(); err == nil {
+                    err = err2
+                }
+            }
+            
+            return err
+        }
+}

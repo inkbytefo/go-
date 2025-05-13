@@ -1,0 +1,503 @@
+// GO-Minus Paket Yöneticisi (gompm)
+package main
+
+import (
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+// Sürüm bilgisi
+const (
+    VERSION = "0.1.0"
+)
+
+// Komut tanımları
+const (
+    CMD_INIT    = "init"
+    CMD_INSTALL = "install"
+    CMD_REMOVE  = "remove"
+    CMD_UPDATE  = "update"
+    CMD_LIST    = "list"
+    CMD_SEARCH  = "search"
+    CMD_INFO    = "info"
+    CMD_HELP    = "help"
+    CMD_VERSION = "version"
+)
+
+// Paket yapılandırma dosyası
+const (
+    CONFIG_FILE = "gompm.json"
+)
+
+// Paket deposu URL'si
+const (
+    REPOSITORY_URL = "https://repo.gominus.org"
+)
+
+// Paket bilgisi
+class Package {
+    public:
+        string name
+        string version
+        string description
+        string author
+        string license
+        string[] dependencies
+        string[] devDependencies
+        string[] keywords
+        string homepage
+        string repository
+        
+        // Yeni bir paket oluştur
+        static func New(name string, version string) *Package {
+            pkg := new Package()
+            pkg.name = name
+            pkg.version = version
+            pkg.dependencies = []string{}
+            pkg.devDependencies = []string{}
+            pkg.keywords = []string{}
+            return pkg
+        }
+        
+        // Paket bilgilerini göster
+        func (p *Package) Display() {
+            fmt.Printf("Paket: %s\n", p.name)
+            fmt.Printf("Sürüm: %s\n", p.version)
+            
+            if p.description != "" {
+                fmt.Printf("Açıklama: %s\n", p.description)
+            }
+            
+            if p.author != "" {
+                fmt.Printf("Yazar: %s\n", p.author)
+            }
+            
+            if p.license != "" {
+                fmt.Printf("Lisans: %s\n", p.license)
+            }
+            
+            if len(p.dependencies) > 0 {
+                fmt.Println("Bağımlılıklar:")
+                for _, dep := range p.dependencies {
+                    fmt.Printf("  - %s\n", dep)
+                }
+            }
+            
+            if len(p.devDependencies) > 0 {
+                fmt.Println("Geliştirme Bağımlılıkları:")
+                for _, dep := range p.devDependencies {
+                    fmt.Printf("  - %s\n", dep)
+                }
+            }
+            
+            if len(p.keywords) > 0 {
+                fmt.Printf("Anahtar Kelimeler: %s\n", strings.Join(p.keywords, ", "))
+            }
+            
+            if p.homepage != "" {
+                fmt.Printf("Ana Sayfa: %s\n", p.homepage)
+            }
+            
+            if p.repository != "" {
+                fmt.Printf("Depo: %s\n", p.repository)
+            }
+        }
+}
+
+// Paket yöneticisi
+class PackageManager {
+    private:
+        string workDir
+        Package config
+        
+    public:
+        // Yeni bir paket yöneticisi oluştur
+        static func New(workDir string) *PackageManager {
+            pm := new PackageManager()
+            pm.workDir = workDir
+            return pm
+        }
+        
+        // Paket yapılandırma dosyasını yükle
+        func (pm *PackageManager) LoadConfig() error {
+            configPath := filepath.Join(pm.workDir, CONFIG_FILE)
+            
+            // Dosya var mı kontrol et
+            if _, err := os.Stat(configPath); os.IsNotExist(err) {
+                return error("Paket yapılandırma dosyası bulunamadı: " + configPath)
+            }
+            
+            // Dosyayı oku ve ayrıştır
+            // TODO: JSON dosyasını oku ve ayrıştır
+            
+            return nil
+        }
+        
+        // Paket yapılandırma dosyasını kaydet
+        func (pm *PackageManager) SaveConfig() error {
+            configPath := filepath.Join(pm.workDir, CONFIG_FILE)
+            
+            // Dosyayı oluştur ve yaz
+            // TODO: JSON dosyasını oluştur ve yaz
+            
+            return nil
+        }
+        
+        // Yeni bir proje başlat
+        func (pm *PackageManager) Init(name string) error {
+            // Proje dizini oluştur
+            if name != "" {
+                pm.workDir = filepath.Join(pm.workDir, name)
+                err := os.MkdirAll(pm.workDir, 0755)
+                if err != nil {
+                    return err
+                }
+            }
+            
+            // Paket yapılandırma dosyası var mı kontrol et
+            configPath := filepath.Join(pm.workDir, CONFIG_FILE)
+            if _, err := os.Stat(configPath); err == nil {
+                return error("Paket yapılandırma dosyası zaten var: " + configPath)
+            }
+            
+            // Proje adını al
+            projectName := name
+            if projectName == "" {
+                projectName = filepath.Base(pm.workDir)
+            }
+            
+            // Yeni paket yapılandırması oluştur
+            pm.config = *Package.New(projectName, "0.1.0")
+            
+            // Yapılandırmayı kaydet
+            err := pm.SaveConfig()
+            if err != nil {
+                return err
+            }
+            
+            fmt.Printf("Proje başlatıldı: %s\n", projectName)
+            return nil
+        }
+        
+        // Paket kur
+        func (pm *PackageManager) Install(packageName string, version string, isDev bool) error {
+            // Paket yapılandırma dosyasını yükle
+            err := pm.LoadConfig()
+            if err != nil {
+                return err
+            }
+            
+            // Paket adı ve sürümü ayrıştır
+            name := packageName
+            ver := version
+            
+            if version == "" && strings.Contains(packageName, "@") {
+                parts := strings.Split(packageName, "@")
+                name = parts[0]
+                ver = parts[1]
+            }
+            
+            // Paket zaten kurulu mu kontrol et
+            for _, dep := range pm.config.dependencies {
+                if strings.HasPrefix(dep, name+"@") {
+                    return error("Paket zaten kurulu: " + name)
+                }
+            }
+            
+            if isDev {
+                for _, dep := range pm.config.devDependencies {
+                    if strings.HasPrefix(dep, name+"@") {
+                        return error("Paket zaten kurulu (geliştirme): " + name)
+                    }
+                }
+            }
+            
+            // Paketi indir
+            // TODO: Paketi indir
+            
+            // Bağımlılık ekle
+            depStr := name
+            if ver != "" {
+                depStr += "@" + ver
+            }
+            
+            if isDev {
+                pm.config.devDependencies = append(pm.config.devDependencies, depStr)
+            } else {
+                pm.config.dependencies = append(pm.config.dependencies, depStr)
+            }
+            
+            // Yapılandırmayı kaydet
+            err = pm.SaveConfig()
+            if err != nil {
+                return err
+            }
+            
+            fmt.Printf("Paket kuruldu: %s\n", depStr)
+            return nil
+        }
+        
+        // Paket kaldır
+        func (pm *PackageManager) Remove(packageName string) error {
+            // Paket yapılandırma dosyasını yükle
+            err := pm.LoadConfig()
+            if err != nil {
+                return err
+            }
+            
+            // Paketi bağımlılıklardan kaldır
+            found := false
+            
+            // Normal bağımlılıklardan kaldır
+            newDeps := []string{}
+            for _, dep := range pm.config.dependencies {
+                if strings.HasPrefix(dep, packageName+"@") || dep == packageName {
+                    found = true
+                } else {
+                    newDeps = append(newDeps, dep)
+                }
+            }
+            pm.config.dependencies = newDeps
+            
+            // Geliştirme bağımlılıklarından kaldır
+            newDevDeps := []string{}
+            for _, dep := range pm.config.devDependencies {
+                if strings.HasPrefix(dep, packageName+"@") || dep == packageName {
+                    found = true
+                } else {
+                    newDevDeps = append(newDevDeps, dep)
+                }
+            }
+            pm.config.devDependencies = newDevDeps
+            
+            if !found {
+                return error("Paket bulunamadı: " + packageName)
+            }
+            
+            // Yapılandırmayı kaydet
+            err = pm.SaveConfig()
+            if err != nil {
+                return err
+            }
+            
+            fmt.Printf("Paket kaldırıldı: %s\n", packageName)
+            return nil
+        }
+        
+        // Paketleri güncelle
+        func (pm *PackageManager) Update() error {
+            // Paket yapılandırma dosyasını yükle
+            err := pm.LoadConfig()
+            if err != nil {
+                return err
+            }
+            
+            // Tüm paketleri güncelle
+            // TODO: Paketleri güncelle
+            
+            fmt.Println("Tüm paketler güncellendi.")
+            return nil
+        }
+        
+        // Kurulu paketleri listele
+        func (pm *PackageManager) List() error {
+            // Paket yapılandırma dosyasını yükle
+            err := pm.LoadConfig()
+            if err != nil {
+                return err
+            }
+            
+            // Bağımlılıkları listele
+            if len(pm.config.dependencies) > 0 {
+                fmt.Println("Bağımlılıklar:")
+                for _, dep := range pm.config.dependencies {
+                    fmt.Printf("  - %s\n", dep)
+                }
+            } else {
+                fmt.Println("Bağımlılık yok.")
+            }
+            
+            // Geliştirme bağımlılıklarını listele
+            if len(pm.config.devDependencies) > 0 {
+                fmt.Println("Geliştirme Bağımlılıkları:")
+                for _, dep := range pm.config.devDependencies {
+                    fmt.Printf("  - %s\n", dep)
+                }
+            }
+            
+            return nil
+        }
+        
+        // Paket ara
+        func (pm *PackageManager) Search(query string) error {
+            // TODO: Paket deposunda ara
+            
+            fmt.Printf("'%s' için arama sonuçları:\n", query)
+            // TODO: Arama sonuçlarını göster
+            
+            return nil
+        }
+        
+        // Paket bilgisi göster
+        func (pm *PackageManager) Info(packageName string) error {
+            // TODO: Paket bilgisini al
+            
+            // Örnek paket bilgisi
+            pkg := Package.New(packageName, "1.0.0")
+            pkg.description = "Örnek paket açıklaması"
+            pkg.author = "GO-Minus Ekibi"
+            pkg.license = "MIT"
+            pkg.dependencies = []string{"dep1@1.0.0", "dep2@2.0.0"}
+            pkg.keywords = []string{"örnek", "paket", "gominus"}
+            pkg.homepage = "https://example.com"
+            pkg.repository = "https://github.com/example/repo"
+            
+            pkg.Display()
+            
+            return nil
+        }
+}
+
+// Yardım mesajını göster
+func showHelp() {
+    fmt.Println("GO-Minus Paket Yöneticisi (gompm) v" + VERSION)
+    fmt.Println("Kullanım: gompm <komut> [argümanlar]")
+    fmt.Println("")
+    fmt.Println("Komutlar:")
+    fmt.Println("  init [proje-adı]       Yeni bir proje başlat")
+    fmt.Println("  install <paket>        Paket kur")
+    fmt.Println("  install <paket> --dev  Geliştirme paketi olarak kur")
+    fmt.Println("  remove <paket>         Paket kaldır")
+    fmt.Println("  update                 Tüm paketleri güncelle")
+    fmt.Println("  list                   Kurulu paketleri listele")
+    fmt.Println("  search <sorgu>         Paket ara")
+    fmt.Println("  info <paket>           Paket bilgisi göster")
+    fmt.Println("  help                   Yardım mesajını göster")
+    fmt.Println("  version                Sürüm bilgisini göster")
+}
+
+// Sürüm bilgisini göster
+func showVersion() {
+    fmt.Println("GO-Minus Paket Yöneticisi (gompm) v" + VERSION)
+}
+
+func main() {
+    // Komut satırı argümanlarını al
+    args := os.Args
+    
+    // Komut kontrolü
+    if len(args) < 2 {
+        showHelp()
+        return
+    }
+    
+    // Çalışma dizini
+    workDir, err := os.Getwd()
+    if err != nil {
+        fmt.Println("Hata:", err)
+        return
+    }
+    
+    // Paket yöneticisi oluştur
+    pm := PackageManager.New(workDir)
+    
+    // Komutu işle
+    cmd := args[1]
+    
+    switch cmd {
+    case CMD_INIT:
+        // Proje adı
+        var name string
+        if len(args) > 2 {
+            name = args[2]
+        }
+        
+        err := pm.Init(name)
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_INSTALL:
+        if len(args) < 3 {
+            fmt.Println("Hata: Paket adı gerekli")
+            return
+        }
+        
+        packageName := args[2]
+        version := ""
+        isDev := false
+        
+        // Geliştirme paketi mi kontrol et
+        if len(args) > 3 && args[3] == "--dev" {
+            isDev = true
+        }
+        
+        err := pm.Install(packageName, version, isDev)
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_REMOVE:
+        if len(args) < 3 {
+            fmt.Println("Hata: Paket adı gerekli")
+            return
+        }
+        
+        packageName := args[2]
+        
+        err := pm.Remove(packageName)
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_UPDATE:
+        err := pm.Update()
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_LIST:
+        err := pm.List()
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_SEARCH:
+        if len(args) < 3 {
+            fmt.Println("Hata: Arama sorgusu gerekli")
+            return
+        }
+        
+        query := args[2]
+        
+        err := pm.Search(query)
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_INFO:
+        if len(args) < 3 {
+            fmt.Println("Hata: Paket adı gerekli")
+            return
+        }
+        
+        packageName := args[2]
+        
+        err := pm.Info(packageName)
+        if err != nil {
+            fmt.Println("Hata:", err)
+        }
+        
+    case CMD_HELP:
+        showHelp()
+        
+    case CMD_VERSION:
+        showVersion()
+        
+    default:
+        fmt.Printf("Hata: Bilinmeyen komut: %s\n", cmd)
+        showHelp()
+    }
+}

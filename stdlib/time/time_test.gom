@@ -1,0 +1,230 @@
+// GO-Minus Standart Kütüphane - Time Paketi Test
+package time
+
+import (
+    "testing"
+)
+
+// TestTimeBasic, temel zaman işlemlerini test eder.
+func TestTimeBasic(t *testing.T) {
+    // Belirli bir zaman oluştur
+    tm := New(2023, 5, 15, 14, 30, 0, 0, UTC)
+    
+    // Zaman bileşenlerini kontrol et
+    if tm.Year() != 2023 {
+        t.Errorf("Beklenen yıl 2023, alınan: %d", tm.Year())
+    }
+    
+    if tm.Month() != 5 {
+        t.Errorf("Beklenen ay 5, alınan: %d", tm.Month())
+    }
+    
+    if tm.Day() != 15 {
+        t.Errorf("Beklenen gün 15, alınan: %d", tm.Day())
+    }
+    
+    if tm.Hour() != 14 {
+        t.Errorf("Beklenen saat 14, alınan: %d", tm.Hour())
+    }
+    
+    if tm.Minute() != 30 {
+        t.Errorf("Beklenen dakika 30, alınan: %d", tm.Minute())
+    }
+    
+    if tm.Second() != 0 {
+        t.Errorf("Beklenen saniye 0, alınan: %d", tm.Second())
+    }
+    
+    // Biçimlendirme
+    formatted := tm.Format(RFC3339)
+    expected := "2023-05-15T14:30:00Z"
+    if formatted != expected {
+        t.Errorf("Beklenen biçim %s, alınan: %s", expected, formatted)
+    }
+    
+    // Ayrıştırma
+    parsed, err := Parse(RFC3339, "2023-05-15T14:30:00Z")
+    if err != nil {
+        t.Errorf("Ayrıştırma hatası: %v", err)
+    }
+    
+    if !parsed.Equal(tm) {
+        t.Errorf("Ayrıştırılan zaman orijinal zamana eşit değil")
+    }
+}
+
+// TestTimeArithmetic, zaman aritmetiği işlemlerini test eder.
+func TestTimeArithmetic(t *testing.T) {
+    // Başlangıç zamanı
+    tm := New(2023, 5, 15, 14, 30, 0, 0, UTC)
+    
+    // Süre ekle
+    d := New(3600 * 1e9) // 1 saat
+    tm2 := tm.Add(d)
+    
+    if tm2.Hour() != 15 {
+        t.Errorf("Beklenen saat 15, alınan: %d", tm2.Hour())
+    }
+    
+    // Tarih ekle
+    tm3 := tm.AddDate(0, 1, 0) // 1 ay
+    
+    if tm3.Month() != 6 {
+        t.Errorf("Beklenen ay 6, alınan: %d", tm3.Month())
+    }
+    
+    // İki zaman arasındaki fark
+    diff := tm3.Sub(tm)
+    
+    // Yaklaşık 30 gün (saniye cinsinden)
+    expectedSeconds := 30 * 24 * 60 * 60
+    actualSeconds := int(diff.Seconds())
+    
+    // Ay uzunluğu değişebileceğinden, yaklaşık bir kontrol yapalım
+    if actualSeconds < expectedSeconds-86400 || actualSeconds > expectedSeconds+86400 {
+        t.Errorf("Beklenen süre yaklaşık %d saniye, alınan: %d", expectedSeconds, actualSeconds)
+    }
+    
+    // Karşılaştırma
+    if !tm.Before(tm2) {
+        t.Errorf("tm, tm2'den önce olmalı")
+    }
+    
+    if !tm2.After(tm) {
+        t.Errorf("tm2, tm'den sonra olmalı")
+    }
+    
+    if !tm.Equal(tm) {
+        t.Errorf("tm kendisine eşit olmalı")
+    }
+}
+
+// TestDuration, süre işlemlerini test eder.
+func TestDuration(t *testing.T) {
+    // Süre oluştur
+    d1 := New(5 * 1e9) // 5 saniye
+    d2 := New(2 * 60 * 1e9) // 2 dakika
+    
+    // Süre bileşenlerini kontrol et
+    if d1.Seconds() != 5 {
+        t.Errorf("Beklenen saniye 5, alınan: %.2f", d1.Seconds())
+    }
+    
+    if d2.Minutes() != 2 {
+        t.Errorf("Beklenen dakika 2, alınan: %.2f", d2.Minutes())
+    }
+    
+    // Süre ayrıştırma
+    parsedDuration, err := ParseDuration("1h30m")
+    if err != nil {
+        t.Errorf("Süre ayrıştırma hatası: %v", err)
+    }
+    
+    expectedHours := 1.5
+    if parsedDuration.Hours() != expectedHours {
+        t.Errorf("Beklenen saat %.2f, alınan: %.2f", expectedHours, parsedDuration.Hours())
+    }
+    
+    // Süre dizesi
+    d3 := New(90 * 60 * 1e9) // 90 dakika
+    expectedString := "1h30m0s"
+    if d3.String() != expectedString {
+        t.Errorf("Beklenen dize %s, alınan: %s", expectedString, d3.String())
+    }
+}
+
+// TestLocation, zaman dilimi işlemlerini test eder.
+func TestLocation(t *testing.T) {
+    // UTC zaman dilimi
+    utc := UTC
+    
+    // Sabit zaman dilimi oluştur
+    fixedZone := FixedZone("GMT+3", 3*60*60)
+    
+    // Belirli bir zaman oluştur
+    tm := New(2023, 5, 15, 14, 30, 0, 0, utc)
+    
+    // Zaman dilimini değiştir
+    tmFixed := tm.In(fixedZone)
+    
+    // UTC'de saat 14:30 ise, GMT+3'te saat 17:30 olmalı
+    if tmFixed.Hour() != 17 {
+        t.Errorf("Beklenen saat 17, alınan: %d", tmFixed.Hour())
+    }
+    
+    if tmFixed.Minute() != 30 {
+        t.Errorf("Beklenen dakika 30, alınan: %d", tmFixed.Minute())
+    }
+    
+    // Zaman dilimi adı
+    expectedName := "GMT+3"
+    if fixedZone.String() != expectedName {
+        t.Errorf("Beklenen zaman dilimi adı %s, alınan: %s", expectedName, fixedZone.String())
+    }
+}
+
+// TestUnix, Unix zaman damgası işlemlerini test eder.
+func TestUnix(t *testing.T) {
+    // Unix zaman damgasından zaman oluştur
+    unixTime := Unix(1621091400, 0) // 2021-05-15 14:30:00 UTC
+    
+    // Zaman bileşenlerini kontrol et
+    if unixTime.Year() != 2021 {
+        t.Errorf("Beklenen yıl 2021, alınan: %d", unixTime.Year())
+    }
+    
+    if unixTime.Month() != 5 {
+        t.Errorf("Beklenen ay 5, alınan: %d", unixTime.Month())
+    }
+    
+    if unixTime.Day() != 15 {
+        t.Errorf("Beklenen gün 15, alınan: %d", unixTime.Day())
+    }
+    
+    if unixTime.Hour() != 14 {
+        t.Errorf("Beklenen saat 14, alınan: %d", unixTime.Hour())
+    }
+    
+    if unixTime.Minute() != 30 {
+        t.Errorf("Beklenen dakika 30, alınan: %d", unixTime.Minute())
+    }
+    
+    // Unix zaman damgasını al
+    if unixTime.Unix() != 1621091400 {
+        t.Errorf("Beklenen Unix zaman damgası 1621091400, alınan: %d", unixTime.Unix())
+    }
+}
+
+// TestSleep, Sleep fonksiyonunu test eder.
+func TestSleep(t *testing.T) {
+    // Başlangıç zamanı
+    start := Now()
+    
+    // 100 milisaniye bekle
+    Sleep(New(100 * 1e6))
+    
+    // Geçen süre
+    elapsed := Since(start)
+    
+    // En az 100 milisaniye geçmiş olmalı
+    if elapsed.Milliseconds() < 100 {
+        t.Errorf("Beklenen süre en az 100 ms, alınan: %d ms", elapsed.Milliseconds())
+    }
+}
+
+// TestAfter, After fonksiyonunu test eder.
+func TestAfter(t *testing.T) {
+    // Başlangıç zamanı
+    start := Now()
+    
+    // 100 milisaniye sonra bir değer gönderen kanal
+    <-After(New(100 * 1e6))
+    
+    // Geçen süre
+    elapsed := Since(start)
+    
+    // En az 100 milisaniye geçmiş olmalı
+    if elapsed.Milliseconds() < 100 {
+        t.Errorf("Beklenen süre en az 100 ms, alınan: %d ms", elapsed.Milliseconds())
+    }
+}

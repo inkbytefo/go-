@@ -100,7 +100,7 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
   - Sınıf üyeleri için erişim belirleyicileri eklendi.
   - Erişim kontrolü için destek eklendi.
 
-- [ ] **Semantik Analiz İyileştirmeleri**: Semantik analiz bileşeninin daha karmaşık ifadeleri analiz edebilmesi için iyileştirmeler.
+- [x] **Semantik Analiz İyileştirmeleri**: Semantik analiz bileşeninin daha karmaşık ifadeleri analiz edebilmesi için iyileştirmeler.
   - Hata mesajlarının iyileştirilmesi.
   - Daha karmaşık tip çıkarımı.
   - Daha iyi hata kurtarma mekanizmaları.
@@ -185,7 +185,7 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
 - [ ] **Container Paketi Genişletme**: Container paketinin genişletilmesi.
   - [x] Heap (öncelik kuyruğu) implementasyonu
   - [x] Deque (çift uçlu kuyruk) implementasyonu
-  - [ ] Trie (önek ağacı) implementasyonu
+  - [x] Trie (önek ağacı) implementasyonu
   - [ ] Graph (çizge) implementasyonu
 
 - [x] **Concurrent Paketi Genişletme**: Concurrent paketinin genişletilmesi.
@@ -195,13 +195,13 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
   - [x] Future/Promise implementasyonu
 
 - [ ] **IO Paketi Genişletme**: IO paketinin genişletilmesi.
-  - [ ] Buffered IO implementasyonu
+  - [x] Buffered IO implementasyonu
   - [ ] Memory-mapped IO implementasyonu
   - [ ] Asenkron IO implementasyonu
   - [ ] Network IO implementasyonu
 
 - [ ] **Yeni Paketler**: Yeni paketlerin eklenmesi.
-  - [ ] Regex paketi (düzenli ifadeler)
+  - [x] Regex paketi (düzenli ifadeler)
   - [ ] Time paketi (zaman işlemleri)
   - [ ] Crypto paketi (kriptografi)
   - [ ] Encoding paketi (JSON, XML, CSV, vb.)
@@ -284,3 +284,36 @@ Durum: Temel altyapı, semantik analiz, ara kod üretimi, IDE entegrasyonu ve ek
 
 Tarih: 2024-05-15
 Durum: Proje adı "GO+" dan "GO-Minus" olarak değiştirildi. Dosya uzantısı `.gop` yerine `.gom` olarak güncellendi. Tüm dokümantasyon ve kod tabanı bu değişikliğe göre güncellendi.
+
+## Belgelendirme ve Örnekler Güncellemesi
+
+Tarih: 2024-05-20
+Durum: Belgelendirme yapısı genişletildi ve yeni belgeler eklendi:
+
+1. "Neden GO-Minus" kılavuzu oluşturuldu
+2. Başlangıç rehberi eklendi
+3. Dil referansı belgeleri güncellendi
+4. Vulkan "Hello Triangle" örneği ve belgelendirmesi eklendi
+5. SSS (Sık Sorulan Sorular) belgesi oluşturuldu
+6. En İyi Uygulamalar belgesi eklendi
+
+Kısa vadeli geliştirme planı kapsamında belgelendirme çalışmaları devam ediyor. Vulkan bağlayıcıları için prototip çalışmaları başlatıldı ve manuel bellek yönetimi için araştırma ekibi oluşturuldu.
+
+## Semantik Analiz İyileştirmeleri ve Standart Kütüphane Genişletmeleri
+
+Tarih: 2024-06-15
+Durum: GO-Minus programlama dilinin temel özelliklerini tamamlamak için aşağıdaki geliştirmeler yapıldı:
+
+### Semantik Analiz İyileştirmeleri:
+1. **Gelişmiş Hata Raporlama Sistemi**: Farklı hata seviyeleri, renkli çıktı, dosya ve konum bilgisi, ipuçları ve düzeltme önerileri, benzer tanımlayıcı önerileri eklendi.
+2. **Tip Çıkarımı Modülü**: Değişken tanımlamaları, fonksiyon dönüş tipleri, karmaşık ifadeler, jenerik fonksiyonlar ve şablon sınıflar için tip çıkarımı eklendi.
+3. **Hata Kurtarma Mekanizmaları**: Analiz devam etme, eksik sembol kurtarma, tip uyuşmazlığı kurtarma, eksik üye kurtarma ve sözdizimi hatası kurtarma mekanizmaları eklendi.
+
+### Standart Kütüphane Genişletmeleri:
+1. **Trie (Önek Ağacı) Implementasyonu**: Container paketine jenerik tip desteği olan, kelime ekleme, arama, silme, önek araması ve tüm kelimeleri listeleme özelliklerine sahip Trie veri yapısı eklendi.
+2. **Buffered IO Implementasyonu**: IO paketine tamponlanmış okuma ve yazma işlemleri için BufferedReader ve BufferedWriter sınıfları eklendi.
+3. **Regex Paketi**: Düzenli ifade deseni derleme, metin eşleştirme, tüm eşleşmeleri bulma, metin değiştirme, metin bölme, büyük/küçük harf duyarlı ve duyarsız modlar, çok satırlı mod desteği sağlayan Regex paketi eklendi.
+
+Bu geliştirmeler, GO-Minus programlama dilinin daha güçlü, kullanıcı dostu ve yetenekli olmasını sağlamıştır. Semantik analiz iyileştirmeleri, programcıların hatalarını daha hızlı bulmasına ve düzeltmesine yardımcı olurken, standart kütüphane genişletmeleri, GO-Minus'un daha geniş bir uygulama yelpazesinde kullanılmasını sağlamaktadır.
+
+Detaylı bilgi için [Semantik Analiz İyileştirmeleri](docs/semantic-analysis-improvements.md), [Standart Kütüphane Genişletmeleri](docs/stdlib-extensions.md) ve [Geliştirme Raporu](docs/development-report.md) belgelerine bakabilirsiniz.

@@ -1,0 +1,328 @@
+// GO-Minus Derleyici Gelişmiş Testleri
+package main
+
+import (
+    "fmt"
+    "container/trie"
+    "io/buffered"
+    "regex"
+)
+
+// Jenerik sınıf testi
+template<T>
+class Stack {
+    private:
+        T[] elements
+        int size
+        int capacity
+    
+    public:
+        Stack(int initialCapacity) {
+            this.elements = make([]T, initialCapacity)
+            this.size = 0
+            this.capacity = initialCapacity
+        }
+        
+        void Push(T element) {
+            if this.size >= this.capacity {
+                // Kapasiteyi iki katına çıkar
+                newCapacity := this.capacity * 2
+                newElements := make([]T, newCapacity)
+                copy(newElements, this.elements)
+                this.elements = newElements
+                this.capacity = newCapacity
+            }
+            
+            this.elements[this.size] = element
+            this.size++
+        }
+        
+        T Pop() {
+            if this.size == 0 {
+                throw "Stack boş"
+            }
+            
+            this.size--
+            return this.elements[this.size]
+        }
+        
+        T Peek() {
+            if this.size == 0 {
+                throw "Stack boş"
+            }
+            
+            return this.elements[this.size - 1]
+        }
+        
+        int Size() {
+            return this.size
+        }
+        
+        bool IsEmpty() {
+            return this.size == 0
+        }
+}
+
+func testGenericClass() {
+    // Integer stack
+    intStack := Stack<int>(5)
+    intStack.Push(10)
+    intStack.Push(20)
+    intStack.Push(30)
+    
+    fmt.Println("Integer stack size:", intStack.Size())
+    fmt.Println("Integer stack peek:", intStack.Peek())
+    fmt.Println("Integer stack pop:", intStack.Pop())
+    fmt.Println("Integer stack size after pop:", intStack.Size())
+    
+    // String stack
+    stringStack := Stack<string>(5)
+    stringStack.Push("Merhaba")
+    stringStack.Push("Dünya")
+    
+    fmt.Println("String stack size:", stringStack.Size())
+    fmt.Println("String stack peek:", stringStack.Peek())
+    fmt.Println("String stack pop:", stringStack.Pop())
+    fmt.Println("String stack size after pop:", stringStack.Size())
+}
+
+// Çoklu kalıtım testi
+interface Swimmer {
+    func Swim() string
+}
+
+interface Flyer {
+    func Fly() string
+}
+
+class Bird {
+    private:
+        string name
+    
+    public:
+        Bird(string name) {
+            this.name = name
+        }
+        
+        string getName() {
+            return this.name
+        }
+        
+        string Chirp() {
+            return "Cik cik!"
+        }
+}
+
+class Duck extends Bird implements Swimmer, Flyer {
+    public:
+        Duck(string name) {
+            super(name)
+        }
+        
+        string Swim() {
+            return this.getName() + " yüzüyor"
+        }
+        
+        string Fly() {
+            return this.getName() + " uçuyor"
+        }
+        
+        string Quack() {
+            return "Vak vak!"
+        }
+}
+
+func testMultipleInheritance() {
+    duck := Duck("Donald")
+    
+    // Bird metotları
+    fmt.Println("İsim:", duck.getName())
+    fmt.Println("Cıvıltı:", duck.Chirp())
+    
+    // Duck metotları
+    fmt.Println("Vaklama:", duck.Quack())
+    
+    // Arayüz metotları
+    fmt.Println("Yüzme:", duck.Swim())
+    fmt.Println("Uçma:", duck.Fly())
+    
+    // Arayüz değişkenlerine atama
+    var swimmer Swimmer = duck
+    var flyer Flyer = duck
+    
+    fmt.Println("Swimmer arayüzü:", swimmer.Swim())
+    fmt.Println("Flyer arayüzü:", flyer.Fly())
+}
+
+// Standart kütüphane testleri
+func testStandardLibrary() {
+    // Trie testi
+    t := trie.Trie.New<string>()
+    t.Insert("apple", "elma")
+    t.Insert("banana", "muz")
+    t.Insert("application", "uygulama")
+    
+    value, found := t.Search("apple")
+    fmt.Printf("apple: %s, found: %t\n", value, found)
+    
+    appWords := t.GetWordsWithPrefix("app")
+    fmt.Println("'app' öneki ile başlayan kelimeler:")
+    for word, value := range appWords {
+        fmt.Printf("  %s: %s\n", word, value)
+    }
+    
+    // Regex testi
+    pattern := regex.Compile("hello")
+    fmt.Printf("'hello world' eşleşiyor mu: %t\n", pattern.Match("hello world"))
+    
+    ignoreCase := regex.CompileIgnoreCase("hello")
+    fmt.Printf("'Hello World' büyük/küçük harf duyarsız eşleşiyor mu: %t\n", ignoreCase.Match("Hello World"))
+    
+    replaced := regex.Replace("hello world", "hello", "merhaba")
+    fmt.Printf("Değiştirme sonucu: %s\n", replaced)
+}
+
+// Eşzamanlılık testleri
+func testConcurrency() {
+    // Kanallar
+    ch := make(chan int, 2)
+    
+    // Gönderme
+    ch <- 1
+    ch <- 2
+    
+    // Alma
+    fmt.Println(<-ch)
+    fmt.Println(<-ch)
+    
+    // Goroutine
+    go func() {
+        fmt.Println("Goroutine çalışıyor")
+    }()
+    
+    // Select
+    select {
+    case msg := <-ch:
+        fmt.Println("Mesaj alındı:", msg)
+    default:
+        fmt.Println("Mesaj yok")
+    }
+}
+
+// Operatör aşırı yükleme testi
+class Complex {
+    private:
+        float real
+        float imag
+    
+    public:
+        Complex(float real, float imag) {
+            this.real = real
+            this.imag = imag
+        }
+        
+        float getReal() {
+            return this.real
+        }
+        
+        float getImag() {
+            return this.imag
+        }
+        
+        string toString() {
+            if this.imag >= 0 {
+                return fmt.Sprintf("%.2f + %.2fi", this.real, this.imag)
+            } else {
+                return fmt.Sprintf("%.2f - %.2fi", this.real, -this.imag)
+            }
+        }
+        
+        // Operatör aşırı yükleme
+        Complex operator+(Complex other) {
+            return Complex(this.real + other.real, this.imag + other.imag)
+        }
+        
+        Complex operator-(Complex other) {
+            return Complex(this.real - other.real, this.imag - other.imag)
+        }
+        
+        Complex operator*(Complex other) {
+            real := this.real * other.real - this.imag * other.imag
+            imag := this.real * other.imag + this.imag * other.real
+            return Complex(real, imag)
+        }
+}
+
+func testOperatorOverloading() {
+    c1 := Complex(3, 4)
+    c2 := Complex(1, 2)
+    
+    sum := c1 + c2
+    diff := c1 - c2
+    prod := c1 * c2
+    
+    fmt.Printf("c1 = %s\n", c1.toString())
+    fmt.Printf("c2 = %s\n", c2.toString())
+    fmt.Printf("c1 + c2 = %s\n", sum.toString())
+    fmt.Printf("c1 - c2 = %s\n", diff.toString())
+    fmt.Printf("c1 * c2 = %s\n", prod.toString())
+}
+
+// Metaprogramlama testi
+template<T>
+class TypeInfo {
+    public:
+        static string GetTypeName() {
+            return "Unknown"
+        }
+}
+
+template<>
+class TypeInfo<int> {
+    public:
+        static string GetTypeName() {
+            return "Integer"
+        }
+}
+
+template<>
+class TypeInfo<string> {
+    public:
+        static string GetTypeName() {
+            return "String"
+        }
+}
+
+template<>
+class TypeInfo<float> {
+    public:
+        static string GetTypeName() {
+            return "Float"
+        }
+}
+
+func testMetaprogramming() {
+    fmt.Println("int tipi:", TypeInfo<int>.GetTypeName())
+    fmt.Println("string tipi:", TypeInfo<string>.GetTypeName())
+    fmt.Println("float tipi:", TypeInfo<float>.GetTypeName())
+}
+
+func main() {
+    fmt.Println("=== Jenerik Sınıf Testi ===")
+    testGenericClass()
+    
+    fmt.Println("\n=== Çoklu Kalıtım Testi ===")
+    testMultipleInheritance()
+    
+    fmt.Println("\n=== Standart Kütüphane Testi ===")
+    testStandardLibrary()
+    
+    fmt.Println("\n=== Eşzamanlılık Testi ===")
+    testConcurrency()
+    
+    fmt.Println("\n=== Operatör Aşırı Yükleme Testi ===")
+    testOperatorOverloading()
+    
+    fmt.Println("\n=== Metaprogramlama Testi ===")
+    testMetaprogramming()
+}

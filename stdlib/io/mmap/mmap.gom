@@ -1,0 +1,264 @@
+// GO-Minus Standart Kütüphane - IO Paketi - Memory-mapped IO
+package mmap
+
+import (
+    "io"
+    "os"
+    "unsafe"
+)
+
+// Koruma bayrakları
+const (
+    PROT_READ  = 0x1 // Okuma izni
+    PROT_WRITE = 0x2 // Yazma izni
+    PROT_EXEC  = 0x4 // Çalıştırma izni
+)
+
+// Eşleme bayrakları
+const (
+    MAP_SHARED  = 0x01 // Değişiklikler diğer süreçlerle paylaşılır
+    MAP_PRIVATE = 0x02 // Değişiklikler özeldir
+)
+
+// MMapError, memory-mapped IO işlemlerinde oluşan hataları temsil eder.
+class MMapError extends error {
+    private:
+        string message
+        int code
+    
+    public:
+        MMapError(string message, int code) {
+            this.message = message
+            this.code = code
+        }
+        
+        string Error() {
+            return this.message
+        }
+        
+        int Code() {
+            return this.code
+        }
+}
+
+// MMapFile, belleğe eşlenmiş bir dosyayı temsil eder.
+class MMapFile {
+    private:
+        void* data
+        int64 size
+        int prot
+        int flags
+        bool isMapped
+    
+    public:
+        // New, yeni bir MMapFile oluşturur.
+        static func New(file *os.File, prot int, flags int) (*MMapFile, error) {
+            // Dosya boyutunu al
+            fileInfo, err := file.Stat()
+            if err != nil {
+                return nil, err
+            }
+            
+            size := fileInfo.Size()
+            if size == 0 {
+                return nil, MMapError("Dosya boş", 1)
+            }
+            
+            // Dosyayı belleğe eşle
+            data, err := mmap(file.Fd(), 0, size, prot, flags)
+            if err != nil {
+                return nil, err
+            }
+            
+            mmapFile := new MMapFile()
+            mmapFile.data = data
+            mmapFile.size = size
+            mmapFile.prot = prot
+            mmapFile.flags = flags
+            mmapFile.isMapped = true
+            
+            return mmapFile, nil
+        }
+        
+        // Close, belleğe eşlenmiş dosyayı kapatır.
+        func (mf *MMapFile) Close() error {
+            if !mf.isMapped {
+                return nil
+            }
+            
+            err := munmap(mf.data, mf.size)
+            if err != nil {
+                return err
+            }
+            
+            mf.isMapped = false
+            return nil
+        }
+        
+        // Len, belleğe eşlenmiş dosyanın boyutunu döndürür.
+        func (mf *MMapFile) Len() int64 {
+            return mf.size
+        }
+        
+        // Data, belleğe eşlenmiş dosyanın veri işaretçisini döndürür.
+        func (mf *MMapFile) Data() unsafe.Pointer {
+            return mf.data
+        }
+        
+        // Bytes, belleğe eşlenmiş dosyanın içeriğini byte dizisi olarak döndürür.
+        func (mf *MMapFile) Bytes() []byte {
+            if !mf.isMapped {
+                return nil
+            }
+            
+            // Veriyi byte dizisine dönüştür
+            var bytes []byte
+            header := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+            header.Data = uintptr(mf.data)
+            header.Len = int(mf.size)
+            header.Cap = int(mf.size)
+            
+            return bytes
+        }
+        
+        // ReadAt, belleğe eşlenmiş dosyadan belirtilen konumdan itibaren veri okur.
+        func (mf *MMapFile) ReadAt(p []byte, off int64) (n int, err error) {
+            if !mf.isMapped {
+                return 0, MMapError("Dosya eşlenmemiş", 2)
+            }
+            
+            if off < 0 || off >= mf.size {
+                return 0, MMapError("Geçersiz konum", 3)
+            }
+            
+            // Okunacak veri miktarını hesapla
+            n = len(p)
+            if off + int64(n) > mf.size {
+                n = int(mf.size - off)
+                if n == 0 {
+                    return 0, io.EOF
+                }
+            }
+            
+            // Veriyi kopyala
+            bytes := mf.Bytes()
+            copy(p, bytes[off:off+int64(n)])
+            
+            return n, nil
+        }
+        
+        // WriteAt, belleğe eşlenmiş dosyaya belirtilen konumdan itibaren veri yazar.
+        func (mf *MMapFile) WriteAt(p []byte, off int64) (n int, err error) {
+            if !mf.isMapped {
+                return 0, MMapError("Dosya eşlenmemiş", 2)
+            }
+            
+            if mf.prot & PROT_WRITE == 0 {
+                return 0, MMapError("Yazma izni yok", 4)
+            }
+            
+            if off < 0 || off >= mf.size {
+                return 0, MMapError("Geçersiz konum", 3)
+            }
+            
+            // Yazılacak veri miktarını hesapla
+            n = len(p)
+            if off + int64(n) > mf.size {
+                n = int(mf.size - off)
+                if n == 0 {
+                    return 0, io.ErrShortWrite
+                }
+            }
+            
+            // Veriyi kopyala
+            bytes := mf.Bytes()
+            copy(bytes[off:off+int64(n)], p)
+            
+            return n, nil
+        }
+        
+        // Flush, belleğe eşlenmiş dosyadaki değişiklikleri diske yazar.
+        func (mf *MMapFile) Flush() error {
+            if !mf.isMapped {
+                return MMapError("Dosya eşlenmemiş", 2)
+            }
+            
+            return msync(mf.data, mf.size)
+        }
+}
+
+// Map, bir dosyayı belleğe eşler.
+func Map(file *os.File, prot int, flags int) (*MMapFile, error) {
+    return MMapFile.New(file, prot, flags)
+}
+
+// MapRegion, bir dosyanın belirli bir bölgesini belleğe eşler.
+func MapRegion(file *os.File, length int64, prot int, flags int, offset int64) (*MMapFile, error) {
+    // Dosya boyutunu al
+    fileInfo, err := file.Stat()
+    if err != nil {
+        return nil, err
+    }
+    
+    fileSize := fileInfo.Size()
+    if offset < 0 || offset >= fileSize {
+        return nil, MMapError("Geçersiz konum", 3)
+    }
+    
+    if length <= 0 {
+        length = fileSize - offset
+    }
+    
+    if offset + length > fileSize {
+        return nil, MMapError("Geçersiz uzunluk", 5)
+    }
+    
+    // Dosyayı belleğe eşle
+    data, err := mmap(file.Fd(), offset, length, prot, flags)
+    if err != nil {
+        return nil, err
+    }
+    
+    mmapFile := new MMapFile()
+    mmapFile.data = data
+    mmapFile.size = length
+    mmapFile.prot = prot
+    mmapFile.flags = flags
+    mmapFile.isMapped = true
+    
+    return mmapFile, nil
+}
+
+// Platform bağımlı fonksiyonlar
+// Bu fonksiyonlar, farklı işletim sistemleri için farklı implementasyonlara sahip olacaktır.
+// Burada sadece arayüzleri tanımlanmıştır.
+
+// mmap, bir dosyayı belleğe eşler.
+func mmap(fd uintptr, offset int64, length int64, prot int, flags int) (unsafe.Pointer, error) {
+    // Platform bağımlı implementasyon
+    #ifdef _WIN32
+    return mmapWindows(fd, offset, length, prot, flags)
+    #else
+    return mmapUnix(fd, offset, length, prot, flags)
+    #endif
+}
+
+// munmap, belleğe eşlenmiş bir dosyayı serbest bırakır.
+func munmap(addr unsafe.Pointer, length int64) error {
+    // Platform bağımlı implementasyon
+    #ifdef _WIN32
+    return munmapWindows(addr, length)
+    #else
+    return munmapUnix(addr, length)
+    #endif
+}
+
+// msync, belleğe eşlenmiş bir dosyadaki değişiklikleri diske yazar.
+func msync(addr unsafe.Pointer, length int64) error {
+    // Platform bağımlı implementasyon
+    #ifdef _WIN32
+    return msyncWindows(addr, length)
+    #else
+    return msyncUnix(addr, length)
+    #endif
+}
