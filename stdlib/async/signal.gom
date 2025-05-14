@@ -1,0 +1,218 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Signal
+package async
+
+import (
+    "os"
+    "os/signal"
+    "sync"
+    "syscall"
+)
+
+// Signal, bir işletim sistemi sinyalini temsil eder.
+type Signal os.Signal
+
+// Standart sinyaller
+const (
+    SIGINT  = syscall.SIGINT
+    SIGTERM = syscall.SIGTERM
+    SIGHUP  = syscall.SIGHUP
+    SIGQUIT = syscall.SIGQUIT
+    SIGKILL = syscall.SIGKILL
+    SIGUSR1 = syscall.SIGUSR1
+    SIGUSR2 = syscall.SIGUSR2
+)
+
+// SignalHandler, bir sinyal işleyicisini temsil eder.
+type SignalHandler func(Signal)
+
+// AsyncSignal, asenkron sinyal işleme için bir sınıftır.
+class AsyncSignal {
+    private:
+        var eventLoop *EventLoop
+        var handlers map[Signal][]SignalHandler
+        var signalChan chan os.Signal
+        var mutex sync.Mutex
+        var running bool
+        var stopChan chan struct{}
+    
+    public:
+        // New, yeni bir AsyncSignal oluşturur.
+        static func New(eventLoop *EventLoop) *AsyncSignal {
+            sig := new AsyncSignal()
+            sig.eventLoop = eventLoop
+            sig.handlers = make(map[Signal][]SignalHandler)
+            sig.signalChan = make(chan os.Signal, 10)
+            sig.running = false
+            sig.stopChan = make(chan struct{})
+            
+            return sig
+        }
+        
+        // Start, sinyal işlemeyi başlatır.
+        func (sig *AsyncSignal) Start() error {
+            sig.mutex.Lock()
+            defer sig.mutex.Unlock()
+            
+            if sig.running {
+                return errors.New("async: sinyal işleyici zaten çalışıyor")
+            }
+            
+            sig.running = true
+            
+            // Sinyal işleme döngüsünü başlat
+            go sig.run()
+            
+            return nil
+        }
+        
+        // Stop, sinyal işlemeyi durdurur.
+        func (sig *AsyncSignal) Stop() error {
+            sig.mutex.Lock()
+            defer sig.mutex.Unlock()
+            
+            if !sig.running {
+                return errors.New("async: sinyal işleyici çalışmıyor")
+            }
+            
+            sig.running = false
+            
+            // Sinyal işleme döngüsünü durdur
+            close(sig.stopChan)
+            
+            // Sinyal kanalını kapat
+            signal.Stop(sig.signalChan)
+            
+            return nil
+        }
+        
+        // AddHandler, belirtilen sinyal için bir işleyici ekler.
+        func (sig *AsyncSignal) AddHandler(s Signal, handler SignalHandler) {
+            sig.mutex.Lock()
+            defer sig.mutex.Unlock()
+            
+            // İşleyiciyi ekle
+            sig.handlers[s] = append(sig.handlers[s], handler)
+            
+            // Sinyali dinle
+            signal.Notify(sig.signalChan, os.Signal(s))
+        }
+        
+        // RemoveHandler, belirtilen sinyal için tüm işleyicileri kaldırır.
+        func (sig *AsyncSignal) RemoveHandler(s Signal) {
+            sig.mutex.Lock()
+            defer sig.mutex.Unlock()
+            
+            // İşleyicileri kaldır
+            delete(sig.handlers, s)
+            
+            // Sinyali dinlemeyi durdur
+            signal.Reset(os.Signal(s))
+        }
+        
+        // run, sinyal işleme döngüsünü çalıştırır.
+        private func (sig *AsyncSignal) run() {
+            for {
+                select {
+                case s := <-sig.signalChan:
+                    // Sinyal alındı
+                    sig.handleSignal(Signal(s))
+                case <-sig.stopChan:
+                    // Durdurma sinyali alındı
+                    return
+                }
+            }
+        }
+        
+        // handleSignal, bir sinyali işler.
+        private func (sig *AsyncSignal) handleSignal(s Signal) {
+            sig.mutex.Lock()
+            handlers := sig.handlers[s]
+            sig.mutex.Unlock()
+            
+            // İşleyicileri çağır
+            for _, handler := range handlers {
+                // İşleyiciyi asenkron olarak çağır
+                go handler(s)
+            }
+        }
+}
+
+// WaitForSignal, belirtilen sinyali bekler ve bir Future döndürür.
+func WaitForSignal(eventLoop *EventLoop, s Signal) *AsyncFuture<Signal> {
+    promise, future := AsyncPromise.New<Signal>(eventLoop)
+    
+    // AsyncSignal oluştur
+    sig := AsyncSignal.New(eventLoop)
+    sig.Start()
+    
+    // Sinyal işleyici ekle
+    sig.AddHandler(s, func(receivedSignal Signal) {
+        promise.Complete(receivedSignal)
+        sig.Stop()
+    })
+    
+    return future
+}
+
+// WaitForAnySignal, belirtilen sinyallerden herhangi birini bekler ve bir Future döndürür.
+func WaitForAnySignal(eventLoop *EventLoop, signals []Signal) *AsyncFuture<Signal> {
+    promise, future := AsyncPromise.New<Signal>(eventLoop)
+    
+    // AsyncSignal oluştur
+    sig := AsyncSignal.New(eventLoop)
+    sig.Start()
+    
+    // Her sinyal için işleyici ekle
+    for _, s := range signals {
+        s := s // Değişkeni kopyala
+        sig.AddHandler(s, func(receivedSignal Signal) {
+            promise.Complete(receivedSignal)
+            sig.Stop()
+        })
+    }
+    
+    return future
+}
+
+// OnSignal, belirtilen sinyal alındığında bir işlevi çalıştırır ve bir iptal fonksiyonu döndürür.
+func OnSignal(eventLoop *EventLoop, s Signal, action func(Signal)) func() {
+    // AsyncSignal oluştur
+    sig := AsyncSignal.New(eventLoop)
+    sig.Start()
+    
+    // Sinyal işleyici ekle
+    sig.AddHandler(s, action)
+    
+    // İptal fonksiyonu döndür
+    return func() {
+        sig.RemoveHandler(s)
+        sig.Stop()
+    }
+}
+
+// SendSignal, belirtilen sinyali gönderir.
+func SendSignal(pid int, s Signal) error {
+    // Platform bağımlı implementasyon
+    #ifdef _WIN32
+    return sendSignalWindows(pid, s)
+    #else
+    return syscall.Kill(pid, syscall.Signal(s))
+    #endif
+}
+
+// sendSignalWindows, Windows sistemlerinde sinyal gönderir.
+func sendSignalWindows(pid int, s Signal) error {
+    // Windows'ta sinyal gönderme
+    // Bu, gerçek implementasyonda daha karmaşık olacaktır
+    return errors.New("async: Windows'ta sinyal gönderme henüz desteklenmiyor")
+}
+
+// IgnoreSignal, belirtilen sinyali görmezden gelir.
+func IgnoreSignal(s Signal) {
+    signal.Ignore(os.Signal(s))
+}
+
+// ResetSignal, belirtilen sinyal için varsayılan davranışı geri yükler.
+func ResetSignal(s Signal) {
+    signal.Reset(os.Signal(s))
+}

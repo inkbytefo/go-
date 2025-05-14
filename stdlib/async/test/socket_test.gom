@@ -1,0 +1,332 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Socket Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "net"
+)
+
+// TestAsyncSocketDialClose, asenkron soket bağlantı kurma ve kapatma işlemlerini test eder.
+func TestAsyncSocketDialClose(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Yerel bir TCP sunucu başlat
+    listener, err := net.Listen("tcp", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("TCP sunucu başlatma hatası: %v", err)
+    }
+    defer listener.Close()
+    
+    // Sunucu adresi
+    serverAddr := listener.Addr().String()
+    
+    // Asenkron soket bağlantısı kur
+    socket, err := async.AsyncSocket.Dial(loop, "tcp", serverAddr)
+    if err != nil {
+        t.Fatalf("AsyncSocket.Dial hatası: %v", err)
+    }
+    
+    // Yerel ve uzak adresleri kontrol et
+    if socket.LocalAddr() == nil {
+        t.Error("Yerel adres nil")
+    }
+    
+    if socket.RemoteAddr() == nil {
+        t.Error("Uzak adres nil")
+    }
+    
+    if socket.RemoteAddr().String() != serverAddr {
+        t.Errorf("Beklenen uzak adres '%s', alınan: '%s'", serverAddr, socket.RemoteAddr().String())
+    }
+    
+    // Soketi kapat
+    closeErr, err := socket.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncSocket.Close hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Soket kapatma hatası: %v", closeErr)
+    }
+    
+    // Soketi tekrar kapat (hata vermemeli)
+    closeErr, err = socket.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncSocket.Close (tekrar) hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Soket tekrar kapatma hatası: %v", closeErr)
+    }
+}
+
+// TestAsyncSocketDialTimeout, asenkron soket bağlantı kurma zaman aşımı işlemini test eder.
+func TestAsyncSocketDialTimeout(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Yerel bir TCP sunucu başlat
+    listener, err := net.Listen("tcp", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("TCP sunucu başlatma hatası: %v", err)
+    }
+    defer listener.Close()
+    
+    // Sunucu adresi
+    serverAddr := listener.Addr().String()
+    
+    // Asenkron soket bağlantısı kur (zaman aşımı ile)
+    socket, err := async.AsyncSocket.DialTimeout(loop, "tcp", serverAddr, 1*time.Second)
+    if err != nil {
+        t.Fatalf("AsyncSocket.DialTimeout hatası: %v", err)
+    }
+    defer socket.Close().Get()
+    
+    // Geçersiz bir adrese bağlanmayı dene (zaman aşımı bekleniyor)
+    // Not: 192.0.2.0/24 bloğu test amaçlı ayrılmıştır (RFC 5737)
+    invalidAddr := "192.0.2.1:12345"
+    _, err = async.AsyncSocket.DialTimeout(loop, "tcp", invalidAddr, 100*time.Millisecond)
+    
+    // Hata bekleniyor
+    if err == nil {
+        t.Error("Geçersiz adrese bağlanma hatası bekleniyor")
+    }
+}
+
+// TestAsyncSocketReadWrite, asenkron soket okuma ve yazma işlemlerini test eder.
+func TestAsyncSocketReadWrite(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Yerel bir TCP sunucu başlat
+    listener, err := net.Listen("tcp", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("TCP sunucu başlatma hatası: %v", err)
+    }
+    defer listener.Close()
+    
+    // Sunucu adresi
+    serverAddr := listener.Addr().String()
+    
+    // Sunucu goroutine
+    go func() {
+        conn, err := listener.Accept()
+        if err != nil {
+            t.Errorf("Sunucu bağlantı kabul hatası: %v", err)
+            return
+        }
+        defer conn.Close()
+        
+        // İstemciden veri oku
+        buffer := make([]byte, 1024)
+        n, err := conn.Read(buffer)
+        if err != nil {
+            t.Errorf("Sunucu okuma hatası: %v", err)
+            return
+        }
+        
+        // Okunan veriyi geri gönder
+        _, err = conn.Write(buffer[:n])
+        if err != nil {
+            t.Errorf("Sunucu yazma hatası: %v", err)
+            return
+        }
+    }()
+    
+    // Asenkron soket bağlantısı kur
+    socket, err := async.AsyncSocket.Dial(loop, "tcp", serverAddr)
+    if err != nil {
+        t.Fatalf("AsyncSocket.Dial hatası: %v", err)
+    }
+    defer socket.Close().Get()
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, Async Socket!")
+    
+    // Sokete yaz
+    n, err := socket.Write(data).Get()
+    if err != nil {
+        t.Errorf("AsyncSocket.Write hatası: %v", err)
+    }
+    
+    if n != len(data) {
+        t.Errorf("Beklenen yazılan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    // Soketten oku
+    buffer := make([]byte, 1024)
+    n, err = socket.Read(buffer).Get()
+    if err != nil {
+        t.Errorf("AsyncSocket.Read hatası: %v", err)
+    }
+    
+    if n != len(data) {
+        t.Errorf("Beklenen okunan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    if string(buffer[:n]) != string(data) {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", string(data), string(buffer[:n]))
+    }
+}
+
+// TestAsyncSocketDeadline, asenkron soket son tarih ayarlama işlemini test eder.
+func TestAsyncSocketDeadline(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Yerel bir TCP sunucu başlat
+    listener, err := net.Listen("tcp", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("TCP sunucu başlatma hatası: %v", err)
+    }
+    defer listener.Close()
+    
+    // Sunucu adresi
+    serverAddr := listener.Addr().String()
+    
+    // Asenkron soket bağlantısı kur
+    socket, err := async.AsyncSocket.Dial(loop, "tcp", serverAddr)
+    if err != nil {
+        t.Fatalf("AsyncSocket.Dial hatası: %v", err)
+    }
+    defer socket.Close().Get()
+    
+    // Son tarih ayarla
+    err = socket.SetDeadline(time.Now().Add(100 * time.Millisecond))
+    if err != nil {
+        t.Errorf("AsyncSocket.SetDeadline hatası: %v", err)
+    }
+    
+    // Okuma son tarihi ayarla
+    err = socket.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+    if err != nil {
+        t.Errorf("AsyncSocket.SetReadDeadline hatası: %v", err)
+    }
+    
+    // Yazma son tarihi ayarla
+    err = socket.SetWriteDeadline(time.Now().Add(300 * time.Millisecond))
+    if err != nil {
+        t.Errorf("AsyncSocket.SetWriteDeadline hatası: %v", err)
+    }
+}
+
+// TestAsyncListener, asenkron dinleyici işlemlerini test eder.
+func TestAsyncListener(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Asenkron dinleyici oluştur
+    listener, err := async.AsyncListener.Listen(loop, "tcp", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("AsyncListener.Listen hatası: %v", err)
+    }
+    
+    // Dinleyici adresi
+    listenerAddr := listener.Addr().String()
+    
+    // İstemci goroutine
+    go func() {
+        // Kısa bir süre bekle
+        time.Sleep(100 * time.Millisecond)
+        
+        // Dinleyiciye bağlan
+        conn, err := net.Dial("tcp", listenerAddr)
+        if err != nil {
+            t.Errorf("İstemci bağlantı hatası: %v", err)
+            return
+        }
+        defer conn.Close()
+        
+        // Veri gönder
+        data := []byte("Merhaba, Async Listener!")
+        _, err = conn.Write(data)
+        if err != nil {
+            t.Errorf("İstemci yazma hatası: %v", err)
+            return
+        }
+    }()
+    
+    // Bağlantı kabul et
+    socket, err := listener.Accept().Get()
+    if err != nil {
+        t.Fatalf("AsyncListener.Accept hatası: %v", err)
+    }
+    
+    // Soketten oku
+    buffer := make([]byte, 1024)
+    n, err := socket.Read(buffer).Get()
+    if err != nil {
+        t.Errorf("AsyncSocket.Read hatası: %v", err)
+    }
+    
+    expectedData := "Merhaba, Async Listener!"
+    if string(buffer[:n]) != expectedData {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", expectedData, string(buffer[:n]))
+    }
+    
+    // Soketi kapat
+    socket.Close().Get()
+    
+    // Dinleyiciyi kapat
+    closeErr, err := listener.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncListener.Close hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Dinleyici kapatma hatası: %v", closeErr)
+    }
+}

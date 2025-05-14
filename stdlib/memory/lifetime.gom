@@ -1,0 +1,368 @@
+// GO-Minus Standart Kütüphane - Memory Paketi - Lifetime
+// Bu dosya, GO-Minus programlama dili için yaşam süresi analizi (Lifetime Analysis) implementasyonunu içerir.
+package memory
+
+import (
+    "sync"
+    "unsafe"
+)
+
+// LifetimeScope, yaşam süresi kapsamını temsil eder.
+// Bu yapı, bir kapsamdaki değişkenlerin yaşam sürelerini izler.
+struct LifetimeScope {
+    // Parent, üst yaşam süresi kapsamı.
+    Parent *LifetimeScope
+    
+    // Children, alt yaşam süresi kapsamları.
+    Children []*LifetimeScope
+    
+    // Variables, bu kapsamdaki değişkenler.
+    Variables map[string]*LifetimeVariable
+    
+    // ID, kapsam kimliği.
+    ID uint64
+    
+    // Name, kapsam adı.
+    Name string
+}
+
+// LifetimeVariable, yaşam süresi değişkenini temsil eder.
+// Bu yapı, bir değişkenin yaşam süresini izler.
+struct LifetimeVariable {
+    // Name, değişken adı.
+    Name string
+    
+    // Type, değişken tipi.
+    Type string
+    
+    // Address, değişken adresi.
+    Address unsafe.Pointer
+    
+    // Size, değişken boyutu.
+    Size uint64
+    
+    // IsOwner, değişkenin sahibi olup olmadığını belirtir.
+    IsOwner bool
+    
+    // References, bu değişkene referans veren değişkenler.
+    References []*LifetimeVariable
+    
+    // ReferencedBy, bu değişkeni referans alan değişkenler.
+    ReferencedBy []*LifetimeVariable
+    
+    // Scope, değişkenin kapsamı.
+    Scope *LifetimeScope
+    
+    // IsAlive, değişkenin hayatta olup olmadığını belirtir.
+    IsAlive bool
+}
+
+// LifetimeAnalyzer, yaşam süresi analizörünü temsil eder.
+// Bu sınıf, değişkenlerin yaşam sürelerini analiz eder ve potansiyel bellek sızıntılarını veya dangling pointer'ları tespit eder.
+class LifetimeAnalyzer {
+    private:
+        var rootScope *LifetimeScope
+        var currentScope *LifetimeScope
+        var variables map[unsafe.Pointer]*LifetimeVariable
+        var nextScopeID uint64
+        var mutex sync.Mutex
+        var isEnabled bool
+    
+    public:
+        // New, yeni bir LifetimeAnalyzer örneği oluşturur.
+        static func New() *LifetimeAnalyzer {
+            analyzer := &LifetimeAnalyzer{
+                variables: make(map[unsafe.Pointer]*LifetimeVariable),
+                nextScopeID: 1,
+                isEnabled: true,
+            }
+            
+            // Kök kapsamı oluştur
+            analyzer.rootScope = &LifetimeScope{
+                Parent: null,
+                Children: []*LifetimeScope{},
+                Variables: make(map[string]*LifetimeVariable),
+                ID: 0,
+                Name: "root",
+            }
+            
+            analyzer.currentScope = analyzer.rootScope
+            
+            return analyzer
+        }
+        
+        // Enable, yaşam süresi analizini etkinleştirir.
+        func Enable() {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            this.isEnabled = true
+        }
+        
+        // Disable, yaşam süresi analizini devre dışı bırakır.
+        func Disable() {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            this.isEnabled = false
+        }
+        
+        // IsEnabled, yaşam süresi analizinin etkin olup olmadığını döndürür.
+        func IsEnabled() bool {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            return this.isEnabled
+        }
+        
+        // EnterScope, yeni bir kapsama girer.
+        func EnterScope(name string) *LifetimeScope {
+            if !this.isEnabled {
+                return null
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Yeni bir kapsam oluştur
+            scope := &LifetimeScope{
+                Parent: this.currentScope,
+                Children: []*LifetimeScope{},
+                Variables: make(map[string]*LifetimeVariable),
+                ID: this.nextScopeID,
+                Name: name,
+            }
+            
+            this.nextScopeID++
+            
+            // Üst kapsama ekle
+            this.currentScope.Children = append(this.currentScope.Children, scope)
+            
+            // Geçerli kapsamı güncelle
+            this.currentScope = scope
+            
+            return scope
+        }
+        
+        // ExitScope, mevcut kapsamdan çıkar.
+        func ExitScope() *LifetimeScope {
+            if !this.isEnabled {
+                return null
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Kapsamdaki değişkenleri temizle
+            for _, variable := range this.currentScope.Variables {
+                this.cleanupVariable(variable)
+            }
+            
+            // Üst kapsama dön
+            previousScope := this.currentScope
+            this.currentScope = this.currentScope.Parent
+            
+            return previousScope
+        }
+        
+        // DeclareVariable, bir değişken bildirir.
+        func DeclareVariable(name string, typeName string, address unsafe.Pointer, size uint64, isOwner bool) *LifetimeVariable {
+            if !this.isEnabled {
+                return null
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Değişken zaten tanımlanmışsa, hata döndür
+            if _, exists := this.currentScope.Variables[name]; exists {
+                throw "lifetime: variable already declared in this scope: " + name
+            }
+            
+            // Yeni bir değişken oluştur
+            variable := &LifetimeVariable{
+                Name: name,
+                Type: typeName,
+                Address: address,
+                Size: size,
+                IsOwner: isOwner,
+                References: []*LifetimeVariable{},
+                ReferencedBy: []*LifetimeVariable{},
+                Scope: this.currentScope,
+                IsAlive: true,
+            }
+            
+            // Değişkeni kapsama ekle
+            this.currentScope.Variables[name] = variable
+            
+            // Değişkeni global haritaya ekle
+            this.variables[address] = variable
+            
+            return variable
+        }
+        
+        // AddReference, bir değişkenden diğerine referans ekler.
+        func AddReference(fromVariable *LifetimeVariable, toVariable *LifetimeVariable) {
+            if !this.isEnabled {
+                return
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Referansı ekle
+            fromVariable.References = append(fromVariable.References, toVariable)
+            toVariable.ReferencedBy = append(toVariable.ReferencedBy, fromVariable)
+        }
+        
+        // RemoveReference, bir değişkenden diğerine referansı kaldırır.
+        func RemoveReference(fromVariable *LifetimeVariable, toVariable *LifetimeVariable) {
+            if !this.isEnabled {
+                return
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Referansı kaldır
+            for i, ref := range fromVariable.References {
+                if ref == toVariable {
+                    fromVariable.References = append(fromVariable.References[:i], fromVariable.References[i+1:]...)
+                    break
+                }
+            }
+            
+            for i, ref := range toVariable.ReferencedBy {
+                if ref == fromVariable {
+                    toVariable.ReferencedBy = append(toVariable.ReferencedBy[:i], toVariable.ReferencedBy[i+1:]...)
+                    break
+                }
+            }
+        }
+        
+        // CheckForLeaks, bellek sızıntılarını kontrol eder.
+        func CheckForLeaks() []*LifetimeVariable {
+            if !this.isEnabled {
+                return []*LifetimeVariable{}
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            leaks := []*LifetimeVariable{}
+            
+            // Tüm değişkenleri kontrol et
+            for _, variable := range this.variables {
+                if variable.IsAlive && variable.IsOwner && len(variable.ReferencedBy) == 0 {
+                    // Bu değişken bir sahibidir, hayattadır ve hiçbir değişken tarafından referans alınmamaktadır
+                    // Bu, potansiyel bir bellek sızıntısıdır
+                    leaks = append(leaks, variable)
+                }
+            }
+            
+            return leaks
+        }
+        
+        // CheckForDanglingPointers, dangling pointer'ları kontrol eder.
+        func CheckForDanglingPointers() []*LifetimeVariable {
+            if !this.isEnabled {
+                return []*LifetimeVariable{}
+            }
+            
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            danglingPointers := []*LifetimeVariable{}
+            
+            // Tüm değişkenleri kontrol et
+            for _, variable := range this.variables {
+                if variable.IsAlive {
+                    // Bu değişkenin referans verdiği değişkenleri kontrol et
+                    for _, ref := range variable.References {
+                        if !ref.IsAlive {
+                            // Bu değişken, hayatta olmayan bir değişkene referans veriyor
+                            // Bu, bir dangling pointer'dır
+                            danglingPointers = append(danglingPointers, variable)
+                            break
+                        }
+                    }
+                }
+            }
+            
+            return danglingPointers
+        }
+        
+        // cleanupVariable, bir değişkeni temizler.
+        private func cleanupVariable(variable *LifetimeVariable) {
+            // Değişkeni ölü olarak işaretle
+            variable.IsAlive = false
+            
+            // Değişkenin referans verdiği değişkenleri kontrol et
+            for _, ref := range variable.References {
+                // Referansı kaldır
+                this.RemoveReference(variable, ref)
+                
+                // Eğer referans verilen değişken bir sahibiyse ve başka hiçbir değişken tarafından referans alınmıyorsa,
+                // o değişkeni de temizle
+                if ref.IsOwner && len(ref.ReferencedBy) == 0 {
+                    this.cleanupVariable(ref)
+                }
+            }
+            
+            // Değişkeni global haritadan kaldır
+            delete(this.variables, variable.Address)
+        }
+}
+
+// GlobalLifetimeAnalyzer, global yaşam süresi analizörüdür.
+var GlobalLifetimeAnalyzer *LifetimeAnalyzer = LifetimeAnalyzer.New()
+
+// EnableLifetimeAnalysis, yaşam süresi analizini etkinleştirir.
+func EnableLifetimeAnalysis() {
+    GlobalLifetimeAnalyzer.Enable()
+}
+
+// DisableLifetimeAnalysis, yaşam süresi analizini devre dışı bırakır.
+func DisableLifetimeAnalysis() {
+    GlobalLifetimeAnalyzer.Disable()
+}
+
+// IsLifetimeAnalysisEnabled, yaşam süresi analizinin etkin olup olmadığını döndürür.
+func IsLifetimeAnalysisEnabled() bool {
+    return GlobalLifetimeAnalyzer.IsEnabled()
+}
+
+// EnterScope, yeni bir kapsama girer.
+func EnterScope(name string) *LifetimeScope {
+    return GlobalLifetimeAnalyzer.EnterScope(name)
+}
+
+// ExitScope, mevcut kapsamdan çıkar.
+func ExitScope() *LifetimeScope {
+    return GlobalLifetimeAnalyzer.ExitScope()
+}
+
+// DeclareVariable, bir değişken bildirir.
+func DeclareVariable(name string, typeName string, address unsafe.Pointer, size uint64, isOwner bool) *LifetimeVariable {
+    return GlobalLifetimeAnalyzer.DeclareVariable(name, typeName, address, size, isOwner)
+}
+
+// AddReference, bir değişkenden diğerine referans ekler.
+func AddReference(fromVariable *LifetimeVariable, toVariable *LifetimeVariable) {
+    GlobalLifetimeAnalyzer.AddReference(fromVariable, toVariable)
+}
+
+// RemoveReference, bir değişkenden diğerine referansı kaldırır.
+func RemoveReference(fromVariable *LifetimeVariable, toVariable *LifetimeVariable) {
+    GlobalLifetimeAnalyzer.RemoveReference(fromVariable, toVariable)
+}
+
+// CheckForLeaks, bellek sızıntılarını kontrol eder.
+func CheckForLeaks() []*LifetimeVariable {
+    return GlobalLifetimeAnalyzer.CheckForLeaks()
+}
+
+// CheckForDanglingPointers, dangling pointer'ları kontrol eder.
+func CheckForDanglingPointers() []*LifetimeVariable {
+    return GlobalLifetimeAnalyzer.CheckForDanglingPointers()
+}

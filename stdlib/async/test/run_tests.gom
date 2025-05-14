@@ -1,0 +1,124 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Test Çalıştırıcı
+package main
+
+import (
+    "fmt"
+    "os"
+    "path/filepath"
+    "testing"
+    "time"
+)
+
+func main() {
+    fmt.Println("GO-Minus Async Paketi Test Çalıştırıcı")
+    fmt.Println("======================================")
+    
+    // Test dosyaları
+    testFiles := []string{
+        "async_test.gom",
+        "eventloop_test.gom",
+        "future_test.gom",
+        "file_test.gom",
+        "socket_test.gom",
+    }
+    
+    // Başlangıç zamanı
+    startTime := time.Now()
+    
+    // Toplam test sayısı
+    totalTests := 0
+    passedTests := 0
+    failedTests := 0
+    
+    // Her test dosyasını çalıştır
+    for _, testFile := range testFiles {
+        fmt.Printf("\nÇalıştırılıyor: %s\n", testFile)
+        fmt.Println(strings.Repeat("-", len(testFile) + 15))
+        
+        // Test dosyasını yükle
+        tests, err := loadTests(testFile)
+        if err != nil {
+            fmt.Printf("Hata: %v\n", err)
+            continue
+        }
+        
+        // Testleri çalıştır
+        for _, test := range tests {
+            totalTests++
+            
+            fmt.Printf("Test: %s ... ", test.Name)
+            
+            // Test başlangıç zamanı
+            testStartTime := time.Now()
+            
+            // Testi çalıştır
+            err := runTest(test)
+            
+            // Test bitiş zamanı
+            testEndTime := time.Now()
+            testDuration := testEndTime.Sub(testStartTime)
+            
+            if err != nil {
+                fmt.Printf("BAŞARISIZ (%v)\n", err)
+                failedTests++
+            } else {
+                fmt.Printf("BAŞARILI (%.2f ms)\n", float64(testDuration.Microseconds()) / 1000.0)
+                passedTests++
+            }
+        }
+    }
+    
+    // Bitiş zamanı
+    endTime := time.Now()
+    duration := endTime.Sub(startTime)
+    
+    // Sonuçları göster
+    fmt.Println("\nTest Sonuçları")
+    fmt.Println("==============")
+    fmt.Printf("Toplam Test: %d\n", totalTests)
+    fmt.Printf("Başarılı: %d\n", passedTests)
+    fmt.Printf("Başarısız: %d\n", failedTests)
+    fmt.Printf("Süre: %.2f saniye\n", duration.Seconds())
+    
+    // Başarı durumuna göre çıkış kodu
+    if failedTests > 0 {
+        os.Exit(1)
+    }
+}
+
+// Test yapısı
+type Test struct {
+    Name string
+    Func func(*testing.T)
+}
+
+// Test dosyasını yükle
+func loadTests(filename string) ([]Test, error) {
+    // Bu fonksiyon, gerçek implementasyonda test dosyasını yükleyecek
+    // Şimdilik, örnek testler döndürelim
+    
+    return []Test{
+        {
+            Name: "TestExample",
+            Func: func(t *testing.T) {
+                // Örnek test
+            },
+        },
+    }, nil
+}
+
+// Testi çalıştır
+func runTest(test Test) error {
+    // Test nesnesi oluştur
+    t := &testing.T{}
+    
+    // Testi çalıştır
+    test.Func(t)
+    
+    // Test başarısız olduysa, hata döndür
+    if t.Failed() {
+        return fmt.Errorf("test başarısız oldu")
+    }
+    
+    return nil
+}

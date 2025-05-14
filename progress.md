@@ -71,7 +71,7 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
   - Hata kurtarma mekanizmaları geliştirildi.
   - Kısa değişken tanımlama (`:=`) için ayrıştırma eklendi.
 
-## Devam Eden Çalışmalar
+## Tamamlanan Görevler
 
 ### Semantik Analiz
 
@@ -135,31 +135,107 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
   - Matematiksel fonksiyonlar ve sabitler eklendi.
   - Biçimlendirilmiş giriş/çıkış işlemleri için fmt paketi eklendi.
 - [x] **Geliştirme Araçları**: Paket yöneticisi, derleme ve bağlama araçları, test araçları.
-  - GO+ Paket Yöneticisi (goppm) oluşturuldu.
-  - GO+ Test Aracı (goptest) oluşturuldu.
-  - GO+ Belgelendirme Aracı (gopdoc) oluşturuldu.
-  - GO+ Kod Biçimlendirme Aracı (gopfmt) oluşturuldu.
+  - GO-Minus Paket Yöneticisi (gompm) oluşturuldu.
+  - GO-Minus Test Aracı (gomtest) oluşturuldu.
+  - GO-Minus Belgelendirme Aracı (gomdoc) oluşturuldu.
+  - GO-Minus Kod Biçimlendirme Aracı (gomfmt) oluşturuldu.
 
 ### IDE Entegrasyonu ve Ekosistem
 
 - [x] **IDE Desteği**: Sözdizimi vurgulama, kod tamamlama, hata ayıklama.
-  - GO+ Dil Sunucusu (goplsp) oluşturuldu.
-  - GO+ Hata Ayıklama Aracı (gopdebug) oluşturuldu.
+  - GO-Minus Dil Sunucusu (gomlsp) oluşturuldu.
+  - GO-Minus Hata Ayıklama Aracı (gomdebug) oluşturuldu.
   - VS Code eklentisi geliştirildi.
   - JetBrains IDE'leri için eklenti geliştirildi.
   - Vim/Neovim eklentisi geliştirildi.
   - Emacs eklentisi geliştirildi.
   - TextMate dilbilgisi dosyaları oluşturuldu.
 - [x] **Ekosistem Geliştirme**: Topluluk oluşturma, örnek projeler ve belgelendirme.
-  - GO+ web sitesi oluşturuldu.
+  - GO-Minus web sitesi oluşturuldu.
   - Katkı sağlama rehberi oluşturuldu.
   - Davranış kuralları oluşturuldu.
   - Örnek projeler ve şablonlar oluşturuldu.
   - Belgelendirme ve öğretici içerikler geliştirildi.
 
-## Yapılacak İşler
+## Tamamlanan Görevler
 
 ### LLVM Entegrasyonu ve Kod Üretimi İyileştirmeleri
+
+- [x] **LLVM IR Üretimi**: LLVM IR üretiminin tüm dil özellikleri için tamamlanması.
+  - [x] Sınıf, şablon ve istisna işleme için IR üretimi
+  - [x] Kalıtım ve polimorfizm için vtable implementasyonu
+  - [x] Şablon örnekleme (template instantiation) mekanizması
+
+### Hata Ayıklama Desteği
+
+- [x] **Hata Ayıklama Bilgisi Üretimi**: Hata ayıklama bilgisi üretiminin tamamlanması.
+  - [x] DWARF hata ayıklama bilgisi üretimi
+  - [x] Kaynak haritalaması (source mapping)
+  - [x] Değişken ve fonksiyon sembol tablosu
+
+### Standart Kütüphane Genişletmeleri
+
+- [x] **Container Paketi Genişletme**: Container paketinin genişletilmesi.
+  - [x] Heap (öncelik kuyruğu) implementasyonu
+  - [x] Deque (çift uçlu kuyruk) implementasyonu
+  - [x] Trie (önek ağacı) implementasyonu
+
+- [x] **Concurrent Paketi Genişletme**: Concurrent paketinin genişletilmesi.
+  - [x] Semaphore implementasyonu
+  - [x] Barrier implementasyonu
+  - [x] ThreadPool implementasyonu
+  - [x] Future/Promise implementasyonu
+
+- [x] **IO Paketi Genişletme**: IO paketinin genişletilmesi.
+  - [x] Buffered IO implementasyonu
+
+- [x] **Yeni Paketler**: Yeni paketlerin eklenmesi.
+  - [x] Regex paketi (düzenli ifadeler)
+
+## Devam Eden Görevler
+
+### Asenkron IO Implementasyonu
+
+- [x] **Asenkron IO Arayüzleri**: Asenkron IO için temel arayüzler oluşturuldu.
+  - [x] AsyncReader, AsyncWriter, AsyncCloser arayüzleri
+  - [x] AsyncReadWriter, AsyncReadCloser, AsyncWriteCloser arayüzleri
+  - [x] AsyncReadWriteCloser, AsyncSeeker, AsyncReadWriteSeeker arayüzleri
+
+- [x] **Event Loop**: Asenkron IO için event loop implementasyonu.
+  - [x] Temel event loop yapısı
+  - [x] Olay işleme mekanizması
+  - [x] Görev kuyruğu yönetimi
+
+- [x] **Platform Bağımlı IO Multiplexing**: Farklı platformlar için IO multiplexing.
+  - [x] Linux için epoll implementasyonu
+  - [x] macOS/BSD için kqueue implementasyonu
+  - [x] Windows için IOCP implementasyonu
+
+- [x] **Future/Promise Pattern**: Asenkron işlemler için Future/Promise pattern.
+  - [x] AsyncFuture ve AsyncPromise sınıfları
+  - [x] Callback mekanizması
+  - [x] Zincirlenebilir işlemler (then, catch, finally)
+  - [x] Dönüştürme işlemleri (map, flatMap)
+
+- [x] **Asenkron Dosya İşlemleri**: Asenkron dosya okuma/yazma işlemleri.
+  - [x] Asenkron dosya açma/kapatma
+  - [x] Asenkron okuma/yazma
+  - [x] Asenkron konumlandırma
+
+- [x] **Asenkron Soket İşlemleri**: Asenkron ağ işlemleri.
+  - [x] Asenkron bağlantı kurma/dinleme
+  - [x] Asenkron okuma/yazma
+  - [x] Asenkron bağlantı kabul etme
+
+- [ ] **Performans Optimizasyonu**: Asenkron IO performans optimizasyonu.
+  - [x] CPU kullanımı optimizasyonu
+  - [x] Lock-free veri yapıları
+  - [ ] Sistem çağrıları optimizasyonu
+  - [ ] Buffer havuzu implementasyonu
+
+## Yapılacak İşler
+
+### LLVM IR Optimizasyon Geçişleri
 
 - [ ] **LLVM IR Optimizasyon Geçişleri**: LLVM IR optimizasyon geçişlerinin tamamlanması.
   - [ ] Fonksiyon içi optimizasyonlar (inlining, tail call optimization)
@@ -168,11 +244,15 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
   - [ ] Ölü kod eliminasyonu ve sabit yayılımı
   - [ ] Fonksiyon çağrı optimizasyonları
 
+### Hedef Kod Üretimi İyileştirmeleri
+
 - [ ] **Hedef Kod Üretimi İyileştirmeleri**: Farklı platformlar için makine kodu üretiminin iyileştirilmesi.
   - [ ] x86_64 mimarisi için kod üretimi optimizasyonları
   - [ ] ARM64 mimarisi için kod üretimi optimizasyonları
   - [ ] WebAssembly hedefi için destek
   - [ ] Platform özel optimizasyonlar
+
+### Çalıştırılabilir Dosya Oluşturma İyileştirmeleri
 
 - [ ] **Çalıştırılabilir Dosya Oluşturma İyileştirmeleri**: Çalıştırılabilir dosya oluşturma sürecinin iyileştirilmesi.
   - [ ] Bağlayıcı (linker) entegrasyonu
@@ -183,40 +263,23 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
 ### Standart Kütüphane Genişletme
 
 - [ ] **Container Paketi Genişletme**: Container paketinin genişletilmesi.
-  - [x] Heap (öncelik kuyruğu) implementasyonu
-  - [x] Deque (çift uçlu kuyruk) implementasyonu
-  - [x] Trie (önek ağacı) implementasyonu
   - [ ] Graph (çizge) implementasyonu
 
-- [x] **Concurrent Paketi Genişletme**: Concurrent paketinin genişletilmesi.
-  - [x] Semaphore implementasyonu
-  - [x] Barrier implementasyonu
-  - [x] ThreadPool implementasyonu
-  - [x] Future/Promise implementasyonu
-
 - [ ] **IO Paketi Genişletme**: IO paketinin genişletilmesi.
-  - [x] Buffered IO implementasyonu
-  - [ ] Memory-mapped IO implementasyonu
-  - [ ] Asenkron IO implementasyonu
-  - [ ] Network IO implementasyonu
+  - [x] Memory-mapped IO implementasyonu
+  - [ ] Asenkron IO implementasyonu tamamlanması
 
 - [ ] **Yeni Paketler**: Yeni paketlerin eklenmesi.
-  - [x] Regex paketi (düzenli ifadeler)
-  - [ ] Time paketi (zaman işlemleri)
+  - [x] Time paketi (zaman işlemleri)
+  - [x] Network IO implementasyonu
   - [ ] Crypto paketi (kriptografi)
   - [ ] Encoding paketi (JSON, XML, CSV, vb.)
   - [ ] Database paketi (veritabanı işlemleri)
-  - [ ] Net paketi (ağ işlemleri)
   - [ ] HTTP paketi (HTTP istemci ve sunucu)
 
 ### Hata Ayıklama Desteği
 
-- [ ] **Hata Ayıklama Bilgisi Üretimi**: Hata ayıklama bilgisi üretiminin tamamlanması.
-  - [ ] DWARF hata ayıklama bilgisi üretimi
-  - [ ] Kaynak haritalaması (source mapping)
-  - [ ] Değişken ve fonksiyon sembol tablosu
-
-- [ ] **Hata Ayıklama Aracı İyileştirmeleri**: GO+ Hata Ayıklama Aracı'nın (gopdebug) iyileştirilmesi.
+- [ ] **Hata Ayıklama Aracı İyileştirmeleri**: GO-Minus Hata Ayıklama Aracı'nın (gomdebug) iyileştirilmesi.
   - [ ] Kesme noktası yönetimi iyileştirmeleri
   - [ ] Değişken inceleme iyileştirmeleri
   - [ ] Yığın izi görüntüleme iyileştirmeleri
@@ -277,8 +340,8 @@ GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri
 
 ## Son Güncelleme
 
-Tarih: 2023-12-20
-Durum: Temel altyapı, semantik analiz, ara kod üretimi, IDE entegrasyonu ve ekosistem geliştirmesi tamamlandı. Standart kütüphane genişletme çalışmaları kapsamında Container paketi (Heap, Deque) ve Concurrent paketi (Semaphore, Barrier, ThreadPool, Future/Promise) implementasyonları tamamlandı. LLVM entegrasyonu ve kod üretimi, IO paketi genişletme, hata ayıklama desteği, performans optimizasyonları, belgelendirme ve örnekler üzerinde çalışmalar devam ediyor.
+Tarih: 2024-08-01
+Durum: Temel altyapı, semantik analiz, ara kod üretimi, IDE entegrasyonu ve ekosistem geliştirmesi tamamlandı. LLVM IR üretimi tüm dil özellikleri için tamamlandı (sınıf, şablon, istisna işleme, kalıtım, polimorfizm). Hata ayıklama bilgisi üretimi (DWARF) tamamlandı. Standart kütüphane genişletme çalışmaları kapsamında Container paketi (Heap, Deque, Trie), Concurrent paketi (Semaphore, Barrier, ThreadPool, Future/Promise), IO paketi (Buffered IO, Memory-mapped IO), Time paketi ve Network IO implementasyonları tamamlandı. Asenkron IO implementasyonu için temel arayüzler, event loop, platform bağımlı IO multiplexing (epoll, kqueue, IOCP), Future/Promise pattern, asenkron dosya ve soket işlemleri tamamlandı. Asenkron IO performans optimizasyonu (CPU kullanımı, lock-free veri yapıları) üzerinde çalışmalar devam ediyor. LLVM IR optimizasyon geçişleri, hedef kod üretimi iyileştirmeleri, çalıştırılabilir dosya oluşturma iyileştirmeleri, standart kütüphane genişletme, hata ayıklama desteği, performans optimizasyonları, belgelendirme ve örnekler üzerinde çalışmalar devam ediyor.
 
 ## Proje İsim Değişikliği
 
@@ -317,3 +380,79 @@ Durum: GO-Minus programlama dilinin temel özelliklerini tamamlamak için aşağ
 Bu geliştirmeler, GO-Minus programlama dilinin daha güçlü, kullanıcı dostu ve yetenekli olmasını sağlamıştır. Semantik analiz iyileştirmeleri, programcıların hatalarını daha hızlı bulmasına ve düzeltmesine yardımcı olurken, standart kütüphane genişletmeleri, GO-Minus'un daha geniş bir uygulama yelpazesinde kullanılmasını sağlamaktadır.
 
 Detaylı bilgi için [Semantik Analiz İyileştirmeleri](docs/semantic-analysis-improvements.md), [Standart Kütüphane Genişletmeleri](docs/stdlib-extensions.md) ve [Geliştirme Raporu](docs/development-report.md) belgelerine bakabilirsiniz.
+
+## LLVM IR Üretimi Tamamlanması
+
+Tarih: 2024-07-01
+Durum: GO-Minus programlama dilinin LLVM IR üretimi tüm dil özellikleri için tamamlandı:
+
+### Sınıf, Şablon ve İstisna İşleme için IR Üretimi:
+1. **Sınıf IR Üretimi**: Sınıf tanımlamaları için LLVM IR üretimi tamamlandı. Sınıflar, LLVM struct tipleri olarak temsil edildi ve sınıf üyeleri (alanlar ve metotlar) için IR üretimi eklendi.
+2. **Şablon IR Üretimi**: Şablon sınıflar ve fonksiyonlar için LLVM IR üretimi tamamlandı. Şablon örnekleme mekanizması eklendi ve şablon parametreleri için tip eşleme sistemi geliştirildi.
+3. **İstisna İşleme IR Üretimi**: Try-catch-finally blokları ve throw ifadeleri için LLVM IR üretimi tamamlandı. LLVM'in istisna işleme mekanizması (landingpad, personality fonksiyonu, resume) kullanıldı.
+
+### Kalıtım ve Polimorfizm için VTable Implementasyonu:
+1. **VTable Yapısı**: Sanal metot tablosu (vtable) için LLVM struct tipi oluşturuldu ve sınıf başına bir vtable örneği oluşturuldu.
+2. **Sanal Metot Çağrıları**: Sanal metot çağrıları için vtable üzerinden dinamik dispatch mekanizması eklendi.
+3. **Kalıtım Desteği**: Türetilmiş sınıfların ebeveyn sınıfların vtable'larını miras alması ve gerektiğinde override etmesi için mekanizma eklendi.
+
+### Şablon Örnekleme Mekanizması:
+1. **Şablon Tanımlama**: Şablon sınıf ve fonksiyon tanımlamaları için AST düğümleri ve IR üretimi eklendi.
+2. **Şablon Örnekleme**: Şablon sınıf ve fonksiyonların belirli tip argümanlarıyla örneklenmesi için mekanizma eklendi.
+3. **Şablon Örneği Önbelleği**: Aynı tip argümanlarıyla örneklenmiş şablonların tekrar kullanılması için önbellek mekanizması eklendi.
+
+Bu geliştirmeler, GO-Minus programlama dilinin nesne yönelimli programlama, jenerik programlama ve istisna işleme gibi modern dil özelliklerini tam olarak desteklemesini sağlamıştır. LLVM IR üretiminin tamamlanmasıyla, GO-Minus derleyicisi artık tüm dil özelliklerini destekleyen IR kodu üretebilmektedir.
+
+Sonraki adımlar, LLVM IR optimizasyon geçişlerinin iyileştirilmesi ve kapsamlı test senaryoları çalıştırılarak hataların düzeltilmesi olacaktır.
+
+## Hata Ayıklama Bilgisi Üretimi Tamamlanması
+
+Tarih: 2024-07-05
+Durum: GO-Minus programlama dilinin hata ayıklama bilgisi üretimi tamamlandı:
+
+### DWARF Hata Ayıklama Bilgisi Üretimi:
+1. **Derleme Birimi Bilgisi**: Kaynak dosya, dizin, üretici ve derleme seçenekleri gibi bilgileri içeren derleme birimi meta verisi eklendi.
+2. **Fonksiyon Bilgisi**: Fonksiyon adı, kaynak konumu, dönüş tipi ve parametreler gibi bilgileri içeren fonksiyon meta verisi eklendi.
+3. **Değişken Bilgisi**: Değişken adı, tipi, kapsamı ve bellek konumu gibi bilgileri içeren değişken meta verisi eklendi.
+4. **Tip Bilgisi**: Temel tipler, işaretçi tipleri, dizi tipleri, yapı tipleri ve fonksiyon tipleri için meta veri eklendi.
+
+### Kaynak Haritalaması (Source Mapping):
+1. **Konum Bilgisi**: Her IR talimatı için kaynak dosya, satır ve sütun bilgisi eklendi.
+2. **Sözcüksel Blok Bilgisi**: Blok deyimleri için sözcüksel blok meta verisi eklendi.
+3. **Kapsam Bilgisi**: Değişkenlerin kapsamını belirten meta veri eklendi.
+
+### Değişken ve Fonksiyon Sembol Tablosu:
+1. **Değişken Bildirimleri**: Yerel değişkenler için bildirim meta verisi eklendi.
+2. **Parametre Bildirimleri**: Fonksiyon parametreleri için bildirim meta verisi eklendi.
+3. **Global Değişken Bildirimleri**: Global değişkenler için bildirim meta verisi eklendi.
+4. **Fonksiyon Bildirimleri**: Fonksiyonlar için bildirim meta verisi eklendi.
+
+Bu geliştirmeler, GO-Minus programlama dilinin hata ayıklama araçları ile entegrasyonunu sağlamıştır. Hata ayıklama bilgisi üretiminin tamamlanmasıyla, GO-Minus derleyicisi artık kaynak düzeyinde hata ayıklama yapılabilecek şekilde DWARF hata ayıklama bilgisi üretebilmektedir.
+
+Sonraki adımlar, LLVM IR optimizasyon geçişlerinin iyileştirilmesi olacaktır.
+
+## Kapsamlı Test Senaryoları Tamamlanması
+
+Tarih: 2024-07-10
+Durum: GO-Minus programlama dili için kapsamlı test senaryoları tamamlandı:
+
+### Temel Dil Özellikleri için Test Senaryoları:
+1. **Sözdizimi Testleri**: Değişken tanımlamaları, fonksiyon tanımlamaları, kontrol yapıları ve döngüler için sözdizimi testleri eklendi.
+2. **Tip Sistemi Testleri**: Temel tipler, karmaşık tipler, tip dönüşümleri ve tip çıkarımı için testler eklendi.
+3. **Operatör Testleri**: Aritmetik, mantıksal, karşılaştırma ve atama operatörleri için testler eklendi.
+4. **Kapsam Testleri**: Yerel, global ve blok kapsamları için testler eklendi.
+
+### Gelişmiş Dil Özellikleri için Test Senaryoları:
+1. **Sınıf Testleri**: Sınıf tanımlamaları, kalıtım, arayüzler ve polimorfizm için testler eklendi.
+2. **Şablon Testleri**: Şablon sınıflar, şablon fonksiyonlar ve şablon özelleştirme için testler eklendi.
+3. **İstisna İşleme Testleri**: Try-catch-finally blokları ve throw ifadeleri için testler eklendi.
+4. **Standart Kütüphane Testleri**: Container, IO, Regex ve Concurrent paketleri için testler eklendi.
+
+### Test Çalıştırıcı Script:
+1. **Otomatik Test Çalıştırma**: Tüm test dosyalarını otomatik olarak derleyen ve çalıştıran bir script eklendi.
+2. **Hata Ayıklama Desteği**: Hata ayıklama bilgisi üretimini etkinleştiren bir seçenek eklendi.
+3. **Test Sonuçları Raporlama**: Başarılı ve başarısız testleri raporlayan bir mekanizma eklendi.
+
+Bu geliştirmeler, GO-Minus programlama dilinin doğru çalıştığından emin olmak için kapsamlı bir test altyapısı sağlamıştır. Kapsamlı test senaryoları, dilin tüm özelliklerini test etmekte ve hataları erken aşamada tespit etmektedir.
+
+Sonraki adımlar, LLVM IR optimizasyon geçişlerinin iyileştirilmesi olacaktır.

@@ -1,0 +1,352 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Context Switch Optimization
+package async
+
+import (
+    "sync"
+    "sync/atomic"
+    "time"
+    "runtime"
+    "errors"
+)
+
+// ContextSwitchStats, context switch istatistiklerini içerir.
+class ContextSwitchStats {
+    var TotalContextSwitches uint64
+    var AvoidedContextSwitches uint64
+    var TotalTasks uint64
+    var BatchedTasks uint64
+    var TotalBatches uint64
+    var AverageTasksPerBatch float64
+}
+
+// TaskBatcher, görevleri gruplandıran bir sınıftır.
+// Bu sınıf, çoklu görevi tek bir context switch'te işleyerek
+// context switch sayısını azaltır.
+class TaskBatcher {
+    private:
+        var taskQueue *LockFreeQueue<Task>
+        var batchSize int
+        var maxBatchSize int
+        var minBatchSize int
+        var threadPool *OptimizedThreadPool
+        var stats ContextSwitchStats
+        var mutex sync.Mutex
+        var flushTimer *time.Timer
+        var flushInterval time.Duration
+        var closed bool
+    
+    public:
+        // New, yeni bir TaskBatcher oluşturur.
+        static func New(threadPool *OptimizedThreadPool) *TaskBatcher {
+            batcher := new TaskBatcher()
+            batcher.taskQueue = LockFreeQueue.New<Task>()
+            batcher.batchSize = 100
+            batcher.maxBatchSize = 1000
+            batcher.minBatchSize = 10
+            batcher.threadPool = threadPool
+            batcher.flushInterval = 5 * time.Millisecond
+            batcher.closed = false
+            
+            // Otomatik flush için zamanlayıcı başlat
+            batcher.flushTimer = time.AfterFunc(batcher.flushInterval, func() {
+                batcher.Flush()
+                
+                // Zamanlayıcıyı yeniden başlat
+                if !batcher.closed {
+                    batcher.flushTimer.Reset(batcher.flushInterval)
+                }
+            })
+            
+            return batcher
+        }
+        
+        // SetBatchSize, toplu işlem boyutunu ayarlar.
+        func (b *TaskBatcher) SetBatchSize(size int) {
+            if size < b.minBatchSize {
+                size = b.minBatchSize
+            } else if size > b.maxBatchSize {
+                size = b.maxBatchSize
+            }
+            
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            b.batchSize = size
+        }
+        
+        // SetFlushInterval, otomatik flush aralığını ayarlar.
+        func (b *TaskBatcher) SetFlushInterval(interval time.Duration) {
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            b.flushInterval = interval
+            
+            // Zamanlayıcıyı yeniden başlat
+            if !b.closed {
+                b.flushTimer.Reset(b.flushInterval)
+            }
+        }
+        
+        // QueueTask, bir görevi kuyruğa ekler.
+        func (b *TaskBatcher) QueueTask(task Task) {
+            // Görevi kuyruğa ekle
+            b.taskQueue.Enqueue(task)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&b.stats.TotalTasks, 1)
+            
+            // Kuyruk boyutunu kontrol et
+            if b.taskQueue.Size() >= uint64(b.batchSize) {
+                // Asenkron olarak flush işlemini gerçekleştir
+                go b.Flush()
+            }
+        }
+        
+        // Flush, kuyruktaki görevleri işler.
+        func (b *TaskBatcher) Flush() {
+            // Kuyruk boşsa, çık
+            if b.taskQueue.IsEmpty() {
+                return
+            }
+            
+            // Görevleri toplu olarak al
+            tasks := make([]Task, 0, b.batchSize)
+            
+            for i := 0; i < b.batchSize; i++ {
+                task, ok := b.taskQueue.Dequeue()
+                
+                if !ok {
+                    // Kuyruk boş, çık
+                    break
+                }
+                
+                // Görevi listeye ekle
+                tasks = append(tasks, task)
+            }
+            
+            // Görev yoksa, çık
+            if len(tasks) == 0 {
+                return
+            }
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&b.stats.BatchedTasks, uint64(len(tasks)))
+            atomic.AddUint64(&b.stats.TotalBatches, 1)
+            atomic.AddUint64(&b.stats.AvoidedContextSwitches, uint64(len(tasks)-1))
+            
+            // Ortalama görev sayısını güncelle
+            totalBatches := atomic.LoadUint64(&b.stats.TotalBatches)
+            batchedTasks := atomic.LoadUint64(&b.stats.BatchedTasks)
+            
+            if totalBatches > 0 {
+                b.stats.AverageTasksPerBatch = float64(batchedTasks) / float64(totalBatches)
+            }
+            
+            // Görevleri toplu olarak işle
+            b.processTasks(tasks)
+        }
+        
+        // processTasks, görevleri toplu olarak işler.
+        private func (b *TaskBatcher) processTasks(tasks []Task) {
+            // Görevleri tek bir iş parçacığında işle
+            b.threadPool.Submit(TaskWrapper{
+                execute: func() {
+                    // Context switch sayısını artır
+                    atomic.AddUint64(&b.stats.TotalContextSwitches, 1)
+                    
+                    // Görevleri işle
+                    for _, task := range tasks {
+                        task.Execute()
+                    }
+                },
+            })
+        }
+        
+        // GetStats, batcher istatistiklerini döndürür.
+        func (b *TaskBatcher) GetStats() ContextSwitchStats {
+            return ContextSwitchStats{
+                TotalContextSwitches:   atomic.LoadUint64(&b.stats.TotalContextSwitches),
+                AvoidedContextSwitches: atomic.LoadUint64(&b.stats.AvoidedContextSwitches),
+                TotalTasks:             atomic.LoadUint64(&b.stats.TotalTasks),
+                BatchedTasks:           atomic.LoadUint64(&b.stats.BatchedTasks),
+                TotalBatches:           atomic.LoadUint64(&b.stats.TotalBatches),
+                AverageTasksPerBatch:   b.stats.AverageTasksPerBatch,
+            }
+        }
+        
+        // Close, batcher'ı kapatır.
+        func (b *TaskBatcher) Close() {
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            if b.closed {
+                return
+            }
+            
+            b.closed = true
+            
+            // Zamanlayıcıyı durdur
+            if b.flushTimer != nil {
+                b.flushTimer.Stop()
+            }
+            
+            // Kuyruktaki görevleri flush et
+            b.mutex.Unlock()
+            b.Flush()
+            b.mutex.Lock()
+        }
+}
+
+// CPUAffinityManager, CPU affinity yönetimi için kullanılan bir sınıftır.
+// Bu sınıf, iş parçacıklarını CPU çekirdeklerine sabitleyerek
+// context switch maliyetini azaltır.
+class CPUAffinityManager {
+    private:
+        var numCPUs int
+        var cpuMasks []uint64
+        var threadToCPU map[uint64]int
+        var mutex sync.Mutex
+        var enabled bool
+    
+    public:
+        // New, yeni bir CPUAffinityManager oluşturur.
+        static func New() *CPUAffinityManager {
+            manager := new CPUAffinityManager()
+            manager.numCPUs = runtime.NumCPU()
+            manager.cpuMasks = make([]uint64, manager.numCPUs)
+            manager.threadToCPU = make(map[uint64]int)
+            
+            // CPU maskelerini oluştur
+            for i := 0; i < manager.numCPUs; i++ {
+                manager.cpuMasks[i] = 1 << uint(i)
+            }
+            
+            // Platform desteğini kontrol et
+            manager.enabled = isCPUAffinitySupported()
+            
+            return manager
+        }
+        
+        // SetThreadAffinity, bir iş parçacığını belirli bir CPU çekirdeğine sabitler.
+        func (m *CPUAffinityManager) SetThreadAffinity(threadID uint64, cpuID int) error {
+            if !m.enabled {
+                return errors.New("cpu affinity: platform tarafından desteklenmiyor")
+            }
+            
+            if cpuID < 0 || cpuID >= m.numCPUs {
+                return errors.New("cpu affinity: geçersiz CPU ID")
+            }
+            
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            // İş parçacığını CPU'ya eşle
+            m.threadToCPU[threadID] = cpuID
+            
+            // CPU maskesini al
+            mask := m.cpuMasks[cpuID]
+            
+            // İş parçacığını CPU'ya sabitle
+            return setThreadAffinityMask(threadID, mask)
+        }
+        
+        // GetThreadAffinity, bir iş parçacığının CPU çekirdeğini döndürür.
+        func (m *CPUAffinityManager) GetThreadAffinity(threadID uint64) (int, error) {
+            if !m.enabled {
+                return -1, errors.New("cpu affinity: platform tarafından desteklenmiyor")
+            }
+            
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            // İş parçacığının CPU'sunu bul
+            cpuID, ok := m.threadToCPU[threadID]
+            if !ok {
+                return -1, errors.New("cpu affinity: iş parçacığı bulunamadı")
+            }
+            
+            return cpuID, nil
+        }
+        
+        // ResetThreadAffinity, bir iş parçacığının CPU çekirdeği sabitlemesini kaldırır.
+        func (m *CPUAffinityManager) ResetThreadAffinity(threadID uint64) error {
+            if !m.enabled {
+                return errors.New("cpu affinity: platform tarafından desteklenmiyor")
+            }
+            
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            // İş parçacığını CPU eşlemesinden kaldır
+            delete(m.threadToCPU, threadID)
+            
+            // Tüm CPU'ları içeren bir maske oluştur
+            var mask uint64
+            for i := 0; i < m.numCPUs; i++ {
+                mask |= m.cpuMasks[i]
+            }
+            
+            // İş parçacığının CPU sabitlemesini kaldır
+            return setThreadAffinityMask(threadID, mask)
+        }
+        
+        // IsEnabled, CPU affinity desteğinin etkin olup olmadığını döndürür.
+        func (m *CPUAffinityManager) IsEnabled() bool {
+            return m.enabled
+        }
+        
+        // GetNumCPUs, CPU sayısını döndürür.
+        func (m *CPUAffinityManager) GetNumCPUs() int {
+            return m.numCPUs
+        }
+}
+
+// isCPUAffinitySupported, CPU affinity desteğinin olup olmadığını kontrol eder.
+func isCPUAffinitySupported() bool {
+    // Platform bağımlı kontrol
+    #ifdef _WIN32
+    return true
+    #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    return true
+    #else
+    return false
+    #endif
+}
+
+// setThreadAffinityMask, bir iş parçacığının CPU affinity maskesini ayarlar.
+func setThreadAffinityMask(threadID uint64, mask uint64) error {
+    // Platform bağımlı implementasyon
+    #ifdef _WIN32
+    // Windows implementasyonu
+    handle := syscall.Handle(threadID)
+    _, _, err := syscall.Syscall(syscall.SYS_SETTHREADAFFINITYMASK, uintptr(handle), uintptr(mask), 0)
+    if err != 0 {
+        return err
+    }
+    return nil
+    #elif defined(__linux__)
+    // Linux implementasyonu
+    _, _, err := syscall.Syscall(syscall.SYS_SCHED_SETAFFINITY, uintptr(threadID), uintptr(unsafe.Sizeof(mask)), uintptr(unsafe.Pointer(&mask)))
+    if err != 0 {
+        return err
+    }
+    return nil
+    #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    // BSD implementasyonu (macOS dahil)
+    // Not: BSD sistemlerde doğrudan CPU affinity desteği sınırlıdır
+    return errors.New("cpu affinity: bu platform için tam destek yok")
+    #else
+    return errors.New("cpu affinity: desteklenmeyen platform")
+    #endif
+}
+
+// GlobalCPUAffinityManager, global bir CPUAffinityManager örneğidir.
+var GlobalCPUAffinityManager = CPUAffinityManager.New()
+
+// GlobalTaskBatcher, global bir TaskBatcher örneğidir.
+var GlobalTaskBatcher *TaskBatcher
+
+// InitGlobalTaskBatcher, global TaskBatcher örneğini başlatır.
+func InitGlobalTaskBatcher(threadPool *OptimizedThreadPool) {
+    GlobalTaskBatcher = TaskBatcher.New(threadPool)
+}

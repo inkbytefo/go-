@@ -1,0 +1,399 @@
+// GO-Minus Standart Kütüphane - Async Paketi - IO Multiplexing
+package async
+
+import (
+    "errors"
+    "sync"
+    "sync/atomic"
+    "time"
+)
+
+// MultiplexerType, I/O multiplexer tipini belirtir.
+type MultiplexerType int
+
+const (
+    // EpollMultiplexer, epoll multiplexer tipini belirtir.
+    EpollMultiplexer MultiplexerType = iota
+    
+    // KqueueMultiplexer, kqueue multiplexer tipini belirtir.
+    KqueueMultiplexer
+    
+    // IOCPMultiplexer, IOCP multiplexer tipini belirtir.
+    IOCPMultiplexer
+    
+    // SelectMultiplexer, select multiplexer tipini belirtir.
+    SelectMultiplexer
+)
+
+// MultiplexerMode, I/O multiplexer modunu belirtir.
+type MultiplexerMode int
+
+const (
+    // LevelTriggered, seviye tetiklemeli modu belirtir.
+    LevelTriggered MultiplexerMode = iota
+    
+    // EdgeTriggered, kenar tetiklemeli modu belirtir.
+    EdgeTriggered
+)
+
+// MultiplexerOptions, I/O multiplexer seçeneklerini belirtir.
+class MultiplexerOptions {
+    var Type MultiplexerType
+    var Mode MultiplexerMode
+    var Timeout int
+    var MaxEvents int
+    var OneShot bool
+    var NumWorkers int
+}
+
+// MultiplexerStats, I/O multiplexer istatistiklerini içerir.
+class MultiplexerStats {
+    var TotalEvents uint64
+    var TotalWakeups uint64
+    var TotalTimeouts uint64
+    var AverageEventsPerWakeup float64
+    var MaxEventsPerWakeup uint64
+    var TotalWaitTime time.Duration
+    var AverageWaitTime time.Duration
+}
+
+// IOMultiplexer, I/O multiplexing için kullanılan bir arayüzdür.
+interface IOMultiplexer {
+    func Add(fd int, events int) error
+    func Remove(fd int) error
+    func Modify(fd int, events int) error
+    func Wait(timeout int) ([]Event, error)
+    func Close() error
+    func GetStats() MultiplexerStats
+}
+
+// OptimizedIOMultiplexer, optimize edilmiş bir I/O multiplexer sağlar.
+// Bu sınıf, platform özelinde en verimli I/O multiplexing mekanizmasını seçer.
+class OptimizedIOMultiplexer {
+    private:
+        var multiplexers []IOMultiplexer
+        var numMultiplexers int
+        var options MultiplexerOptions
+        var stats MultiplexerStats
+        var mutex sync.Mutex
+        var fdToMultiplexer map[int]int
+        var nextMultiplexer int
+        var closed bool
+    
+    public:
+        // New, yeni bir OptimizedIOMultiplexer oluşturur.
+        static func New(options MultiplexerOptions) (*OptimizedIOMultiplexer, error) {
+            if options.NumWorkers <= 0 {
+                options.NumWorkers = 1
+            }
+            
+            if options.MaxEvents <= 0 {
+                options.MaxEvents = 1024
+            }
+            
+            if options.Timeout <= 0 {
+                options.Timeout = 100
+            }
+            
+            multiplexer := new OptimizedIOMultiplexer()
+            multiplexer.options = options
+            multiplexer.numMultiplexers = options.NumWorkers
+            multiplexer.multiplexers = make([]IOMultiplexer, options.NumWorkers)
+            multiplexer.fdToMultiplexer = make(map[int]int)
+            
+            // Platform özelinde multiplexer oluştur
+            for i := 0; i < options.NumWorkers; i++ {
+                var m IOMultiplexer
+                var err error
+                
+                switch options.Type {
+                case EpollMultiplexer:
+                    m, err = newOptimizedEpollPoller(options)
+                case KqueueMultiplexer:
+                    m, err = newOptimizedKqueuePoller(options)
+                case IOCPMultiplexer:
+                    m, err = newOptimizedIOCPPoller(options)
+                case SelectMultiplexer:
+                    m, err = newOptimizedSelectPoller(options)
+                default:
+                    // Otomatik seçim
+                    #ifdef _WIN32
+                    m, err = newOptimizedIOCPPoller(options)
+                    #elif defined(__linux__)
+                    m, err = newOptimizedEpollPoller(options)
+                    #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+                    m, err = newOptimizedKqueuePoller(options)
+                    #else
+                    m, err = newOptimizedSelectPoller(options)
+                    #endif
+                }
+                
+                if err != nil {
+                    // Oluşturulan multiplexer'ları kapat
+                    for j := 0; j < i; j++ {
+                        multiplexer.multiplexers[j].Close()
+                    }
+                    
+                    return nil, err
+                }
+                
+                multiplexer.multiplexers[i] = m
+            }
+            
+            return multiplexer, nil
+        }
+        
+        // Add, bir dosya tanımlayıcısını multiplexer'a ekler.
+        func (m *OptimizedIOMultiplexer) Add(fd int, events int) error {
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            if m.closed {
+                return errors.New("io multiplexer: kapalı")
+            }
+            
+            // Dosya tanımlayıcısının hangi multiplexer'a ait olduğunu kontrol et
+            multiplexerID, ok := m.fdToMultiplexer[fd]
+            
+            if ok {
+                // Dosya tanımlayıcısı zaten bir multiplexer'a eklenmiş
+                return errors.New("io multiplexer: dosya tanımlayıcısı zaten eklenmiş")
+            }
+            
+            // Yük dengelemesi için round-robin kullan
+            multiplexerID = m.nextMultiplexer
+            m.nextMultiplexer = (m.nextMultiplexer + 1) % m.numMultiplexers
+            
+            // Dosya tanımlayıcısını multiplexer'a ekle
+            err := m.multiplexers[multiplexerID].Add(fd, events)
+            if err != nil {
+                return err
+            }
+            
+            // Dosya tanımlayıcısını multiplexer'a eşle
+            m.fdToMultiplexer[fd] = multiplexerID
+            
+            return nil
+        }
+        
+        // Remove, bir dosya tanımlayıcısını multiplexer'dan kaldırır.
+        func (m *OptimizedIOMultiplexer) Remove(fd int) error {
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            if m.closed {
+                return errors.New("io multiplexer: kapalı")
+            }
+            
+            // Dosya tanımlayıcısının hangi multiplexer'a ait olduğunu bul
+            multiplexerID, ok := m.fdToMultiplexer[fd]
+            
+            if !ok {
+                // Dosya tanımlayıcısı hiçbir multiplexer'a eklenmemiş
+                return errors.New("io multiplexer: dosya tanımlayıcısı bulunamadı")
+            }
+            
+            // Dosya tanımlayıcısını multiplexer'dan kaldır
+            err := m.multiplexers[multiplexerID].Remove(fd)
+            if err != nil {
+                return err
+            }
+            
+            // Dosya tanımlayıcısını multiplexer eşlemesinden kaldır
+            delete(m.fdToMultiplexer, fd)
+            
+            return nil
+        }
+        
+        // Modify, bir dosya tanımlayıcısının olaylarını değiştirir.
+        func (m *OptimizedIOMultiplexer) Modify(fd int, events int) error {
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            if m.closed {
+                return errors.New("io multiplexer: kapalı")
+            }
+            
+            // Dosya tanımlayıcısının hangi multiplexer'a ait olduğunu bul
+            multiplexerID, ok := m.fdToMultiplexer[fd]
+            
+            if !ok {
+                // Dosya tanımlayıcısı hiçbir multiplexer'a eklenmemiş
+                return errors.New("io multiplexer: dosya tanımlayıcısı bulunamadı")
+            }
+            
+            // Dosya tanımlayıcısının olaylarını değiştir
+            return m.multiplexers[multiplexerID].Modify(fd, events)
+        }
+        
+        // Wait, olayları bekler.
+        // Bu metot, tüm multiplexer'ları paralel olarak bekler.
+        func (m *OptimizedIOMultiplexer) Wait(timeout int) ([]Event, error) {
+            if m.closed {
+                return nil, errors.New("io multiplexer: kapalı")
+            }
+            
+            // Tüm multiplexer'ları paralel olarak bekle
+            var wg sync.WaitGroup
+            results := make([][]Event, m.numMultiplexers)
+            errors := make([]error, m.numMultiplexers)
+            
+            startTime := time.Now()
+            
+            for i := 0; i < m.numMultiplexers; i++ {
+                wg.Add(1)
+                
+                go func(index int) {
+                    defer wg.Done()
+                    
+                    // Multiplexer'ı bekle
+                    events, err := m.multiplexers[index].Wait(timeout)
+                    
+                    // Sonuçları kaydet
+                    results[index] = events
+                    errors[index] = err
+                }(i)
+            }
+            
+            // Tüm multiplexer'ların tamamlanmasını bekle
+            wg.Wait()
+            
+            waitTime := time.Since(startTime)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&m.stats.TotalWakeups, 1)
+            atomic.AddInt64((*int64)(&m.stats.TotalWaitTime), int64(waitTime))
+            
+            // Ortalama bekleme süresini güncelle
+            totalWakeups := atomic.LoadUint64(&m.stats.TotalWakeups)
+            if totalWakeups > 0 {
+                m.stats.AverageWaitTime = time.Duration(int64(m.stats.TotalWaitTime) / int64(totalWakeups))
+            }
+            
+            // Sonuçları birleştir
+            var allEvents []Event
+            var firstError error
+            
+            for i := 0; i < m.numMultiplexers; i++ {
+                if errors[i] != nil && firstError == nil {
+                    firstError = errors[i]
+                }
+                
+                if results[i] != nil {
+                    allEvents = append(allEvents, results[i]...)
+                }
+            }
+            
+            // İstatistikleri güncelle
+            numEvents := uint64(len(allEvents))
+            atomic.AddUint64(&m.stats.TotalEvents, numEvents)
+            
+            // Ortalama olay sayısını güncelle
+            if totalWakeups > 0 {
+                m.stats.AverageEventsPerWakeup = float64(atomic.LoadUint64(&m.stats.TotalEvents)) / float64(totalWakeups)
+            }
+            
+            // Maksimum olay sayısını güncelle
+            if numEvents > atomic.LoadUint64(&m.stats.MaxEventsPerWakeup) {
+                atomic.StoreUint64(&m.stats.MaxEventsPerWakeup, numEvents)
+            }
+            
+            // Zaman aşımı kontrolü
+            if len(allEvents) == 0 && firstError == nil {
+                atomic.AddUint64(&m.stats.TotalTimeouts, 1)
+            }
+            
+            return allEvents, firstError
+        }
+        
+        // Close, multiplexer'ı kapatır.
+        func (m *OptimizedIOMultiplexer) Close() error {
+            m.mutex.Lock()
+            defer m.mutex.Unlock()
+            
+            if m.closed {
+                return errors.New("io multiplexer: zaten kapalı")
+            }
+            
+            m.closed = true
+            
+            // Tüm multiplexer'ları kapat
+            var firstError error
+            
+            for i := 0; i < m.numMultiplexers; i++ {
+                err := m.multiplexers[i].Close()
+                if err != nil && firstError == nil {
+                    firstError = err
+                }
+            }
+            
+            return firstError
+        }
+        
+        // GetStats, multiplexer istatistiklerini döndürür.
+        func (m *OptimizedIOMultiplexer) GetStats() MultiplexerStats {
+            // Tüm multiplexer'ların istatistiklerini topla
+            var stats MultiplexerStats
+            
+            for i := 0; i < m.numMultiplexers; i++ {
+                multiplexerStats := m.multiplexers[i].GetStats()
+                
+                stats.TotalEvents += multiplexerStats.TotalEvents
+                stats.TotalWakeups += multiplexerStats.TotalWakeups
+                stats.TotalTimeouts += multiplexerStats.TotalTimeouts
+                stats.TotalWaitTime += multiplexerStats.TotalWaitTime
+                
+                if multiplexerStats.MaxEventsPerWakeup > stats.MaxEventsPerWakeup {
+                    stats.MaxEventsPerWakeup = multiplexerStats.MaxEventsPerWakeup
+                }
+            }
+            
+            // Ortalama değerleri hesapla
+            if stats.TotalWakeups > 0 {
+                stats.AverageEventsPerWakeup = float64(stats.TotalEvents) / float64(stats.TotalWakeups)
+                stats.AverageWaitTime = time.Duration(int64(stats.TotalWaitTime) / int64(stats.TotalWakeups))
+            }
+            
+            return stats
+        }
+}
+
+// GetOptimalMultiplexerType, platform için en uygun multiplexer tipini döndürür.
+func GetOptimalMultiplexerType() MultiplexerType {
+    #ifdef _WIN32
+    return IOCPMultiplexer
+    #elif defined(__linux__)
+    return EpollMultiplexer
+    #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    return KqueueMultiplexer
+    #else
+    return SelectMultiplexer
+    #endif
+}
+
+// GetOptimalMultiplexerMode, platform için en uygun multiplexer modunu döndürür.
+func GetOptimalMultiplexerMode() MultiplexerMode {
+    #ifdef _WIN32
+    return LevelTriggered // IOCP için mod kavramı yok
+    #elif defined(__linux__)
+    return EdgeTriggered // Linux için EPOLLET daha verimli
+    #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    return EdgeTriggered // BSD için EV_CLEAR daha verimli
+    #else
+    return LevelTriggered // Select için sadece seviye tetiklemeli mod var
+    #endif
+}
+
+// GetDefaultMultiplexerOptions, varsayılan multiplexer seçeneklerini döndürür.
+func GetDefaultMultiplexerOptions() MultiplexerOptions {
+    options := MultiplexerOptions{
+        Type:       GetOptimalMultiplexerType(),
+        Mode:       GetOptimalMultiplexerMode(),
+        Timeout:    100,
+        MaxEvents:  1024,
+        OneShot:    true,
+        NumWorkers: runtime.NumCPU(),
+    }
+    
+    return options
+}

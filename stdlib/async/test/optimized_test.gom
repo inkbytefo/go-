@@ -1,0 +1,530 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "sync"
+    "math/rand"
+    "os"
+    "io"
+)
+
+// TestOptimizedBufferPool, OptimizedBufferPool sınıfını test eder.
+func TestOptimizedBufferPool(t *testing.T) {
+    // OptimizedBufferPool oluştur
+    pool := async.OptimizedBufferPool.New()
+    
+    // Farklı boyutlarda tamponlar al
+    sizes := []int{32, 64, 128, 256, 512, 1024, 2048, 4096, 8192}
+    
+    for _, size := range sizes {
+        // Tampon al
+        buffer := pool.Get(size)
+        
+        // Tampon boyutunu kontrol et
+        if len(buffer) != size {
+            t.Errorf("OptimizedBufferPool.Get: beklenen tampon boyutu %d, alınan: %d", size, len(buffer))
+        }
+        
+        // Tampon kapasitesini kontrol et (en küçük 2^n >= size)
+        expectedCap := size
+        if cap(buffer) < expectedCap {
+            t.Errorf("OptimizedBufferPool.Get: beklenen tampon kapasitesi en az %d, alınan: %d", expectedCap, cap(buffer))
+        }
+        
+        // Tamponu havuza geri koy
+        pool.Put(buffer)
+    }
+    
+    // İstatistikleri kontrol et
+    stats := pool.GetStats()
+    
+    // Her boyut için bir get ve bir put olmalı
+    if stats["gets"] != uint64(len(sizes)) {
+        t.Errorf("OptimizedBufferPool.GetStats: beklenen get sayısı %d, alınan: %d", len(sizes), stats["gets"])
+    }
+    
+    if stats["puts"] != uint64(len(sizes)) {
+        t.Errorf("OptimizedBufferPool.GetStats: beklenen put sayısı %d, alınan: %d", len(sizes), stats["puts"])
+    }
+}
+
+// TestZeroCopyBuffer, ZeroCopyBuffer sınıfını test eder.
+func TestZeroCopyBuffer(t *testing.T) {
+    // ZeroCopyBuffer oluştur
+    buffer := async.ZeroCopyBuffer.New(1024)
+    
+    // Tampon boyutunu kontrol et
+    if buffer.Len() != 0 {
+        t.Errorf("ZeroCopyBuffer.Len: beklenen tampon boyutu 0, alınan: %d", buffer.Len())
+    }
+    
+    // Tampon kapasitesini kontrol et
+    if buffer.Cap() != 1024 {
+        t.Errorf("ZeroCopyBuffer.Cap: beklenen tampon kapasitesi 1024, alınan: %d", buffer.Cap())
+    }
+    
+    // Tampona veri yaz
+    data := []byte("Hello, World!")
+    if !buffer.Write(data) {
+        t.Errorf("ZeroCopyBuffer.Write: yazma başarısız oldu")
+    }
+    
+    // Tampon boyutunu kontrol et
+    if buffer.Len() != len(data) {
+        t.Errorf("ZeroCopyBuffer.Len: beklenen tampon boyutu %d, alınan: %d", len(data), buffer.Len())
+    }
+    
+    // Tampondan veri oku
+    readData, ok := buffer.Read(len(data))
+    if !ok {
+        t.Errorf("ZeroCopyBuffer.Read: okuma başarısız oldu")
+    }
+    
+    // Okunan veriyi kontrol et
+    if string(readData) != string(data) {
+        t.Errorf("ZeroCopyBuffer.Read: beklenen veri %s, alınan: %s", string(data), string(readData))
+    }
+    
+    // Tampon boyutunu kontrol et
+    if buffer.Len() != 0 {
+        t.Errorf("ZeroCopyBuffer.Len: beklenen tampon boyutu 0, alınan: %d", buffer.Len())
+    }
+    
+    // Tamponu serbest bırak
+    buffer.Release()
+}
+
+// TestWorkStealingQueue, WorkStealingQueue sınıfını test eder.
+func TestWorkStealingQueue(t *testing.T) {
+    // WorkStealingQueue oluştur
+    queue := async.WorkStealingQueue.New<int>(1024)
+    
+    // Kuyruğun boş olduğunu kontrol et
+    if !queue.IsEmpty() {
+        t.Errorf("WorkStealingQueue.IsEmpty: beklenen değer true, alınan: false")
+    }
+    
+    // Kuyruğa eleman ekle
+    queue.PushBottom(42)
+    
+    // Kuyruğun boş olmadığını kontrol et
+    if queue.IsEmpty() {
+        t.Errorf("WorkStealingQueue.IsEmpty: beklenen değer false, alınan: true")
+    }
+    
+    // Kuyruktan eleman çıkar
+    value, ok := queue.PopBottom()
+    if !ok {
+        t.Errorf("WorkStealingQueue.PopBottom: çıkarma başarısız oldu")
+    }
+    
+    // Çıkarılan elemanı kontrol et
+    if value != 42 {
+        t.Errorf("WorkStealingQueue.PopBottom: beklenen değer 42, alınan: %d", value)
+    }
+    
+    // Kuyruğun boş olduğunu kontrol et
+    if !queue.IsEmpty() {
+        t.Errorf("WorkStealingQueue.IsEmpty: beklenen değer true, alınan: false")
+    }
+    
+    // Boş kuyruktan eleman çıkarmayı dene
+    _, ok = queue.PopBottom()
+    if ok {
+        t.Errorf("WorkStealingQueue.PopBottom: boş kuyruktan çıkarma başarılı olmamalıydı")
+    }
+    
+    // Çoklu eleman ekle
+    for i := 0; i < 100; i++ {
+        queue.PushBottom(i)
+    }
+    
+    // Kuyruk boyutunu kontrol et
+    if queue.Size() != 100 {
+        t.Errorf("WorkStealingQueue.Size: beklenen boyut 100, alınan: %d", queue.Size())
+    }
+    
+    // Kuyruktan eleman çal
+    value, ok = queue.StealTop()
+    if !ok {
+        t.Errorf("WorkStealingQueue.StealTop: çalma başarısız oldu")
+    }
+    
+    // Çalınan elemanı kontrol et
+    if value != 0 {
+        t.Errorf("WorkStealingQueue.StealTop: beklenen değer 0, alınan: %d", value)
+    }
+    
+    // Kuyruk boyutunu kontrol et
+    if queue.Size() != 99 {
+        t.Errorf("WorkStealingQueue.Size: beklenen boyut 99, alınan: %d", queue.Size())
+    }
+}
+
+// TestOptimizedThreadPool, OptimizedThreadPool sınıfını test eder.
+func TestOptimizedThreadPool(t *testing.T) {
+    // OptimizedThreadPool oluştur
+    pool := async.OptimizedThreadPool.New(4)
+    
+    // İş parçacığı havuzunu başlat
+    pool.Start()
+    defer pool.Stop()
+    
+    // Görev sayısı
+    numTasks := 1000
+    
+    // Tamamlanan görevleri takip etmek için
+    var completedTasks int
+    var mutex sync.Mutex
+    var wg sync.WaitGroup
+    
+    // Görevleri gönder
+    for i := 0; i < numTasks; i++ {
+        wg.Add(1)
+        
+        // Görevi kopyala (closure için)
+        taskID := i
+        
+        // Görevi oluştur
+        task := async.TaskWrapper{
+            execute: func() {
+                // Rastgele bekle (0-10ms)
+                time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)
+                
+                // Tamamlanan görev sayısını artır
+                mutex.Lock()
+                completedTasks++
+                mutex.Unlock()
+                
+                wg.Done()
+            },
+        }
+        
+        // Görevi gönder
+        pool.Submit(task)
+    }
+    
+    // Tüm görevlerin tamamlanmasını bekle
+    wg.Wait()
+    
+    // Tamamlanan görev sayısını kontrol et
+    if completedTasks != numTasks {
+        t.Errorf("OptimizedThreadPool: beklenen tamamlanan görev sayısı %d, alınan: %d", numTasks, completedTasks)
+    }
+    
+    // İstatistikleri kontrol et
+    stats := pool.GetStats()
+    
+    // Tamamlanan görev sayısı
+    if stats["completedTasks"].(int64) != int64(numTasks) {
+        t.Errorf("OptimizedThreadPool.GetStats: beklenen tamamlanan görev sayısı %d, alınan: %d", numTasks, stats["completedTasks"].(int64))
+    }
+}
+
+// TestOptimizedEventLoop, OptimizedEventLoop sınıfını test eder.
+func TestOptimizedEventLoop(t *testing.T) {
+    // OptimizedEventLoop oluştur
+    loop, err := async.OptimizedEventLoop.New()
+    if err != nil {
+        t.Fatalf("OptimizedEventLoop.New: %v", err)
+    }
+    
+    // Olay döngüsünü başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("OptimizedEventLoop.Start: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test için bir AsyncHandler oluştur
+    handler := new TestHandler()
+    
+    // Olay sayısı
+    numEvents := 100
+    
+    // Olayları gönder
+    for i := 0; i < numEvents; i++ {
+        // Olayı oluştur
+        event := async.Event{
+            Type: i,
+            Data: i,
+            Error: nil,
+        }
+        
+        // Olayı gönder
+        loop.Post(event, handler)
+    }
+    
+    // Olayların işlenmesini bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // İşlenen olay sayısını kontrol et
+    if handler.eventCount != numEvents {
+        t.Errorf("OptimizedEventLoop: beklenen işlenen olay sayısı %d, alınan: %d", numEvents, handler.eventCount)
+    }
+}
+
+// TestHandler, test için bir AsyncHandler implementasyonu.
+class TestHandler {
+    var eventCount int
+    var mutex sync.Mutex
+    
+    func (h *TestHandler) OnEvent(event async.Event) {
+        h.mutex.Lock()
+        defer h.mutex.Unlock()
+        
+        h.eventCount++
+    }
+}
+
+// TestSyscallBatcher, SyscallBatcher sınıfını test eder.
+func TestSyscallBatcher(t *testing.T) {
+    // SyscallBatcher oluştur
+    batcher := async.SyscallBatcher.New()
+    
+    // Geçici dosya oluştur
+    tmpfile, err := os.CreateTemp("", "test")
+    if err != nil {
+        t.Fatalf("Geçici dosya oluşturma hatası: %v", err)
+    }
+    defer os.Remove(tmpfile.Name())
+    defer tmpfile.Close()
+    
+    // Dosyaya veri yaz
+    data := []byte("Hello, World!")
+    _, err = tmpfile.Write(data)
+    if err != nil {
+        t.Fatalf("Dosyaya yazma hatası: %v", err)
+    }
+    
+    // Dosya işaretçisini başa al
+    _, err = tmpfile.Seek(0, io.SeekStart)
+    if err != nil {
+        t.Fatalf("Dosya işaretçisini başa alma hatası: %v", err)
+    }
+    
+    // Dosyayı aç
+    file, err := batcher.OpenFile(tmpfile.Name(), os.O_RDONLY, 0)
+    if err != nil {
+        t.Fatalf("SyscallBatcher.OpenFile: %v", err)
+    }
+    defer batcher.CloseFile(tmpfile.Name(), file)
+    
+    // Tamponlar oluştur
+    buffer1 := make([]byte, 5)
+    buffer2 := make([]byte, 8)
+    
+    // Toplu okuma işlemi gerçekleştir
+    _, err = batcher.ReadBatched(int(file.Fd()), [][]byte{buffer1, buffer2})
+    if err != nil {
+        t.Fatalf("SyscallBatcher.ReadBatched: %v", err)
+    }
+    
+    // Okunan verileri kontrol et
+    if string(buffer1) != "Hello" {
+        t.Errorf("SyscallBatcher.ReadBatched: beklenen veri 'Hello', alınan: '%s'", string(buffer1))
+    }
+    
+    if string(buffer2[:7]) != ", World" {
+        t.Errorf("SyscallBatcher.ReadBatched: beklenen veri ', World', alınan: '%s'", string(buffer2[:7]))
+    }
+}
+
+// BenchmarkStandardBuffer, standart Buffer sınıfı için benchmark.
+func BenchmarkStandardBuffer(b *testing.B) {
+    // BufferPool oluştur
+    pool := async.BufferPool.New()
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        // Tampon al
+        buffer := pool.Get(1024)
+        
+        // Tampona veri yaz
+        for j := 0; j < len(buffer); j++ {
+            buffer[j] = byte(j % 256)
+        }
+        
+        // Tamponu havuza geri koy
+        pool.Put(buffer)
+    }
+}
+
+// BenchmarkOptimizedBuffer, OptimizedBufferPool sınıfı için benchmark.
+func BenchmarkOptimizedBuffer(b *testing.B) {
+    // OptimizedBufferPool oluştur
+    pool := async.OptimizedBufferPool.New()
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        // Tampon al
+        buffer := pool.Get(1024)
+        
+        // Tampona veri yaz
+        for j := 0; j < len(buffer); j++ {
+            buffer[j] = byte(j % 256)
+        }
+        
+        // Tamponu havuza geri koy
+        pool.Put(buffer)
+    }
+}
+
+// BenchmarkStandardEventLoop, standart EventLoop sınıfı için benchmark.
+func BenchmarkStandardEventLoop(b *testing.B) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        b.Fatalf("EventLoop.New: %v", err)
+    }
+    
+    // Olay döngüsünü başlat
+    err = loop.Start()
+    if err != nil {
+        b.Fatalf("EventLoop.Start: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test için bir AsyncHandler oluştur
+    handler := new TestHandler()
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        // Olayı oluştur
+        event := async.Event{
+            Type: i,
+            Data: i,
+            Error: nil,
+        }
+        
+        // Olayı gönder
+        loop.Post(event, handler)
+    }
+    
+    // Olayların işlenmesini bekle
+    time.Sleep(100 * time.Millisecond)
+}
+
+// BenchmarkOptimizedEventLoop, OptimizedEventLoop sınıfı için benchmark.
+func BenchmarkOptimizedEventLoop(b *testing.B) {
+    // OptimizedEventLoop oluştur
+    loop, err := async.OptimizedEventLoop.New()
+    if err != nil {
+        b.Fatalf("OptimizedEventLoop.New: %v", err)
+    }
+    
+    // Olay döngüsünü başlat
+    err = loop.Start()
+    if err != nil {
+        b.Fatalf("OptimizedEventLoop.Start: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test için bir AsyncHandler oluştur
+    handler := new TestHandler()
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        // Olayı oluştur
+        event := async.Event{
+            Type: i,
+            Data: i,
+            Error: nil,
+        }
+        
+        // Olayı gönder
+        loop.Post(event, handler)
+    }
+    
+    // Olayların işlenmesini bekle
+    time.Sleep(100 * time.Millisecond)
+}
+
+// BenchmarkStandardEventLoopParallel, standart EventLoop sınıfı için paralel benchmark.
+func BenchmarkStandardEventLoopParallel(b *testing.B) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        b.Fatalf("EventLoop.New: %v", err)
+    }
+    
+    // Olay döngüsünü başlat
+    err = loop.Start()
+    if err != nil {
+        b.Fatalf("EventLoop.Start: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test için bir AsyncHandler oluştur
+    handler := new TestHandler()
+    
+    b.ResetTimer()
+    
+    b.RunParallel(func(pb *testing.PB) {
+        i := 0
+        for pb.Next() {
+            // Olayı oluştur
+            event := async.Event{
+                Type: i,
+                Data: i,
+                Error: nil,
+            }
+            
+            // Olayı gönder
+            loop.Post(event, handler)
+            
+            i++
+        }
+    })
+    
+    // Olayların işlenmesini bekle
+    time.Sleep(100 * time.Millisecond)
+}
+
+// BenchmarkOptimizedEventLoopParallel, OptimizedEventLoop sınıfı için paralel benchmark.
+func BenchmarkOptimizedEventLoopParallel(b *testing.B) {
+    // OptimizedEventLoop oluştur
+    loop, err := async.OptimizedEventLoop.New()
+    if err != nil {
+        b.Fatalf("OptimizedEventLoop.New: %v", err)
+    }
+    
+    // Olay döngüsünü başlat
+    err = loop.Start()
+    if err != nil {
+        b.Fatalf("OptimizedEventLoop.Start: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test için bir AsyncHandler oluştur
+    handler := new TestHandler()
+    
+    b.ResetTimer()
+    
+    b.RunParallel(func(pb *testing.PB) {
+        i := 0
+        for pb.Next() {
+            // Olayı oluştur
+            event := async.Event{
+                Type: i,
+                Data: i,
+                Error: nil,
+            }
+            
+            // Olayı gönder
+            loop.Post(event, handler)
+            
+            i++
+        }
+    })
+    
+    // Olayların işlenmesini bekle
+    time.Sleep(100 * time.Millisecond)
+}

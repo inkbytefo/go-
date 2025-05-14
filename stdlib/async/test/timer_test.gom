@@ -1,0 +1,571 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Timer Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "sync"
+)
+
+// TestAsyncTimerBasic, AsyncTimer için temel testler içerir.
+func TestAsyncTimerBasic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncTimer oluştur
+    timer := async.AsyncTimer.New(loop)
+    
+    // Timer başlat
+    err = timer.Start()
+    if err != nil {
+        t.Fatalf("AsyncTimer başlatma hatası: %v", err)
+    }
+    
+    // Timer'ı tekrar başlat (hata vermeli)
+    err = timer.Start()
+    if err == nil {
+        t.Error("AsyncTimer iki kez başlatılabildi, hata bekleniyor")
+    }
+    
+    // Timer'ı durdur
+    err = timer.Stop()
+    if err != nil {
+        t.Fatalf("AsyncTimer durdurma hatası: %v", err)
+    }
+    
+    // Timer'ı tekrar durdur (hata vermeli)
+    err = timer.Stop()
+    if err == nil {
+        t.Error("AsyncTimer iki kez durdurulabildi, hata bekleniyor")
+    }
+}
+
+// TestAsyncTimerSchedule, AsyncTimer.Schedule metodunu test eder.
+func TestAsyncTimerSchedule(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncTimer oluştur
+    timer := async.AsyncTimer.New(loop)
+    
+    // Timer başlat
+    err = timer.Start()
+    if err != nil {
+        t.Fatalf("AsyncTimer başlatma hatası: %v", err)
+    }
+    defer timer.Stop()
+    
+    // Callback çağrıldı mı kontrol etmek için değişken
+    var callbackCalled bool
+    var callbackMutex sync.Mutex
+    
+    // Callback fonksiyonu
+    callback := func() {
+        callbackMutex.Lock()
+        defer callbackMutex.Unlock()
+        callbackCalled = true
+    }
+    
+    // Zamanlayıcı olayı planla (100ms sonra)
+    id := timer.Schedule(100*time.Millisecond, callback)
+    
+    // ID geçerli olmalı
+    if id <= 0 {
+        t.Fatalf("Geçersiz zamanlayıcı ID'si: %d", id)
+    }
+    
+    // Callback çağrılmadan önce kontrol et
+    callbackMutex.Lock()
+    if callbackCalled {
+        t.Error("Callback erken çağrıldı")
+    }
+    callbackMutex.Unlock()
+    
+    // Callback'in çağrılması için yeterli süre bekle
+    time.Sleep(200 * time.Millisecond)
+    
+    // Callback çağrıldı mı kontrol et
+    callbackMutex.Lock()
+    if !callbackCalled {
+        t.Error("Callback çağrılmadı")
+    }
+    callbackMutex.Unlock()
+}
+
+// TestAsyncTimerScheduleAt, AsyncTimer.ScheduleAt metodunu test eder.
+func TestAsyncTimerScheduleAt(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncTimer oluştur
+    timer := async.AsyncTimer.New(loop)
+    
+    // Timer başlat
+    err = timer.Start()
+    if err != nil {
+        t.Fatalf("AsyncTimer başlatma hatası: %v", err)
+    }
+    defer timer.Stop()
+    
+    // Callback çağrıldı mı kontrol etmek için değişken
+    var callbackCalled bool
+    var callbackMutex sync.Mutex
+    
+    // Callback fonksiyonu
+    callback := func() {
+        callbackMutex.Lock()
+        defer callbackMutex.Unlock()
+        callbackCalled = true
+    }
+    
+    // Zamanlayıcı olayı planla (100ms sonra)
+    when := time.Now().Add(100 * time.Millisecond)
+    id := timer.ScheduleAt(when, callback)
+    
+    // ID geçerli olmalı
+    if id <= 0 {
+        t.Fatalf("Geçersiz zamanlayıcı ID'si: %d", id)
+    }
+    
+    // Callback çağrılmadan önce kontrol et
+    callbackMutex.Lock()
+    if callbackCalled {
+        t.Error("Callback erken çağrıldı")
+    }
+    callbackMutex.Unlock()
+    
+    // Callback'in çağrılması için yeterli süre bekle
+    time.Sleep(200 * time.Millisecond)
+    
+    // Callback çağrıldı mı kontrol et
+    callbackMutex.Lock()
+    if !callbackCalled {
+        t.Error("Callback çağrılmadı")
+    }
+    callbackMutex.Unlock()
+}
+
+// TestAsyncTimerSchedulePeriodic, AsyncTimer.SchedulePeriodic metodunu test eder.
+func TestAsyncTimerSchedulePeriodic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncTimer oluştur
+    timer := async.AsyncTimer.New(loop)
+    
+    // Timer başlat
+    err = timer.Start()
+    if err != nil {
+        t.Fatalf("AsyncTimer başlatma hatası: %v", err)
+    }
+    defer timer.Stop()
+    
+    // Callback çağrılma sayısını kontrol etmek için değişken
+    var callbackCount int
+    var callbackMutex sync.Mutex
+    
+    // Callback fonksiyonu
+    callback := func() {
+        callbackMutex.Lock()
+        defer callbackMutex.Unlock()
+        callbackCount++
+    }
+    
+    // Periyodik zamanlayıcı olayı planla (50ms aralıklarla)
+    id := timer.SchedulePeriodic(50*time.Millisecond, callback)
+    
+    // ID geçerli olmalı
+    if id <= 0 {
+        t.Fatalf("Geçersiz zamanlayıcı ID'si: %d", id)
+    }
+    
+    // Callback çağrılmadan önce kontrol et
+    callbackMutex.Lock()
+    if callbackCount > 0 {
+        t.Error("Callback erken çağrıldı")
+    }
+    callbackMutex.Unlock()
+    
+    // Callback'in birkaç kez çağrılması için yeterli süre bekle
+    time.Sleep(250 * time.Millisecond)
+    
+    // Callback çağrılma sayısını kontrol et
+    callbackMutex.Lock()
+    if callbackCount < 3 {
+        t.Errorf("Callback yeterince çağrılmadı, beklenen en az 3, alınan: %d", callbackCount)
+    }
+    callbackMutex.Unlock()
+    
+    // Zamanlayıcı olayını iptal et
+    cancelled := timer.Cancel(id)
+    if !cancelled {
+        t.Error("Zamanlayıcı olayı iptal edilemedi")
+    }
+    
+    // Mevcut çağrılma sayısını kaydet
+    callbackMutex.Lock()
+    currentCount := callbackCount
+    callbackMutex.Unlock()
+    
+    // İptal edildikten sonra callback'in çağrılmadığını kontrol et
+    time.Sleep(100 * time.Millisecond)
+    
+    callbackMutex.Lock()
+    if callbackCount > currentCount {
+        t.Errorf("Callback iptal edildikten sonra çağrıldı, beklenen: %d, alınan: %d", currentCount, callbackCount)
+    }
+    callbackMutex.Unlock()
+}
+
+// TestAsyncTimerCancel, AsyncTimer.Cancel metodunu test eder.
+func TestAsyncTimerCancel(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncTimer oluştur
+    timer := async.AsyncTimer.New(loop)
+    
+    // Timer başlat
+    err = timer.Start()
+    if err != nil {
+        t.Fatalf("AsyncTimer başlatma hatası: %v", err)
+    }
+    defer timer.Stop()
+    
+    // Callback çağrıldı mı kontrol etmek için değişken
+    var callbackCalled bool
+    
+    // Callback fonksiyonu
+    callback := func() {
+        callbackCalled = true
+    }
+    
+    // Zamanlayıcı olayı planla (100ms sonra)
+    id := timer.Schedule(100*time.Millisecond, callback)
+    
+    // Zamanlayıcı olayını iptal et
+    cancelled := timer.Cancel(id)
+    if !cancelled {
+        t.Error("Zamanlayıcı olayı iptal edilemedi")
+    }
+    
+    // Callback'in çağrılmaması için yeterli süre bekle
+    time.Sleep(200 * time.Millisecond)
+    
+    // Callback çağrılmadı mı kontrol et
+    if callbackCalled {
+        t.Error("Callback iptal edilmesine rağmen çağrıldı")
+    }
+    
+    // Geçersiz ID ile iptal etmeyi dene
+    cancelled = timer.Cancel(9999)
+    if cancelled {
+        t.Error("Geçersiz ID ile zamanlayıcı olayı iptal edildi")
+    }
+}
+
+// TestAsyncTimerCancelAll, AsyncTimer.CancelAll metodunu test eder.
+func TestAsyncTimerCancelAll(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncTimer oluştur
+    timer := async.AsyncTimer.New(loop)
+    
+    // Timer başlat
+    err = timer.Start()
+    if err != nil {
+        t.Fatalf("AsyncTimer başlatma hatası: %v", err)
+    }
+    defer timer.Stop()
+    
+    // Callback çağrılma sayısını kontrol etmek için değişken
+    var callbackCount int
+    
+    // Callback fonksiyonu
+    callback := func() {
+        callbackCount++
+    }
+    
+    // Birkaç zamanlayıcı olayı planla
+    timer.Schedule(100*time.Millisecond, callback)
+    timer.Schedule(150*time.Millisecond, callback)
+    timer.Schedule(200*time.Millisecond, callback)
+    
+    // Tüm zamanlayıcı olaylarını iptal et
+    timer.CancelAll()
+    
+    // Callback'lerin çağrılmaması için yeterli süre bekle
+    time.Sleep(300 * time.Millisecond)
+    
+    // Callback çağrılmadı mı kontrol et
+    if callbackCount > 0 {
+        t.Errorf("Callback'ler iptal edilmesine rağmen çağrıldı, çağrılma sayısı: %d", callbackCount)
+    }
+}
+
+// TestSleep, Sleep fonksiyonunu test eder.
+func TestSleep(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Başlangıç zamanı
+    startTime := time.Now()
+    
+    // Sleep çağır
+    sleepDuration := 100 * time.Millisecond
+    result, err := async.Sleep(loop, sleepDuration).Get()
+    
+    // Bitiş zamanı
+    endTime := time.Now()
+    actualDuration := endTime.Sub(startTime)
+    
+    // Hata kontrolü
+    if err != nil {
+        t.Errorf("Sleep hatası: %v", err)
+    }
+    
+    // Sonuç kontrolü
+    if !result {
+        t.Error("Sleep sonucu true olmalı")
+    }
+    
+    // Süre kontrolü
+    if actualDuration < sleepDuration {
+        t.Errorf("Sleep yeterince beklemedi, beklenen en az: %v, alınan: %v", sleepDuration, actualDuration)
+    }
+}
+
+// TestDelay, Delay fonksiyonunu test eder.
+func TestDelay(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Callback çağrıldı mı kontrol etmek için değişken
+    var callbackCalled bool
+    
+    // Başlangıç zamanı
+    startTime := time.Now()
+    
+    // Delay çağır
+    delayDuration := 100 * time.Millisecond
+    result, err := async.Delay(loop, delayDuration, func() {
+        callbackCalled = true
+    }).Get()
+    
+    // Bitiş zamanı
+    endTime := time.Now()
+    actualDuration := endTime.Sub(startTime)
+    
+    // Hata kontrolü
+    if err != nil {
+        t.Errorf("Delay hatası: %v", err)
+    }
+    
+    // Sonuç kontrolü
+    if !result {
+        t.Error("Delay sonucu true olmalı")
+    }
+    
+    // Callback çağrıldı mı kontrol et
+    if !callbackCalled {
+        t.Error("Callback çağrılmadı")
+    }
+    
+    // Süre kontrolü
+    if actualDuration < delayDuration {
+        t.Errorf("Delay yeterince beklemedi, beklenen en az: %v, alınan: %v", delayDuration, actualDuration)
+    }
+}
+
+// TestInterval, Interval fonksiyonunu test eder.
+func TestInterval(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Callback çağrılma sayısını kontrol etmek için değişken
+    var callbackCount int
+    var callbackMutex sync.Mutex
+    
+    // Interval çağır
+    intervalDuration := 50 * time.Millisecond
+    cancel := async.Interval(loop, intervalDuration, func() {
+        callbackMutex.Lock()
+        defer callbackMutex.Unlock()
+        callbackCount++
+    })
+    
+    // Callback'in birkaç kez çağrılması için yeterli süre bekle
+    time.Sleep(250 * time.Millisecond)
+    
+    // Callback çağrılma sayısını kontrol et
+    callbackMutex.Lock()
+    if callbackCount < 3 {
+        t.Errorf("Callback yeterince çağrılmadı, beklenen en az 3, alınan: %d", callbackCount)
+    }
+    callbackMutex.Unlock()
+    
+    // Interval'i iptal et
+    cancel()
+    
+    // Mevcut çağrılma sayısını kaydet
+    callbackMutex.Lock()
+    currentCount := callbackCount
+    callbackMutex.Unlock()
+    
+    // İptal edildikten sonra callback'in çağrılmadığını kontrol et
+    time.Sleep(100 * time.Millisecond)
+    
+    callbackMutex.Lock()
+    if callbackCount > currentCount {
+        t.Errorf("Callback iptal edildikten sonra çağrıldı, beklenen: %d, alınan: %d", currentCount, callbackCount)
+    }
+    callbackMutex.Unlock()
+}
+
+// TestTimeout, Timeout fonksiyonunu test eder.
+func TestTimeout(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Zaman aşımı olmadan tamamlanan bir Future
+    promise1, future1 := async.AsyncPromise.New<int>(loop)
+    
+    // Kısa bir süre sonra tamamla
+    go func() {
+        time.Sleep(50 * time.Millisecond)
+        promise1.Complete(42)
+    }()
+    
+    // Timeout ile sar
+    timeoutFuture1 := async.Timeout<int>(loop, future1, 200*time.Millisecond)
+    
+    // Sonucu kontrol et
+    result, err := timeoutFuture1.Get()
+    if err != nil {
+        t.Errorf("Timeout hatası: %v", err)
+    }
+    
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+    
+    // Zaman aşımına uğrayan bir Future
+    promise2, future2 := async.AsyncPromise.New<int>(loop)
+    
+    // Uzun bir süre sonra tamamla (zaman aşımından sonra)
+    go func() {
+        time.Sleep(200 * time.Millisecond)
+        promise2.Complete(42)
+    }()
+    
+    // Timeout ile sar
+    timeoutFuture2 := async.Timeout<int>(loop, future2, 50*time.Millisecond)
+    
+    // Sonucu kontrol et
+    _, err = timeoutFuture2.Get()
+    if err != async.ErrTimeout {
+        t.Errorf("Zaman aşımı hatası bekleniyor, alınan: %v", err)
+    }
+}

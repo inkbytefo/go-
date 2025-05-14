@@ -1,0 +1,429 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Future Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "errors"
+)
+
+// TestAsyncFuturePromiseBasic, AsyncFuture ve AsyncPromise için temel testler içerir.
+func TestAsyncFuturePromiseBasic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Promise ve Future oluştur
+    promise, future := async.AsyncPromise.New<int>(loop)
+    
+    // Başlangıçta tamamlanmamış olmalı
+    if future.IsDone() {
+        t.Error("Yeni oluşturulan future tamamlanmamış olmalı")
+    }
+    
+    // Başlangıçta iptal edilmemiş olmalı
+    if future.IsCancelled() {
+        t.Error("Yeni oluşturulan future iptal edilmemiş olmalı")
+    }
+    
+    // Promise'i tamamla
+    promise.Complete(42)
+    
+    // Şimdi tamamlanmış olmalı
+    if !future.IsDone() {
+        t.Error("Tamamlanan future tamamlanmış olmalı")
+    }
+    
+    // Sonucu kontrol et
+    result, err := future.Get()
+    if err != nil {
+        t.Errorf("Future.Get hatası: %v", err)
+    }
+    
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+}
+
+// TestAsyncFuturePromiseError, hata ile tamamlanan AsyncFuture için testler içerir.
+func TestAsyncFuturePromiseError(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Promise ve Future oluştur
+    promise, future := async.AsyncPromise.New<int>(loop)
+    
+    // Test hatası
+    testError := errors.New("test hatası")
+    
+    // Promise'i hata ile tamamla
+    promise.CompleteWithError(testError)
+    
+    // Şimdi tamamlanmış olmalı
+    if !future.IsDone() {
+        t.Error("Hata ile tamamlanan future tamamlanmış olmalı")
+    }
+    
+    // Sonucu kontrol et
+    result, err := future.Get()
+    if err == nil {
+        t.Error("Future.Get hata döndürmedi")
+    }
+    
+    if err.Error() != testError.Error() {
+        t.Errorf("Beklenen hata '%v', alınan: '%v'", testError, err)
+    }
+    
+    if result != 0 {
+        t.Errorf("Hata durumunda sıfır değer bekleniyor, alınan: %d", result)
+    }
+}
+
+// TestAsyncFutureTimeout, zaman aşımı ile AsyncFuture için testler içerir.
+func TestAsyncFutureTimeout(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Promise ve Future oluştur
+    promise, future := async.AsyncPromise.New<int>(loop)
+    
+    // Zaman aşımı ile sonucu al
+    result, err, ok := future.GetWithTimeout(50 * time.Millisecond)
+    
+    // Zaman aşımı olmalı
+    if ok {
+        t.Error("Zaman aşımı olmadı")
+    }
+    
+    if err != async.ErrTimeout {
+        t.Errorf("Beklenen hata ErrTimeout, alınan: %v", err)
+    }
+    
+    if result != 0 {
+        t.Errorf("Zaman aşımı durumunda sıfır değer bekleniyor, alınan: %d", result)
+    }
+    
+    // Şimdi Promise'i tamamla
+    promise.Complete(42)
+    
+    // Tekrar zaman aşımı ile sonucu al
+    result, err, ok = future.GetWithTimeout(50 * time.Millisecond)
+    
+    // Zaman aşımı olmamalı
+    if !ok {
+        t.Error("Zaman aşımı oldu, olmamalıydı")
+    }
+    
+    if err != nil {
+        t.Errorf("Hata beklenmiyordu, alınan: %v", err)
+    }
+    
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+}
+
+// TestAsyncFutureCancel, AsyncFuture iptal etme işlemini test eder.
+func TestAsyncFutureCancel(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Promise ve Future oluştur
+    _, future := async.AsyncPromise.New<int>(loop)
+    
+    // Future'ı iptal et
+    cancelled := future.Cancel()
+    
+    // İptal başarılı olmalı
+    if !cancelled {
+        t.Error("Future iptal edilemedi")
+    }
+    
+    // Şimdi iptal edilmiş olmalı
+    if !future.IsCancelled() {
+        t.Error("Future iptal edilmiş olmalı")
+    }
+    
+    // Sonucu kontrol et
+    result, err := future.Get()
+    if err == nil {
+        t.Error("Future.Get hata döndürmedi")
+    }
+    
+    if result != 0 {
+        t.Errorf("İptal durumunda sıfır değer bekleniyor, alınan: %d", result)
+    }
+}
+
+// TestAsyncFutureCallbacks, AsyncFuture callback'lerini test eder.
+func TestAsyncFutureCallbacks(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Promise ve Future oluştur
+    promise, future := async.AsyncPromise.New<int>(loop)
+    
+    // Callback'leri takip etmek için değişkenler
+    var thenCalled bool
+    var catchCalled bool
+    var finallyCalled bool
+    var thenResult int
+    var catchError error
+    
+    // Then callback'i ekle
+    future.Then(func(result int) {
+        thenCalled = true
+        thenResult = result
+    })
+    
+    // Catch callback'i ekle
+    future.Catch(func(err error) {
+        catchCalled = true
+        catchError = err
+    })
+    
+    // Finally callback'i ekle
+    future.Finally(func() {
+        finallyCalled = true
+    })
+    
+    // Promise'i tamamla
+    promise.Complete(42)
+    
+    // Callback'lerin çağrılması için kısa bir süre bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // Then callback'i çağrılmış olmalı
+    if !thenCalled {
+        t.Error("Then callback'i çağrılmadı")
+    }
+    
+    // Catch callback'i çağrılmamış olmalı
+    if catchCalled {
+        t.Error("Catch callback'i çağrılmamalıydı")
+    }
+    
+    // Finally callback'i çağrılmış olmalı
+    if !finallyCalled {
+        t.Error("Finally callback'i çağrılmadı")
+    }
+    
+    // Then callback'inin sonucu doğru olmalı
+    if thenResult != 42 {
+        t.Errorf("Then callback'inin beklenen sonucu 42, alınan: %d", thenResult)
+    }
+    
+    // Hata durumu için test
+    promise2, future2 := async.AsyncPromise.New<int>(loop)
+    
+    // Değişkenleri sıfırla
+    thenCalled = false
+    catchCalled = false
+    finallyCalled = false
+    
+    // Then callback'i ekle
+    future2.Then(func(result int) {
+        thenCalled = true
+    })
+    
+    // Catch callback'i ekle
+    future2.Catch(func(err error) {
+        catchCalled = true
+        catchError = err
+    })
+    
+    // Finally callback'i ekle
+    future2.Finally(func() {
+        finallyCalled = true
+    })
+    
+    // Test hatası
+    testError := errors.New("test hatası")
+    
+    // Promise'i hata ile tamamla
+    promise2.CompleteWithError(testError)
+    
+    // Callback'lerin çağrılması için kısa bir süre bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // Then callback'i çağrılmamış olmalı
+    if thenCalled {
+        t.Error("Then callback'i çağrılmamalıydı")
+    }
+    
+    // Catch callback'i çağrılmış olmalı
+    if !catchCalled {
+        t.Error("Catch callback'i çağrılmadı")
+    }
+    
+    // Finally callback'i çağrılmış olmalı
+    if !finallyCalled {
+        t.Error("Finally callback'i çağrılmadı")
+    }
+    
+    // Catch callback'inin hatası doğru olmalı
+    if catchError.Error() != testError.Error() {
+        t.Errorf("Catch callback'inin beklenen hatası '%v', alınan: '%v'", testError, catchError)
+    }
+}
+
+// TestAsyncFutureMap, AsyncFuture.Map metodunu test eder.
+func TestAsyncFutureMap(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Promise ve Future oluştur
+    promise, future := async.AsyncPromise.New<int>(loop)
+    
+    // Map ile dönüştür
+    mappedFuture := future.Map<string>(func(result int) string {
+        return "Sonuç: " + string(result)
+    })
+    
+    // Promise'i tamamla
+    promise.Complete(42)
+    
+    // Dönüştürülmüş sonucu kontrol et
+    mappedResult, err := mappedFuture.Get()
+    if err != nil {
+        t.Errorf("MappedFuture.Get hatası: %v", err)
+    }
+    
+    expectedResult := "Sonuç: 42"
+    if mappedResult != expectedResult {
+        t.Errorf("Beklenen dönüştürülmüş sonuç '%s', alınan: '%s'", expectedResult, mappedResult)
+    }
+}
+
+// TestSupplyAsync, SupplyAsync fonksiyonunu test eder.
+func TestSupplyAsync(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // SupplyAsync ile asenkron işlem başlat
+    future := async.SupplyAsync<int>(loop, func() int {
+        // Asenkron işlem simülasyonu
+        time.Sleep(100 * time.Millisecond)
+        return 42
+    })
+    
+    // Sonucu kontrol et
+    result, err := future.Get()
+    if err != nil {
+        t.Errorf("Future.Get hatası: %v", err)
+    }
+    
+    if result != 42 {
+        t.Errorf("Beklenen sonuç 42, alınan: %d", result)
+    }
+}
+
+// TestRunAsync, RunAsync fonksiyonunu test eder.
+func TestRunAsync(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // İşlem tamamlandı mı kontrol etmek için değişken
+    var done bool
+    
+    // RunAsync ile asenkron işlem başlat
+    future := async.RunAsync(loop, func() {
+        // Asenkron işlem simülasyonu
+        time.Sleep(100 * time.Millisecond)
+        done = true
+    })
+    
+    // Sonucu kontrol et
+    result, err := future.Get()
+    if err != nil {
+        t.Errorf("Future.Get hatası: %v", err)
+    }
+    
+    if !result {
+        t.Error("RunAsync sonucu true olmalı")
+    }
+    
+    if !done {
+        t.Error("Asenkron işlem tamamlanmadı")
+    }
+}

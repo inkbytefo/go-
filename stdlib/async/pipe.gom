@@ -1,0 +1,477 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Pipe
+package async
+
+import (
+    "io"
+    "os"
+    "sync"
+    "syscall"
+)
+
+// PipeMode, boru hattı modunu belirtir.
+type PipeMode int
+
+const (
+    // PipeModeRead, okuma modu.
+    PipeModeRead PipeMode = 1
+    
+    // PipeModeWrite, yazma modu.
+    PipeModeWrite PipeMode = 2
+    
+    // PipeModeReadWrite, okuma ve yazma modu.
+    PipeModeReadWrite PipeMode = PipeModeRead | PipeModeWrite
+)
+
+// AsyncPipe, asenkron boru hattı işlemleri için bir sınıftır.
+class AsyncPipe {
+    private:
+        var reader *os.File
+        var writer *os.File
+        var readerFd int
+        var writerFd int
+        var eventLoop *EventLoop
+        var readHandler AsyncHandler
+        var writeHandler AsyncHandler
+        var closed bool
+        var mode PipeMode
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir AsyncPipe oluşturur.
+        static func New(eventLoop *EventLoop) (*AsyncPipe, error) {
+            // Boru hattı oluştur
+            reader, writer, err := os.Pipe()
+            if err != nil {
+                return nil, err
+            }
+            
+            // Dosya tanımlayıcılarını al
+            readerFd := int(reader.Fd())
+            writerFd := int(writer.Fd())
+            
+            // Dosya tanımlayıcılarını non-blocking olarak ayarla
+            err = setNonblock(readerFd)
+            if err != nil {
+                reader.Close()
+                writer.Close()
+                return nil, err
+            }
+            
+            err = setNonblock(writerFd)
+            if err != nil {
+                reader.Close()
+                writer.Close()
+                return nil, err
+            }
+            
+            // AsyncPipe oluştur
+            pipe := new AsyncPipe()
+            pipe.reader = reader
+            pipe.writer = writer
+            pipe.readerFd = readerFd
+            pipe.writerFd = writerFd
+            pipe.eventLoop = eventLoop
+            pipe.closed = false
+            pipe.mode = PipeModeReadWrite
+            
+            // Okuma işleyicisi oluştur
+            pipe.readHandler = new pipeReadHandler(pipe)
+            
+            // Yazma işleyicisi oluştur
+            pipe.writeHandler = new pipeWriteHandler(pipe)
+            
+            return pipe, nil
+        }
+        
+        // Open, belirtilen modda bir isimli boru hattı açar.
+        static func Open(eventLoop *EventLoop, name string, mode PipeMode) (*AsyncPipe, error) {
+            var reader *os.File
+            var writer *os.File
+            var readerFd int
+            var writerFd int
+            var err error
+            
+            // Okuma modu
+            if mode&PipeModeRead != 0 {
+                reader, err = os.OpenFile(name, os.O_RDONLY, 0)
+                if err != nil {
+                    return nil, err
+                }
+                
+                readerFd = int(reader.Fd())
+                
+                // Dosya tanımlayıcısını non-blocking olarak ayarla
+                err = setNonblock(readerFd)
+                if err != nil {
+                    reader.Close()
+                    return nil, err
+                }
+            }
+            
+            // Yazma modu
+            if mode&PipeModeWrite != 0 {
+                writer, err = os.OpenFile(name, os.O_WRONLY, 0)
+                if err != nil {
+                    if reader != nil {
+                        reader.Close()
+                    }
+                    return nil, err
+                }
+                
+                writerFd = int(writer.Fd())
+                
+                // Dosya tanımlayıcısını non-blocking olarak ayarla
+                err = setNonblock(writerFd)
+                if err != nil {
+                    if reader != nil {
+                        reader.Close()
+                    }
+                    writer.Close()
+                    return nil, err
+                }
+            }
+            
+            // AsyncPipe oluştur
+            pipe := new AsyncPipe()
+            pipe.reader = reader
+            pipe.writer = writer
+            pipe.readerFd = readerFd
+            pipe.writerFd = writerFd
+            pipe.eventLoop = eventLoop
+            pipe.closed = false
+            pipe.mode = mode
+            
+            // Okuma işleyicisi oluştur
+            if mode&PipeModeRead != 0 {
+                pipe.readHandler = new pipeReadHandler(pipe)
+            }
+            
+            // Yazma işleyicisi oluştur
+            if mode&PipeModeWrite != 0 {
+                pipe.writeHandler = new pipeWriteHandler(pipe)
+            }
+            
+            return pipe, nil
+        }
+        
+        // Read, boru hattından veri okur.
+        func (pipe *AsyncPipe) Read(p []byte) *AsyncFuture<int> {
+            pipe.mutex.Lock()
+            defer pipe.mutex.Unlock()
+            
+            if pipe.closed {
+                promise, future := AsyncPromise.New<int>(pipe.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+            
+            if pipe.mode&PipeModeRead == 0 {
+                promise, future := AsyncPromise.New<int>(pipe.eventLoop)
+                promise.CompleteWithError(ErrUnsupported)
+                return future
+            }
+            
+            promise, future := AsyncPromise.New<int>(pipe.eventLoop)
+            
+            // Okuma işlemi başlat
+            n, err := pipe.reader.Read(p)
+            
+            if err == nil {
+                // Okuma başarılı
+                promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Boru hattı hazır değil, olayı bekle
+                readOp := new pipeReadOperation()
+                readOp.buffer = p
+                readOp.promise = promise
+                
+                // Okuma işleyicisine ekle
+                pipe.readHandler.(*pipeReadHandler).addOperation(readOp)
+                
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := pipe.eventLoop.Register(pipe.readerFd, EventRead, pipe.readHandler)
+                if err != nil {
+                    promise.CompleteWithError(err)
+                }
+            } else if err == io.EOF {
+                // Boru hattı sonu
+                promise.Complete(0)
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+            
+            return future
+        }
+        
+        // Write, boru hattına veri yazar.
+        func (pipe *AsyncPipe) Write(p []byte) *AsyncFuture<int> {
+            pipe.mutex.Lock()
+            defer pipe.mutex.Unlock()
+            
+            if pipe.closed {
+                promise, future := AsyncPromise.New<int>(pipe.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+            
+            if pipe.mode&PipeModeWrite == 0 {
+                promise, future := AsyncPromise.New<int>(pipe.eventLoop)
+                promise.CompleteWithError(ErrUnsupported)
+                return future
+            }
+            
+            promise, future := AsyncPromise.New<int>(pipe.eventLoop)
+            
+            // Yazma işlemi başlat
+            n, err := pipe.writer.Write(p)
+            
+            if err == nil {
+                // Yazma başarılı
+                promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Boru hattı hazır değil, olayı bekle
+                writeOp := new pipeWriteOperation()
+                writeOp.buffer = p
+                writeOp.promise = promise
+                
+                // Yazma işleyicisine ekle
+                pipe.writeHandler.(*pipeWriteHandler).addOperation(writeOp)
+                
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := pipe.eventLoop.Register(pipe.writerFd, EventWrite, pipe.writeHandler)
+                if err != nil {
+                    promise.CompleteWithError(err)
+                }
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+            
+            return future
+        }
+        
+        // Close, boru hattını kapatır.
+        func (pipe *AsyncPipe) Close() *AsyncFuture<error> {
+            pipe.mutex.Lock()
+            defer pipe.mutex.Unlock()
+            
+            if pipe.closed {
+                promise, future := AsyncPromise.New<error>(pipe.eventLoop)
+                promise.Complete(nil)
+                return future
+            }
+            
+            pipe.closed = true
+            
+            promise, future := AsyncPromise.New<error>(pipe.eventLoop)
+            
+            // Dosya tanımlayıcılarını olay döngüsünden kaldır
+            if pipe.mode&PipeModeRead != 0 {
+                pipe.eventLoop.Unregister(pipe.readerFd)
+            }
+            
+            if pipe.mode&PipeModeWrite != 0 {
+                pipe.eventLoop.Unregister(pipe.writerFd)
+            }
+            
+            // Boru hattını kapat
+            var err error
+            
+            if pipe.mode&PipeModeRead != 0 {
+                err = pipe.reader.Close()
+                if err != nil {
+                    promise.Complete(err)
+                    return future
+                }
+            }
+            
+            if pipe.mode&PipeModeWrite != 0 {
+                err = pipe.writer.Close()
+                if err != nil {
+                    promise.Complete(err)
+                    return future
+                }
+            }
+            
+            promise.Complete(nil)
+            return future
+        }
+}
+
+// pipeReadOperation, asenkron bir boru hattı okuma işlemini temsil eder.
+class pipeReadOperation {
+    var buffer []byte
+    var promise *AsyncPromise<int>
+}
+
+// pipeWriteOperation, asenkron bir boru hattı yazma işlemini temsil eder.
+class pipeWriteOperation {
+    var buffer []byte
+    var promise *AsyncPromise<int>
+}
+
+// pipeReadHandler, boru hattı okuma olaylarını işler.
+class pipeReadHandler {
+    private:
+        var pipe *AsyncPipe
+        var operations []*pipeReadOperation
+    
+    public:
+        // constructor
+        func new(pipe *AsyncPipe) *pipeReadHandler {
+            handler := new pipeReadHandler()
+            handler.pipe = pipe
+            handler.operations = make([]*pipeReadOperation, 0)
+            return handler
+        }
+        
+        // OnEvent, bir okuma olayını işler.
+        func (h *pipeReadHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+            
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+            
+            // Okuma işlemi başlat
+            n, err := h.pipe.reader.Read(op.buffer)
+            
+            if err == nil {
+                // Okuma başarılı
+                op.promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Boru hattı hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else if err == io.EOF {
+                // Boru hattı sonu
+                op.promise.Complete(0)
+            } else {
+                // Diğer hatalar
+                op.promise.CompleteWithError(err)
+            }
+        }
+        
+        // addOperation, bir okuma işlemi ekler.
+        func (h *pipeReadHandler) addOperation(op *pipeReadOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// pipeWriteHandler, boru hattı yazma olaylarını işler.
+class pipeWriteHandler {
+    private:
+        var pipe *AsyncPipe
+        var operations []*pipeWriteOperation
+    
+    public:
+        // constructor
+        func new(pipe *AsyncPipe) *pipeWriteHandler {
+            handler := new pipeWriteHandler()
+            handler.pipe = pipe
+            handler.operations = make([]*pipeWriteOperation, 0)
+            return handler
+        }
+        
+        // OnEvent, bir yazma olayını işler.
+        func (h *pipeWriteHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+            
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+            
+            // Yazma işlemi başlat
+            n, err := h.pipe.writer.Write(op.buffer)
+            
+            if err == nil {
+                // Yazma başarılı
+                op.promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Boru hattı hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else {
+                // Diğer hatalar
+                op.promise.CompleteWithError(err)
+            }
+        }
+        
+        // addOperation, bir yazma işlemi ekler.
+        func (h *pipeWriteHandler) addOperation(op *pipeWriteOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// CreateNamedPipe, isimli bir boru hattı oluşturur.
+func CreateNamedPipe(name string, perm os.FileMode) error {
+    // Platform bağımlı implementasyon
+    #ifdef _WIN32
+    return createNamedPipeWindows(name, perm)
+    #else
+    return createNamedPipeUnix(name, perm)
+    #endif
+}
+
+// createNamedPipeUnix, Unix sistemlerinde isimli bir boru hattı oluşturur.
+func createNamedPipeUnix(name string, perm os.FileMode) error {
+    return syscall.Mkfifo(name, uint32(perm))
+}
+
+// createNamedPipeWindows, Windows sistemlerinde isimli bir boru hattı oluşturur.
+func createNamedPipeWindows(name string, perm os.FileMode) error {
+    // Windows'ta isimli boru hattı oluşturma
+    // Bu, gerçek implementasyonda daha karmaşık olacaktır
+    return errors.New("async: Windows'ta isimli boru hattı oluşturma henüz desteklenmiyor")
+}
+
+// Pipe, asenkron bir boru hattı çifti oluşturur.
+func Pipe(eventLoop *EventLoop) (*AsyncPipe, *AsyncPipe, error) {
+    // Boru hattı oluştur
+    reader, writer, err := os.Pipe()
+    if err != nil {
+        return nil, nil, err
+    }
+    
+    // Dosya tanımlayıcılarını al
+    readerFd := int(reader.Fd())
+    writerFd := int(writer.Fd())
+    
+    // Dosya tanımlayıcılarını non-blocking olarak ayarla
+    err = setNonblock(readerFd)
+    if err != nil {
+        reader.Close()
+        writer.Close()
+        return nil, nil, err
+    }
+    
+    err = setNonblock(writerFd)
+    if err != nil {
+        reader.Close()
+        writer.Close()
+        return nil, nil, err
+    }
+    
+    // Okuma boru hattı oluştur
+    readPipe := new AsyncPipe()
+    readPipe.reader = reader
+    readPipe.readerFd = readerFd
+    readPipe.eventLoop = eventLoop
+    readPipe.closed = false
+    readPipe.mode = PipeModeRead
+    readPipe.readHandler = new pipeReadHandler(readPipe)
+    
+    // Yazma boru hattı oluştur
+    writePipe := new AsyncPipe()
+    writePipe.writer = writer
+    writePipe.writerFd = writerFd
+    writePipe.eventLoop = eventLoop
+    writePipe.closed = false
+    writePipe.mode = PipeModeWrite
+    writePipe.writeHandler = new pipeWriteHandler(writePipe)
+    
+    return readPipe, writePipe, nil
+}

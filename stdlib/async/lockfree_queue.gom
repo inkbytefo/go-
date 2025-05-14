@@ -1,0 +1,314 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Lock-Free Kuyruk
+package async
+
+import (
+    "sync/atomic"
+    "unsafe"
+)
+
+// LockFreeQueueNode, lock-free kuyruk için bir düğümü temsil eder.
+class LockFreeQueueNode<T> {
+    var value T
+    var next *AtomicPointer<LockFreeQueueNode<T>>
+    
+    // New, yeni bir LockFreeQueueNode oluşturur.
+    static func New<T>(value T) *LockFreeQueueNode<T> {
+        node := new LockFreeQueueNode<T>()
+        node.value = value
+        node.next = AtomicPointer.New<LockFreeQueueNode<T>>(nil)
+        
+        return node
+    }
+    
+    // NewDummy, yeni bir boş düğüm oluşturur.
+    static func NewDummy<T>() *LockFreeQueueNode<T> {
+        node := new LockFreeQueueNode<T>()
+        node.next = AtomicPointer.New<LockFreeQueueNode<T>>(nil)
+        
+        return node
+    }
+}
+
+// LockFreeQueue, Michael-Scott lock-free kuyruk algoritmasını implemente eder.
+// Bu kuyruk, çoklu üretici/tüketici senaryolarını destekler.
+class LockFreeQueue<T> {
+    private:
+        var head *AtomicPointer<LockFreeQueueNode<T>>
+        var tail *AtomicPointer<LockFreeQueueNode<T>>
+        var nodePool *NodePool<LockFreeQueueNode<T>>
+        var size *AtomicCounter
+    
+    public:
+        // New, yeni bir LockFreeQueue oluşturur.
+        static func New<T>() *LockFreeQueue<T> {
+            queue := new LockFreeQueue<T>()
+            
+            // Boş bir düğüm oluştur (dummy node)
+            dummy := LockFreeQueueNode.NewDummy<T>()
+            
+            // Head ve tail işaretçilerini boş düğüme ayarla
+            queue.head = AtomicPointer.New<LockFreeQueueNode<T>>(dummy)
+            queue.tail = AtomicPointer.New<LockFreeQueueNode<T>>(dummy)
+            
+            // Düğüm havuzu oluştur
+            queue.nodePool = NodePool.New<LockFreeQueueNode<T>>(100) // Başlangıçta 100 düğüm
+            
+            // Boyut sayacı oluştur
+            queue.size = AtomicCounter.New(0)
+            
+            return queue
+        }
+        
+        // Enqueue, kuyruğa bir eleman ekler.
+        func (q *LockFreeQueue<T>) Enqueue(value T) {
+            // Yeni düğüm oluştur
+            node := q.nodePool.Get()
+            if node == nil {
+                // Havuzda düğüm yoksa, yeni bir düğüm oluştur
+                node = LockFreeQueueNode.New<T>(value)
+            } else {
+                // Havuzdan alınan düğümü kullan
+                node.value = value
+                node.next.Store(nil, Relaxed)
+            }
+            
+            for {
+                // Tail işaretçisini ve next işaretçisini oku
+                tail, tailCount := q.tail.Load(Acquire)
+                next, nextCount := tail.next.Load(Acquire)
+                
+                // Tail işaretçisinin hala aynı olup olmadığını kontrol et
+                currentTail, currentTailCount := q.tail.Load(Acquire)
+                if tail != currentTail || tailCount != currentTailCount {
+                    continue
+                }
+                
+                // Tail işaretçisi son düğümü gösteriyor mu?
+                if next == nil {
+                    // Yeni düğümü kuyruğun sonuna eklemeye çalış
+                    if tail.next.CompareAndSwap(nil, node, AcquireRelease) {
+                        // Başarılı, tail işaretçisini güncellemeye çalış
+                        q.tail.CompareAndSwap(tail, node, Release)
+                        
+                        // Boyut sayacını artır
+                        q.size.Increment(Relaxed)
+                        
+                        return
+                    }
+                } else {
+                    // Tail işaretçisi son düğümü göstermiyor, güncellemeye çalış
+                    q.tail.CompareAndSwap(tail, next, Release)
+                }
+            }
+        }
+        
+        // Dequeue, kuyruktan bir eleman çıkarır.
+        // Eğer kuyruk boşsa, (zero, false) döndürür.
+        func (q *LockFreeQueue<T>) Dequeue() (T, bool) {
+            for {
+                // Head ve tail işaretçilerini oku
+                head, headCount := q.head.Load(Acquire)
+                tail, tailCount := q.tail.Load(Acquire)
+                next, nextCount := head.next.Load(Acquire)
+                
+                // Head işaretçisinin hala aynı olup olmadığını kontrol et
+                currentHead, currentHeadCount := q.head.Load(Acquire)
+                if head != currentHead || headCount != currentHeadCount {
+                    continue
+                }
+                
+                // Head ve tail aynı düğümü gösteriyor mu?
+                if head == tail {
+                    // Kuyruk boş mu?
+                    if next == nil {
+                        var zero T
+                        return zero, false
+                    }
+                    
+                    // Tail işaretçisi geride kalmış, güncellemeye çalış
+                    q.tail.CompareAndSwap(tail, next, Release)
+                } else {
+                    // Değeri oku
+                    value := next.value
+                    
+                    // Head işaretçisini güncellemeye çalış
+                    if q.head.CompareAndSwap(head, next, AcquireRelease) {
+                        // Başarılı, eski düğümü havuza geri koy
+                        q.nodePool.Put(head)
+                        
+                        // Boyut sayacını azalt
+                        q.size.Decrement(Relaxed)
+                        
+                        return value, true
+                    }
+                }
+            }
+        }
+        
+        // TryDequeue, kuyruktan bir eleman çıkarmaya çalışır.
+        // Eğer kuyruk boşsa, (zero, false) döndürür.
+        // Bu metot, Dequeue'dan farklı olarak, sadece bir kez deneme yapar.
+        func (q *LockFreeQueue<T>) TryDequeue() (T, bool) {
+            // Head ve tail işaretçilerini oku
+            head, headCount := q.head.Load(Acquire)
+            tail, tailCount := q.tail.Load(Acquire)
+            next, nextCount := head.next.Load(Acquire)
+            
+            // Head işaretçisinin hala aynı olup olmadığını kontrol et
+            currentHead, currentHeadCount := q.head.Load(Acquire)
+            if head != currentHead || headCount != currentHeadCount {
+                var zero T
+                return zero, false
+            }
+            
+            // Head ve tail aynı düğümü gösteriyor mu?
+            if head == tail {
+                // Kuyruk boş mu?
+                if next == nil {
+                    var zero T
+                    return zero, false
+                }
+                
+                // Tail işaretçisi geride kalmış, güncellemeye çalış
+                q.tail.CompareAndSwap(tail, next, Release)
+                
+                var zero T
+                return zero, false
+            } else {
+                // Değeri oku
+                value := next.value
+                
+                // Head işaretçisini güncellemeye çalış
+                if q.head.CompareAndSwap(head, next, AcquireRelease) {
+                    // Başarılı, eski düğümü havuza geri koy
+                    q.nodePool.Put(head)
+                    
+                    // Boyut sayacını azalt
+                    q.size.Decrement(Relaxed)
+                    
+                    return value, true
+                }
+                
+                var zero T
+                return zero, false
+            }
+        }
+        
+        // Peek, kuyruğun başındaki elemanı çıkarmadan döndürür.
+        // Eğer kuyruk boşsa, (zero, false) döndürür.
+        func (q *LockFreeQueue<T>) Peek() (T, bool) {
+            for {
+                // Head ve tail işaretçilerini oku
+                head, headCount := q.head.Load(Acquire)
+                tail, tailCount := q.tail.Load(Acquire)
+                next, nextCount := head.next.Load(Acquire)
+                
+                // Head işaretçisinin hala aynı olup olmadığını kontrol et
+                currentHead, currentHeadCount := q.head.Load(Acquire)
+                if head != currentHead || headCount != currentHeadCount {
+                    continue
+                }
+                
+                // Head ve tail aynı düğümü gösteriyor mu?
+                if head == tail {
+                    // Kuyruk boş mu?
+                    if next == nil {
+                        var zero T
+                        return zero, false
+                    }
+                    
+                    // Tail işaretçisi geride kalmış, güncellemeye çalış
+                    q.tail.CompareAndSwap(tail, next, Release)
+                } else {
+                    // Değeri oku
+                    value := next.value
+                    return value, true
+                }
+            }
+        }
+        
+        // IsEmpty, kuyruğun boş olup olmadığını kontrol eder.
+        func (q *LockFreeQueue<T>) IsEmpty() bool {
+            return q.Size() == 0
+        }
+        
+        // Size, kuyruktaki eleman sayısını döndürür.
+        func (q *LockFreeQueue<T>) Size() uint64 {
+            return q.size.Load(Relaxed)
+        }
+        
+        // Clear, kuyruğu temizler.
+        func (q *LockFreeQueue<T>) Clear() {
+            for {
+                var value T
+                var ok bool
+                
+                value, ok = q.Dequeue()
+                if !ok {
+                    break
+                }
+            }
+        }
+}
+
+// NodePool, düğüm havuzunu temsil eder.
+// Bu sınıf, düğümlerin yeniden kullanımını sağlar.
+class NodePool<T> {
+    private:
+        var nodes []T
+        var size int
+        var capacity int
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir NodePool oluşturur.
+        static func New<T>(capacity int) *NodePool<T> {
+            pool := new NodePool<T>()
+            pool.nodes = make([]T, 0, capacity)
+            pool.size = 0
+            pool.capacity = capacity
+            
+            return pool
+        }
+        
+        // Get, havuzdan bir düğüm alır.
+        // Eğer havuz boşsa, nil döndürür.
+        func (p *NodePool<T>) Get() *T {
+            p.mutex.Lock()
+            defer p.mutex.Unlock()
+            
+            if p.size == 0 {
+                return nil
+            }
+            
+            p.size--
+            node := p.nodes[p.size]
+            p.nodes = p.nodes[:p.size]
+            
+            return &node
+        }
+        
+        // Put, bir düğümü havuza geri koyar.
+        func (p *NodePool<T>) Put(node *T) {
+            p.mutex.Lock()
+            defer p.mutex.Unlock()
+            
+            if p.size < p.capacity {
+                p.nodes = append(p.nodes, *node)
+                p.size++
+            }
+        }
+        
+        // Size, havuzdaki düğüm sayısını döndürür.
+        func (p *NodePool<T>) Size() int {
+            p.mutex.Lock()
+            defer p.mutex.Unlock()
+            
+            return p.size
+        }
+        
+        // Capacity, havuzun kapasitesini döndürür.
+        func (p *NodePool<T>) Capacity() int {
+            return p.capacity
+        }
+}

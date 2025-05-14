@@ -1,0 +1,539 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Lock-Free Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "sync"
+    "time"
+    "math/rand"
+)
+
+// TestAtomicPointer, AtomicPointer sınıfını test eder.
+func TestAtomicPointer(t *testing.T) {
+    // Test değeri
+    value := 42
+    
+    // AtomicPointer oluştur
+    ap := async.AtomicPointer.New<int>(&value)
+    
+    // Load işlemini test et
+    ptr, count := ap.Load(async.Relaxed)
+    if *ptr != 42 || count != 0 {
+        t.Errorf("AtomicPointer.Load: beklenen değer 42, 0; alınan %d, %d", *ptr, count)
+    }
+    
+    // Store işlemini test et
+    newValue := 84
+    ap.Store(&newValue, async.Relaxed)
+    
+    ptr, count = ap.Load(async.Relaxed)
+    if *ptr != 84 || count != 1 {
+        t.Errorf("AtomicPointer.Store: beklenen değer 84, 1; alınan %d, %d", *ptr, count)
+    }
+    
+    // CompareAndSwap işlemini test et
+    expectedValue := 84
+    desiredValue := 168
+    
+    // Başarılı CAS
+    if !ap.CompareAndSwap(&expectedValue, count, &desiredValue, async.Relaxed) {
+        t.Errorf("AtomicPointer.CompareAndSwap: başarısız oldu")
+    }
+    
+    ptr, count = ap.Load(async.Relaxed)
+    if *ptr != 168 || count != 2 {
+        t.Errorf("AtomicPointer.CompareAndSwap: beklenen değer 168, 2; alınan %d, %d", *ptr, count)
+    }
+    
+    // Başarısız CAS
+    wrongValue := 84
+    if ap.CompareAndSwap(&wrongValue, count, &value, async.Relaxed) {
+        t.Errorf("AtomicPointer.CompareAndSwap: başarılı olmamalıydı")
+    }
+    
+    ptr, count = ap.Load(async.Relaxed)
+    if *ptr != 168 || count != 2 {
+        t.Errorf("AtomicPointer.CompareAndSwap: beklenen değer 168, 2; alınan %d, %d", *ptr, count)
+    }
+}
+
+// TestAtomicFlag, AtomicFlag sınıfını test eder.
+func TestAtomicFlag(t *testing.T) {
+    // AtomicFlag oluştur
+    af := async.AtomicFlag.New(false)
+    
+    // Load işlemini test et
+    if af.Load(async.Relaxed) {
+        t.Errorf("AtomicFlag.Load: beklenen değer false; alınan true")
+    }
+    
+    // Store işlemini test et
+    af.Store(true, async.Relaxed)
+    
+    if !af.Load(async.Relaxed) {
+        t.Errorf("AtomicFlag.Store: beklenen değer true; alınan false")
+    }
+    
+    // CompareAndSwap işlemini test et
+    
+    // Başarılı CAS
+    if !af.CompareAndSwap(true, false, async.Relaxed) {
+        t.Errorf("AtomicFlag.CompareAndSwap: başarısız oldu")
+    }
+    
+    if af.Load(async.Relaxed) {
+        t.Errorf("AtomicFlag.CompareAndSwap: beklenen değer false; alınan true")
+    }
+    
+    // Başarısız CAS
+    if af.CompareAndSwap(true, true, async.Relaxed) {
+        t.Errorf("AtomicFlag.CompareAndSwap: başarılı olmamalıydı")
+    }
+    
+    if af.Load(async.Relaxed) {
+        t.Errorf("AtomicFlag.CompareAndSwap: beklenen değer false; alınan true")
+    }
+    
+    // Exchange işlemini test et
+    oldValue := af.Exchange(true, async.Relaxed)
+    
+    if oldValue {
+        t.Errorf("AtomicFlag.Exchange: beklenen değer false; alınan true")
+    }
+    
+    if !af.Load(async.Relaxed) {
+        t.Errorf("AtomicFlag.Exchange: beklenen değer true; alınan false")
+    }
+}
+
+// TestAtomicCounter, AtomicCounter sınıfını test eder.
+func TestAtomicCounter(t *testing.T) {
+    // AtomicCounter oluştur
+    ac := async.AtomicCounter.New(0)
+    
+    // Load işlemini test et
+    if ac.Load(async.Relaxed) != 0 {
+        t.Errorf("AtomicCounter.Load: beklenen değer 0; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // Store işlemini test et
+    ac.Store(42, async.Relaxed)
+    
+    if ac.Load(async.Relaxed) != 42 {
+        t.Errorf("AtomicCounter.Store: beklenen değer 42; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // Add işlemini test et
+    oldValue := ac.Add(10, async.Relaxed)
+    
+    if oldValue != 42 {
+        t.Errorf("AtomicCounter.Add: beklenen değer 42; alınan %d", oldValue)
+    }
+    
+    if ac.Load(async.Relaxed) != 52 {
+        t.Errorf("AtomicCounter.Add: beklenen değer 52; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // Increment işlemini test et
+    oldValue = ac.Increment(async.Relaxed)
+    
+    if oldValue != 52 {
+        t.Errorf("AtomicCounter.Increment: beklenen değer 52; alınan %d", oldValue)
+    }
+    
+    if ac.Load(async.Relaxed) != 53 {
+        t.Errorf("AtomicCounter.Increment: beklenen değer 53; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // Decrement işlemini test et
+    oldValue = ac.Decrement(async.Relaxed)
+    
+    if oldValue != 53 {
+        t.Errorf("AtomicCounter.Decrement: beklenen değer 53; alınan %d", oldValue)
+    }
+    
+    if ac.Load(async.Relaxed) != 52 {
+        t.Errorf("AtomicCounter.Decrement: beklenen değer 52; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // CompareAndSwap işlemini test et
+    
+    // Başarılı CAS
+    if !ac.CompareAndSwap(52, 42, async.Relaxed) {
+        t.Errorf("AtomicCounter.CompareAndSwap: başarısız oldu")
+    }
+    
+    if ac.Load(async.Relaxed) != 42 {
+        t.Errorf("AtomicCounter.CompareAndSwap: beklenen değer 42; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // Başarısız CAS
+    if ac.CompareAndSwap(52, 52, async.Relaxed) {
+        t.Errorf("AtomicCounter.CompareAndSwap: başarılı olmamalıydı")
+    }
+    
+    if ac.Load(async.Relaxed) != 42 {
+        t.Errorf("AtomicCounter.CompareAndSwap: beklenen değer 42; alınan %d", ac.Load(async.Relaxed))
+    }
+    
+    // Exchange işlemini test et
+    oldValue = ac.Exchange(84, async.Relaxed)
+    
+    if oldValue != 42 {
+        t.Errorf("AtomicCounter.Exchange: beklenen değer 42; alınan %d", oldValue)
+    }
+    
+    if ac.Load(async.Relaxed) != 84 {
+        t.Errorf("AtomicCounter.Exchange: beklenen değer 84; alınan %d", ac.Load(async.Relaxed))
+    }
+}
+
+// TestLockFreeQueueBasic, LockFreeQueue için temel testler içerir.
+func TestLockFreeQueueBasic(t *testing.T) {
+    // LockFreeQueue oluştur
+    queue := async.LockFreeQueue.New<int>()
+    
+    // IsEmpty işlemini test et
+    if !queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer true; alınan false")
+    }
+    
+    // Size işlemini test et
+    if queue.Size() != 0 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 0; alınan %d", queue.Size())
+    }
+    
+    // Enqueue işlemini test et
+    queue.Enqueue(42)
+    
+    if queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer false; alınan true")
+    }
+    
+    if queue.Size() != 1 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 1; alınan %d", queue.Size())
+    }
+    
+    // Peek işlemini test et
+    value, ok := queue.Peek()
+    
+    if !ok {
+        t.Errorf("LockFreeQueue.Peek: başarısız oldu")
+    }
+    
+    if value != 42 {
+        t.Errorf("LockFreeQueue.Peek: beklenen değer 42; alınan %d", value)
+    }
+    
+    // Dequeue işlemini test et
+    value, ok = queue.Dequeue()
+    
+    if !ok {
+        t.Errorf("LockFreeQueue.Dequeue: başarısız oldu")
+    }
+    
+    if value != 42 {
+        t.Errorf("LockFreeQueue.Dequeue: beklenen değer 42; alınan %d", value)
+    }
+    
+    if !queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer true; alınan false")
+    }
+    
+    if queue.Size() != 0 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 0; alınan %d", queue.Size())
+    }
+    
+    // Boş kuyruktan Dequeue işlemini test et
+    value, ok = queue.Dequeue()
+    
+    if ok {
+        t.Errorf("LockFreeQueue.Dequeue: başarılı olmamalıydı")
+    }
+    
+    // Boş kuyruktan Peek işlemini test et
+    value, ok = queue.Peek()
+    
+    if ok {
+        t.Errorf("LockFreeQueue.Peek: başarılı olmamalıydı")
+    }
+    
+    // Çoklu Enqueue ve Dequeue işlemlerini test et
+    for i := 0; i < 100; i++ {
+        queue.Enqueue(i)
+    }
+    
+    if queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer false; alınan true")
+    }
+    
+    if queue.Size() != 100 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 100; alınan %d", queue.Size())
+    }
+    
+    for i := 0; i < 100; i++ {
+        value, ok = queue.Dequeue()
+        
+        if !ok {
+            t.Errorf("LockFreeQueue.Dequeue: başarısız oldu")
+        }
+        
+        if value != i {
+            t.Errorf("LockFreeQueue.Dequeue: beklenen değer %d; alınan %d", i, value)
+        }
+    }
+    
+    if !queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer true; alınan false")
+    }
+    
+    if queue.Size() != 0 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 0; alınan %d", queue.Size())
+    }
+    
+    // Clear işlemini test et
+    for i := 0; i < 10; i++ {
+        queue.Enqueue(i)
+    }
+    
+    queue.Clear()
+    
+    if !queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer true; alınan false")
+    }
+    
+    if queue.Size() != 0 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 0; alınan %d", queue.Size())
+    }
+}
+
+// TestLockFreeQueueConcurrent, LockFreeQueue için eşzamanlı testler içerir.
+func TestLockFreeQueueConcurrent(t *testing.T) {
+    // LockFreeQueue oluştur
+    queue := async.LockFreeQueue.New<int>()
+    
+    // Test parametreleri
+    numProducers := 4
+    numConsumers := 4
+    itemsPerProducer := 1000
+    totalItems := numProducers * itemsPerProducer
+    
+    // Sonuçları kontrol etmek için
+    var consumedItems int
+    var consumedSum int
+    var expectedSum int
+    
+    // Mutex ve WaitGroup
+    var mutex sync.Mutex
+    var wg sync.WaitGroup
+    
+    // Üreticiler
+    for p := 0; p < numProducers; p++ {
+        wg.Add(1)
+        go func(producerID int) {
+            defer wg.Done()
+            
+            // Rastgele sayı üreteci
+            r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(producerID)))
+            
+            baseValue := producerID * itemsPerProducer
+            
+            for i := 0; i < itemsPerProducer; i++ {
+                value := baseValue + i
+                
+                // Beklenen toplamı güncelle
+                mutex.Lock()
+                expectedSum += value
+                mutex.Unlock()
+                
+                // Kuyruğa ekle
+                queue.Enqueue(value)
+                
+                // Rastgele bekle (0-1ms)
+                time.Sleep(time.Duration(r.Intn(1000)) * time.Microsecond)
+            }
+        }(p)
+    }
+    
+    // Tüketiciler
+    for c := 0; c < numConsumers; c++ {
+        wg.Add(1)
+        go func(consumerID int) {
+            defer wg.Done()
+            
+            // Rastgele sayı üreteci
+            r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(consumerID + numProducers)))
+            
+            for {
+                // Kuyruktan çıkar
+                value, ok := queue.Dequeue()
+                
+                if ok {
+                    // Tüketilen öğeleri güncelle
+                    mutex.Lock()
+                    consumedItems++
+                    consumedSum += value
+                    localConsumedItems := consumedItems
+                    mutex.Unlock()
+                    
+                    // Tüm öğeler tüketildi mi?
+                    if localConsumedItems >= totalItems {
+                        break
+                    }
+                }
+                
+                // Rastgele bekle (0-1ms)
+                time.Sleep(time.Duration(r.Intn(1000)) * time.Microsecond)
+            }
+        }(c)
+    }
+    
+    // Tüm goroutine'lerin tamamlanmasını bekle
+    wg.Wait()
+    
+    // Sonuçları kontrol et
+    if consumedItems != totalItems {
+        t.Errorf("LockFreeQueue: beklenen tüketilen öğe sayısı %d; alınan %d", totalItems, consumedItems)
+    }
+    
+    if consumedSum != expectedSum {
+        t.Errorf("LockFreeQueue: beklenen tüketilen toplam %d; alınan %d", expectedSum, consumedSum)
+    }
+    
+    if !queue.IsEmpty() {
+        t.Errorf("LockFreeQueue.IsEmpty: beklenen değer true; alınan false")
+    }
+    
+    if queue.Size() != 0 {
+        t.Errorf("LockFreeQueue.Size: beklenen değer 0; alınan %d", queue.Size())
+    }
+}
+
+// BenchmarkMutexQueue, mutex kullanan bir kuyruk için benchmark.
+func BenchmarkMutexQueue(b *testing.B) {
+    // Mutex kullanan kuyruk
+    type MutexQueue struct {
+        items []int
+        mutex sync.Mutex
+    }
+    
+    enqueue := func(q *MutexQueue, value int) {
+        q.mutex.Lock()
+        defer q.mutex.Unlock()
+        
+        q.items = append(q.items, value)
+    }
+    
+    dequeue := func(q *MutexQueue) (int, bool) {
+        q.mutex.Lock()
+        defer q.mutex.Unlock()
+        
+        if len(q.items) == 0 {
+            return 0, false
+        }
+        
+        value := q.items[0]
+        q.items = q.items[1:]
+        
+        return value, true
+    }
+    
+    // Benchmark
+    q := &MutexQueue{items: make([]int, 0, b.N)}
+    
+    b.ResetTimer()
+    
+    // Yarısı enqueue, yarısı dequeue
+    for i := 0; i < b.N; i++ {
+        if i%2 == 0 {
+            enqueue(q, i)
+        } else {
+            dequeue(q)
+        }
+    }
+}
+
+// BenchmarkLockFreeQueue, lock-free kuyruk için benchmark.
+func BenchmarkLockFreeQueue(b *testing.B) {
+    // Lock-free kuyruk
+    q := async.LockFreeQueue.New<int>()
+    
+    b.ResetTimer()
+    
+    // Yarısı enqueue, yarısı dequeue
+    for i := 0; i < b.N; i++ {
+        if i%2 == 0 {
+            q.Enqueue(i)
+        } else {
+            q.Dequeue()
+        }
+    }
+}
+
+// BenchmarkMutexQueueParallel, mutex kullanan bir kuyruk için paralel benchmark.
+func BenchmarkMutexQueueParallel(b *testing.B) {
+    // Mutex kullanan kuyruk
+    type MutexQueue struct {
+        items []int
+        mutex sync.Mutex
+    }
+    
+    enqueue := func(q *MutexQueue, value int) {
+        q.mutex.Lock()
+        defer q.mutex.Unlock()
+        
+        q.items = append(q.items, value)
+    }
+    
+    dequeue := func(q *MutexQueue) (int, bool) {
+        q.mutex.Lock()
+        defer q.mutex.Unlock()
+        
+        if len(q.items) == 0 {
+            return 0, false
+        }
+        
+        value := q.items[0]
+        q.items = q.items[1:]
+        
+        return value, true
+    }
+    
+    // Benchmark
+    q := &MutexQueue{items: make([]int, 0, b.N)}
+    
+    b.ResetTimer()
+    
+    b.RunParallel(func(pb *testing.PB) {
+        i := 0
+        for pb.Next() {
+            if i%2 == 0 {
+                enqueue(q, i)
+            } else {
+                dequeue(q)
+            }
+            i++
+        }
+    })
+}
+
+// BenchmarkLockFreeQueueParallel, lock-free kuyruk için paralel benchmark.
+func BenchmarkLockFreeQueueParallel(b *testing.B) {
+    // Lock-free kuyruk
+    q := async.LockFreeQueue.New<int>()
+    
+    b.ResetTimer()
+    
+    b.RunParallel(func(pb *testing.PB) {
+        i := 0
+        for pb.Next() {
+            if i%2 == 0 {
+                q.Enqueue(i)
+            } else {
+                q.Dequeue()
+            }
+            i++
+        }
+    })
+}

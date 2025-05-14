@@ -1,0 +1,283 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized Epoll
+package async
+
+import (
+    "syscall"
+    "unsafe"
+    "sync/atomic"
+    "time"
+    "errors"
+)
+
+// Linux için epoll sabitleri
+const (
+    EPOLLIN      = 0x001
+    EPOLLOUT     = 0x004
+    EPOLLERR     = 0x008
+    EPOLLHUP     = 0x010
+    EPOLLRDHUP   = 0x2000
+    EPOLLPRI     = 0x002
+    EPOLLET      = 0x80000000
+    EPOLLONESHOT = 0x40000000
+)
+
+// epollEvent, epoll_event yapısını temsil eder.
+class epollEvent {
+    var events uint32
+    var data uint64
+}
+
+// OptimizedEpollPoller, optimize edilmiş bir epoll poller sağlar.
+class OptimizedEpollPoller {
+    private:
+        var epfd int
+        var events []epollEvent
+        var maxEvents int
+        var mode MultiplexerMode
+        var oneShot bool
+        var stats MultiplexerStats
+        var closed bool
+    
+    public:
+        // New, yeni bir OptimizedEpollPoller oluşturur.
+        static func New(options MultiplexerOptions) (*OptimizedEpollPoller, error) {
+            // Epoll dosya tanımlayıcısı oluştur
+            epfd, err := syscall.EpollCreate1(0)
+            if err != nil {
+                return nil, err
+            }
+            
+            poller := new OptimizedEpollPoller()
+            poller.epfd = epfd
+            poller.maxEvents = options.MaxEvents
+            poller.events = make([]epollEvent, options.MaxEvents)
+            poller.mode = options.Mode
+            poller.oneShot = options.OneShot
+            
+            return poller, nil
+        }
+        
+        // Add, bir dosya tanımlayıcısını epoll'a ekler.
+        func (p *OptimizedEpollPoller) Add(fd int, events int) error {
+            if p.closed {
+                return errors.New("epoll: kapalı")
+            }
+            
+            // Epoll olaylarını dönüştür
+            epollEvents := p.convertEvents(events)
+            
+            // Edge-triggered mod için EPOLLET ekle
+            if p.mode == EdgeTriggered {
+                epollEvents |= EPOLLET
+            }
+            
+            // One-shot mod için EPOLLONESHOT ekle
+            if p.oneShot {
+                epollEvents |= EPOLLONESHOT
+            }
+            
+            // Epoll olayını oluştur
+            event := epollEvent{
+                events: uint32(epollEvents),
+                data:   uint64(fd),
+            }
+            
+            // Epoll'a ekle
+            return syscall.EpollCtl(p.epfd, syscall.EPOLL_CTL_ADD, fd, (*syscall.EpollEvent)(unsafe.Pointer(&event)))
+        }
+        
+        // Remove, bir dosya tanımlayıcısını epoll'dan kaldırır.
+        func (p *OptimizedEpollPoller) Remove(fd int) error {
+            if p.closed {
+                return errors.New("epoll: kapalı")
+            }
+            
+            // Epoll'dan kaldır
+            return syscall.EpollCtl(p.epfd, syscall.EPOLL_CTL_DEL, fd, nil)
+        }
+        
+        // Modify, bir dosya tanımlayıcısının olaylarını değiştirir.
+        func (p *OptimizedEpollPoller) Modify(fd int, events int) error {
+            if p.closed {
+                return errors.New("epoll: kapalı")
+            }
+            
+            // Epoll olaylarını dönüştür
+            epollEvents := p.convertEvents(events)
+            
+            // Edge-triggered mod için EPOLLET ekle
+            if p.mode == EdgeTriggered {
+                epollEvents |= EPOLLET
+            }
+            
+            // One-shot mod için EPOLLONESHOT ekle
+            if p.oneShot {
+                epollEvents |= EPOLLONESHOT
+            }
+            
+            // Epoll olayını oluştur
+            event := epollEvent{
+                events: uint32(epollEvents),
+                data:   uint64(fd),
+            }
+            
+            // Epoll'u değiştir
+            return syscall.EpollCtl(p.epfd, syscall.EPOLL_CTL_MOD, fd, (*syscall.EpollEvent)(unsafe.Pointer(&event)))
+        }
+        
+        // Wait, olayları bekler.
+        func (p *OptimizedEpollPoller) Wait(timeout int) ([]Event, error) {
+            if p.closed {
+                return nil, errors.New("epoll: kapalı")
+            }
+            
+            startTime := time.Now()
+            
+            // Epoll_wait çağrısı
+            n, err := syscall.EpollWait(p.epfd, (*syscall.EpollEvent)(unsafe.Pointer(&p.events[0])), p.maxEvents, timeout)
+            
+            waitTime := time.Since(startTime)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&p.stats.TotalWakeups, 1)
+            atomic.AddInt64((*int64)(&p.stats.TotalWaitTime), int64(waitTime))
+            
+            // Ortalama bekleme süresini güncelle
+            totalWakeups := atomic.LoadUint64(&p.stats.TotalWakeups)
+            if totalWakeups > 0 {
+                p.stats.AverageWaitTime = time.Duration(int64(p.stats.TotalWaitTime) / int64(totalWakeups))
+            }
+            
+            if err != nil {
+                return nil, err
+            }
+            
+            // Zaman aşımı kontrolü
+            if n == 0 {
+                atomic.AddUint64(&p.stats.TotalTimeouts, 1)
+                return nil, nil
+            }
+            
+            // Olayları dönüştür
+            events := make([]Event, n)
+            
+            for i := 0; i < n; i++ {
+                fd := int(p.events[i].data)
+                eventType := p.events[i].events
+                
+                events[i] = Event{
+                    FD:    fd,
+                    ID:    fd,
+                    Type:  p.convertEpollEvents(eventType),
+                    Data:  nil,
+                    Error: nil,
+                }
+            }
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&p.stats.TotalEvents, uint64(n))
+            
+            // Ortalama olay sayısını güncelle
+            if totalWakeups > 0 {
+                p.stats.AverageEventsPerWakeup = float64(atomic.LoadUint64(&p.stats.TotalEvents)) / float64(totalWakeups)
+            }
+            
+            // Maksimum olay sayısını güncelle
+            if uint64(n) > atomic.LoadUint64(&p.stats.MaxEventsPerWakeup) {
+                atomic.StoreUint64(&p.stats.MaxEventsPerWakeup, uint64(n))
+            }
+            
+            return events, nil
+        }
+        
+        // Close, epoll'u kapatır.
+        func (p *OptimizedEpollPoller) Close() error {
+            if p.closed {
+                return errors.New("epoll: zaten kapalı")
+            }
+            
+            p.closed = true
+            
+            return syscall.Close(p.epfd)
+        }
+        
+        // GetStats, poller istatistiklerini döndürür.
+        func (p *OptimizedEpollPoller) GetStats() MultiplexerStats {
+            return MultiplexerStats{
+                TotalEvents:          atomic.LoadUint64(&p.stats.TotalEvents),
+                TotalWakeups:         atomic.LoadUint64(&p.stats.TotalWakeups),
+                TotalTimeouts:        atomic.LoadUint64(&p.stats.TotalTimeouts),
+                AverageEventsPerWakeup: p.stats.AverageEventsPerWakeup,
+                MaxEventsPerWakeup:   atomic.LoadUint64(&p.stats.MaxEventsPerWakeup),
+                TotalWaitTime:        p.stats.TotalWaitTime,
+                AverageWaitTime:      p.stats.AverageWaitTime,
+            }
+        }
+        
+        // convertEvents, olay tiplerini epoll olaylarına dönüştürür.
+        private func (p *OptimizedEpollPoller) convertEvents(events int) int {
+            var epollEvents int
+            
+            if events&EventRead != 0 {
+                epollEvents |= EPOLLIN
+            }
+            
+            if events&EventWrite != 0 {
+                epollEvents |= EPOLLOUT
+            }
+            
+            if events&EventError != 0 {
+                epollEvents |= EPOLLERR
+            }
+            
+            if events&EventHangup != 0 {
+                epollEvents |= EPOLLHUP
+            }
+            
+            if events&EventPriority != 0 {
+                epollEvents |= EPOLLPRI
+            }
+            
+            if events&EventReadHangup != 0 {
+                epollEvents |= EPOLLRDHUP
+            }
+            
+            return epollEvents
+        }
+        
+        // convertEpollEvents, epoll olaylarını olay tiplerine dönüştürür.
+        private func (p *OptimizedEpollPoller) convertEpollEvents(epollEvents uint32) int {
+            var events int
+            
+            if epollEvents&EPOLLIN != 0 {
+                events |= EventRead
+            }
+            
+            if epollEvents&EPOLLOUT != 0 {
+                events |= EventWrite
+            }
+            
+            if epollEvents&EPOLLERR != 0 {
+                events |= EventError
+            }
+            
+            if epollEvents&EPOLLHUP != 0 {
+                events |= EventHangup
+            }
+            
+            if epollEvents&EPOLLPRI != 0 {
+                events |= EventPriority
+            }
+            
+            if epollEvents&EPOLLRDHUP != 0 {
+                events |= EventReadHangup
+            }
+            
+            return events
+        }
+}
+
+// newOptimizedEpollPoller, yeni bir OptimizedEpollPoller oluşturur.
+func newOptimizedEpollPoller(options MultiplexerOptions) (IOMultiplexer, error) {
+    return OptimizedEpollPoller.New(options)
+}

@@ -1,0 +1,492 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Pipe Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "os"
+    "path/filepath"
+)
+
+// TestAsyncPipeBasic, AsyncPipe için temel testler içerir.
+func TestAsyncPipeBasic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncPipe oluştur
+    pipe, err := async.AsyncPipe.New(loop)
+    if err != nil {
+        t.Fatalf("AsyncPipe oluşturma hatası: %v", err)
+    }
+    
+    // Pipe'ı kapat
+    closeErr, err := pipe.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Close hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Pipe kapatma hatası: %v", closeErr)
+    }
+    
+    // Pipe'ı tekrar kapat (hata vermemeli)
+    closeErr, err = pipe.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Close (tekrar) hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Pipe tekrar kapatma hatası: %v", closeErr)
+    }
+}
+
+// TestAsyncPipeReadWrite, AsyncPipe okuma ve yazma işlemlerini test eder.
+func TestAsyncPipeReadWrite(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncPipe oluştur
+    pipe, err := async.AsyncPipe.New(loop)
+    if err != nil {
+        t.Fatalf("AsyncPipe oluşturma hatası: %v", err)
+    }
+    defer pipe.Close().Get()
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, Async Pipe!")
+    
+    // Okuma işlemi başlat (goroutine)
+    readDone := make(chan struct{})
+    var readData []byte
+    var readErr error
+    var readN int
+    
+    go func() {
+        buffer := make([]byte, 1024)
+        readN, readErr = pipe.Read(buffer).Get()
+        if readErr == nil {
+            readData = buffer[:readN]
+        }
+        close(readDone)
+    }()
+    
+    // Kısa bir süre bekle
+    time.Sleep(50 * time.Millisecond)
+    
+    // Pipe'a yaz
+    n, err := pipe.Write(data).Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Write hatası: %v", err)
+    }
+    
+    if n != len(data) {
+        t.Errorf("Beklenen yazılan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    // Okuma işleminin tamamlanmasını bekle
+    select {
+    case <-readDone:
+        // Okuma tamamlandı
+    case <-time.After(1 * time.Second):
+        t.Fatal("Okuma işlemi zaman aşımına uğradı")
+    }
+    
+    // Okuma hatasını kontrol et
+    if readErr != nil {
+        t.Errorf("AsyncPipe.Read hatası: %v", readErr)
+    }
+    
+    // Okunan veriyi kontrol et
+    if string(readData) != string(data) {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", string(data), string(readData))
+    }
+}
+
+// TestAsyncPipeMultipleWrites, AsyncPipe üzerinde birden fazla yazma işlemini test eder.
+func TestAsyncPipeMultipleWrites(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncPipe oluştur
+    pipe, err := async.AsyncPipe.New(loop)
+    if err != nil {
+        t.Fatalf("AsyncPipe oluşturma hatası: %v", err)
+    }
+    defer pipe.Close().Get()
+    
+    // Yazılacak veriler
+    data1 := []byte("Merhaba, ")
+    data2 := []byte("Async ")
+    data3 := []byte("Pipe!")
+    
+    // Toplam veri
+    totalData := append(append(data1, data2...), data3...)
+    
+    // Okuma işlemi başlat (goroutine)
+    readDone := make(chan struct{})
+    var readData []byte
+    var readErr error
+    
+    go func() {
+        buffer := make([]byte, 1024)
+        n, err := pipe.Read(buffer).Get()
+        if err == nil {
+            readData = buffer[:n]
+        } else {
+            readErr = err
+        }
+        close(readDone)
+    }()
+    
+    // Kısa bir süre bekle
+    time.Sleep(50 * time.Millisecond)
+    
+    // Pipe'a yaz (birden fazla)
+    n1, err := pipe.Write(data1).Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Write (1) hatası: %v", err)
+    }
+    
+    n2, err := pipe.Write(data2).Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Write (2) hatası: %v", err)
+    }
+    
+    n3, err := pipe.Write(data3).Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Write (3) hatası: %v", err)
+    }
+    
+    // Yazılan toplam bayt sayısını kontrol et
+    totalWritten := n1 + n2 + n3
+    if totalWritten != len(totalData) {
+        t.Errorf("Beklenen toplam yazılan bayt sayısı %d, alınan: %d", len(totalData), totalWritten)
+    }
+    
+    // Okuma işleminin tamamlanmasını bekle
+    select {
+    case <-readDone:
+        // Okuma tamamlandı
+    case <-time.After(1 * time.Second):
+        t.Fatal("Okuma işlemi zaman aşımına uğradı")
+    }
+    
+    // Okuma hatasını kontrol et
+    if readErr != nil {
+        t.Errorf("AsyncPipe.Read hatası: %v", readErr)
+    }
+    
+    // Okunan veriyi kontrol et
+    if string(readData) != string(totalData) {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", string(totalData), string(readData))
+    }
+}
+
+// TestAsyncPipeClosedRead, kapatılmış bir pipe'tan okuma işlemini test eder.
+func TestAsyncPipeClosedRead(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncPipe oluştur
+    pipe, err := async.AsyncPipe.New(loop)
+    if err != nil {
+        t.Fatalf("AsyncPipe oluşturma hatası: %v", err)
+    }
+    
+    // Pipe'ı kapat
+    pipe.Close().Get()
+    
+    // Kapatılmış pipe'tan okumayı dene
+    buffer := make([]byte, 1024)
+    _, err = pipe.Read(buffer).Get()
+    
+    // Hata bekleniyor
+    if err != async.ErrClosed {
+        t.Errorf("Kapatılmış pipe'tan okuma hatası bekleniyor, alınan: %v", err)
+    }
+}
+
+// TestAsyncPipeClosedWrite, kapatılmış bir pipe'a yazma işlemini test eder.
+func TestAsyncPipeClosedWrite(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncPipe oluştur
+    pipe, err := async.AsyncPipe.New(loop)
+    if err != nil {
+        t.Fatalf("AsyncPipe oluşturma hatası: %v", err)
+    }
+    
+    // Pipe'ı kapat
+    pipe.Close().Get()
+    
+    // Kapatılmış pipe'a yazmayı dene
+    data := []byte("Merhaba, Async Pipe!")
+    _, err = pipe.Write(data).Get()
+    
+    // Hata bekleniyor
+    if err != async.ErrClosed {
+        t.Errorf("Kapatılmış pipe'a yazma hatası bekleniyor, alınan: %v", err)
+    }
+}
+
+// TestPipe, Pipe fonksiyonunu test eder.
+func TestPipe(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Pipe oluştur
+    readPipe, writePipe, err := async.Pipe(loop)
+    if err != nil {
+        t.Fatalf("Pipe oluşturma hatası: %v", err)
+    }
+    defer readPipe.Close().Get()
+    defer writePipe.Close().Get()
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, Async Pipe!")
+    
+    // Okuma işlemi başlat (goroutine)
+    readDone := make(chan struct{})
+    var readData []byte
+    var readErr error
+    
+    go func() {
+        buffer := make([]byte, 1024)
+        n, err := readPipe.Read(buffer).Get()
+        if err == nil {
+            readData = buffer[:n]
+        } else {
+            readErr = err
+        }
+        close(readDone)
+    }()
+    
+    // Kısa bir süre bekle
+    time.Sleep(50 * time.Millisecond)
+    
+    // Pipe'a yaz
+    n, err := writePipe.Write(data).Get()
+    if err != nil {
+        t.Errorf("AsyncPipe.Write hatası: %v", err)
+    }
+    
+    if n != len(data) {
+        t.Errorf("Beklenen yazılan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    // Okuma işleminin tamamlanmasını bekle
+    select {
+    case <-readDone:
+        // Okuma tamamlandı
+    case <-time.After(1 * time.Second):
+        t.Fatal("Okuma işlemi zaman aşımına uğradı")
+    }
+    
+    // Okuma hatasını kontrol et
+    if readErr != nil {
+        t.Errorf("AsyncPipe.Read hatası: %v", readErr)
+    }
+    
+    // Okunan veriyi kontrol et
+    if string(readData) != string(data) {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", string(data), string(readData))
+    }
+    
+    // Yazma pipe'ından okumayı dene (hata bekleniyor)
+    buffer := make([]byte, 1024)
+    _, err = writePipe.Read(buffer).Get()
+    
+    // Hata bekleniyor
+    if err != async.ErrUnsupported {
+        t.Errorf("Yazma pipe'ından okuma hatası bekleniyor, alınan: %v", err)
+    }
+    
+    // Okuma pipe'ına yazmayı dene (hata bekleniyor)
+    _, err = readPipe.Write(data).Get()
+    
+    // Hata bekleniyor
+    if err != async.ErrUnsupported {
+        t.Errorf("Okuma pipe'ına yazma hatası bekleniyor, alınan: %v", err)
+    }
+}
+
+// TestCreateNamedPipe, isimli boru hattı oluşturma ve kullanma işlemini test eder.
+func TestCreateNamedPipe(t *testing.T) {
+    // Geçici dizin oluştur
+    tempDir := os.TempDir()
+    pipeName := filepath.Join(tempDir, "async_pipe_test")
+    
+    // Önceki pipe'ı temizle
+    os.Remove(pipeName)
+    
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // İsimli pipe oluştur
+    err = async.CreateNamedPipe(pipeName, 0666)
+    if err != nil {
+        // Windows'ta desteklenmiyorsa testi atla
+        if err.Error() == "async: Windows'ta isimli boru hattı oluşturma henüz desteklenmiyor" {
+            t.Skip("Windows'ta isimli boru hattı oluşturma desteklenmiyor")
+        }
+        t.Fatalf("CreateNamedPipe hatası: %v", err)
+    }
+    defer os.Remove(pipeName)
+    
+    // Okuma ve yazma işlemleri için goroutine'ler
+    readDone := make(chan struct{})
+    writeDone := make(chan struct{})
+    var readData []byte
+    var readErr error
+    var writeErr error
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, İsimli Pipe!")
+    
+    // Okuma goroutine'i
+    go func() {
+        // Okuma modunda pipe aç
+        readPipe, err := async.AsyncPipe.Open(loop, pipeName, async.PipeModeRead)
+        if err != nil {
+            readErr = err
+            close(readDone)
+            return
+        }
+        defer readPipe.Close().Get()
+        
+        // Pipe'tan oku
+        buffer := make([]byte, 1024)
+        n, err := readPipe.Read(buffer).Get()
+        if err != nil {
+            readErr = err
+        } else {
+            readData = buffer[:n]
+        }
+        
+        close(readDone)
+    }()
+    
+    // Yazma goroutine'i
+    go func() {
+        // Kısa bir süre bekle
+        time.Sleep(100 * time.Millisecond)
+        
+        // Yazma modunda pipe aç
+        writePipe, err := async.AsyncPipe.Open(loop, pipeName, async.PipeModeWrite)
+        if err != nil {
+            writeErr = err
+            close(writeDone)
+            return
+        }
+        defer writePipe.Close().Get()
+        
+        // Pipe'a yaz
+        _, err = writePipe.Write(data).Get()
+        if err != nil {
+            writeErr = err
+        }
+        
+        close(writeDone)
+    }()
+    
+    // İşlemlerin tamamlanmasını bekle
+    select {
+    case <-readDone:
+        // Okuma tamamlandı
+    case <-time.After(2 * time.Second):
+        t.Fatal("Okuma işlemi zaman aşımına uğradı")
+    }
+    
+    select {
+    case <-writeDone:
+        // Yazma tamamlandı
+    case <-time.After(2 * time.Second):
+        t.Fatal("Yazma işlemi zaman aşımına uğradı")
+    }
+    
+    // Hataları kontrol et
+    if readErr != nil {
+        t.Errorf("AsyncPipe.Read hatası: %v", readErr)
+    }
+    
+    if writeErr != nil {
+        t.Errorf("AsyncPipe.Write hatası: %v", writeErr)
+    }
+    
+    // Okunan veriyi kontrol et
+    if string(readData) != string(data) {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", string(data), string(readData))
+    }
+}

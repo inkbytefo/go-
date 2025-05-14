@@ -15,6 +15,9 @@ cd "$TEST_DIR" || exit 1
 # GO-Minus derleyicisi
 GOMINUS_COMPILER="../../bin/gominus"
 
+# Hata ayıklama bilgisi üretimini etkinleştir
+DEBUG_FLAG="--debug"
+
 # Sonuçlar
 TOTAL_TESTS=0
 PASSED_TESTS=0
@@ -25,25 +28,25 @@ run_test() {
     local test_file="$1"
     local test_name="$(basename "$test_file" .gom)"
     local output_file="${test_name}.out"
-    
+
     echo -e "${YELLOW}Test: $test_name${NC}"
-    
+
     # Dosyayı derle
     echo "  Derleniyor..."
-    "$GOMINUS_COMPILER" "$test_file" -o "$output_file"
+    "$GOMINUS_COMPILER" $DEBUG_FLAG "$test_file" -o "$output_file"
     local compile_result=$?
-    
+
     if [ $compile_result -ne 0 ]; then
         echo -e "  ${RED}Derleme hatası!${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         return
     fi
-    
+
     # Derlenmiş dosyayı çalıştır
     echo "  Çalıştırılıyor..."
     ./"$output_file"
     local run_result=$?
-    
+
     if [ $run_result -ne 0 ]; then
         echo -e "  ${RED}Çalıştırma hatası!${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
@@ -51,10 +54,10 @@ run_test() {
         echo -e "  ${GREEN}Başarılı!${NC}"
         PASSED_TESTS=$((PASSED_TESTS + 1))
     fi
-    
+
     # Temizlik
     rm -f "$output_file"
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 }
 

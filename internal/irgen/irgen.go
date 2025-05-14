@@ -8,31 +8,45 @@ import (
 	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/enum"
+	"github.com/llir/llvm/ir/metadata"
 	"github.com/llir/llvm/ir/types"
 	"github.com/llir/llvm/ir/value"
 )
 
 // IRGenerator, AST'yi LLVM IR'ına veya benzer bir ara koda dönüştürür.
 type IRGenerator struct {
-	errors      []string
-	moduleName  string
-	module      *ir.Module
-	currentFunc *ir.Func
-	currentBB   *ir.Block
-	symbolTable map[string]value.Value // Sembol tablosu
-	typeTable   map[string]types.Type  // Tip tablosu
-	analyzer    *semantic.Analyzer     // Semantik analizci
+	errors         []string
+	moduleName     string
+	module         *ir.Module
+	currentFunc    *ir.Func
+	currentBB      *ir.Block
+	symbolTable    map[string]value.Value   // Sembol tablosu
+	typeTable      map[string]types.Type    // Tip tablosu
+	classTable     map[string]*ClassInfo    // Sınıf tablosu
+	templateTable  map[string]*TemplateInfo // Şablon tablosu
+	exceptionStack []*ExceptionInfo         // İstisna yığını
+	analyzer       *semantic.Analyzer       // Semantik analizci
+	debugInfo      *DebugInfo               // Hata ayıklama bilgisi
+	generateDebug  bool                     // Hata ayıklama bilgisi üretilecek mi?
+	sourceFile     string                   // Kaynak dosya adı
+	sourceDir      string                   // Kaynak dosya dizini
 }
 
 // New, yeni bir IRGenerator oluşturur.
 func New() *IRGenerator {
 	module := ir.NewModule()
 	return &IRGenerator{
-		errors:      []string{},
-		module:      module,
-		moduleName:  "goplus_module",
-		symbolTable: make(map[string]value.Value),
-		typeTable:   make(map[string]types.Type),
+		errors:         []string{},
+		module:         module,
+		moduleName:     "goplus_module",
+		symbolTable:    make(map[string]value.Value),
+		typeTable:      make(map[string]types.Type),
+		classTable:     make(map[string]*ClassInfo),
+		templateTable:  make(map[string]*TemplateInfo),
+		exceptionStack: make([]*ExceptionInfo, 0),
+		generateDebug:  false,
+		sourceFile:     "",
+		sourceDir:      "",
 	}
 }
 
@@ -40,12 +54,18 @@ func New() *IRGenerator {
 func NewWithAnalyzer(analyzer *semantic.Analyzer) *IRGenerator {
 	module := ir.NewModule()
 	return &IRGenerator{
-		errors:      []string{},
-		module:      module,
-		moduleName:  "goplus_module",
-		symbolTable: make(map[string]value.Value),
-		typeTable:   make(map[string]types.Type),
-		analyzer:    analyzer,
+		errors:         []string{},
+		module:         module,
+		moduleName:     "goplus_module",
+		symbolTable:    make(map[string]value.Value),
+		typeTable:      make(map[string]types.Type),
+		classTable:     make(map[string]*ClassInfo),
+		templateTable:  make(map[string]*TemplateInfo),
+		exceptionStack: make([]*ExceptionInfo, 0),
+		analyzer:       analyzer,
+		generateDebug:  false,
+		sourceFile:     "",
+		sourceDir:      "",
 	}
 }
 
@@ -59,6 +79,14 @@ func (g *IRGenerator) ReportError(format string, args ...any) {
 	g.errors = append(g.errors, fmt.Sprintf(format, args...))
 }
 
+// EnableDebugInfo, hata ayıklama bilgisi üretimini etkinleştirir.
+func (g *IRGenerator) EnableDebugInfo(sourceFile, sourceDir string) {
+	g.generateDebug = true
+	g.sourceFile = sourceFile
+	g.sourceDir = sourceDir
+	g.debugInfo = NewDebugInfo(g.module)
+}
+
 // GenerateProgram, programın AST'sinden IR üretir.
 func (g *IRGenerator) GenerateProgram(program *ast.Program) (string, error) {
 	// Modülü sıfırla
@@ -68,6 +96,12 @@ func (g *IRGenerator) GenerateProgram(program *ast.Program) (string, error) {
 	// Temel tipleri tanımla
 	g.defineBasicTypes()
 
+	// Hata ayıklama bilgisi üretimini başlat
+	if g.generateDebug {
+		g.debugInfo = NewDebugInfo(g.module)
+		g.debugInfo.InitCompileUnit(g.sourceFile, g.sourceDir, "GO-Minus Compiler", false, "", 0)
+	}
+
 	// Hata kontrolü
 	if len(g.Errors()) > 0 {
 		return "", fmt.Errorf("IR üretimi sırasında hatalar oluştu: %v", g.Errors())
@@ -75,6 +109,12 @@ func (g *IRGenerator) GenerateProgram(program *ast.Program) (string, error) {
 
 	// AST düğümlerini gezerek IR üretme
 	for _, stmt := range program.Statements {
+		// Hata ayıklama bilgisi için konum bilgisini ayarla
+		if g.generateDebug && stmt.Pos().IsValid() {
+			pos := stmt.Pos()
+			g.debugInfo.SetLocation(pos.Line, pos.Column, g.sourceFile)
+		}
+
 		g.generateStatement(stmt)
 	}
 
@@ -159,10 +199,16 @@ func (g *IRGenerator) generateStatement(stmt ast.Statement) {
 		g.generateBlockStatement(s)
 	case *ast.WhileStatement:
 		g.generateWhileStatement(s)
-	// Fonksiyon tanımlamaları için özel bir durum eklenebilir
-	// Şimdilik bu durumu atlıyoruz
+	case *ast.FunctionStatement:
+		g.generateFunctionStatement(s)
 	case *ast.ClassStatement:
 		g.generateClassStatement(s)
+	case *ast.TemplateStatement:
+		g.generateTemplateStatement(s)
+	case *ast.TryCatchStatement:
+		g.generateTryCatchStatement(s)
+	case *ast.ThrowStatement:
+		g.generateThrowStatement(s)
 	default:
 		g.ReportError("Desteklenmeyen deyim türü: %T", s)
 	}
@@ -191,6 +237,14 @@ func (g *IRGenerator) generateExpression(expr ast.Expression) value.Value {
 		return g.generateFunctionLiteral(e)
 	case *ast.IfExpression:
 		return g.generateIfExpression(e)
+	case *ast.NewExpression:
+		return g.generateNewExpression(e)
+	case *ast.MemberExpression:
+		return g.generateMemberExpression(e)
+	case *ast.TemplateExpression:
+		return g.generateTemplateExpression(e)
+	case *ast.TryExpression:
+		return g.generateTryExpression(e)
 	default:
 		g.ReportError("Desteklenmeyen ifade türü: %T", e)
 		return nil
@@ -641,6 +695,13 @@ func (g *IRGenerator) generateVarStatement(stmt *ast.VarStatement) {
 				globalVar.Init = constVal
 			}
 		}
+
+		// Hata ayıklama bilgisi ekle
+		if g.generateDebug {
+			// Global değişken için hata ayıklama bilgisi oluştur
+			// Not: LLVM IR'da global değişkenler için hata ayıklama bilgisi ekleme
+			// işlemi daha karmaşıktır ve bu örnekte basitleştirilmiştir.
+		}
 	} else {
 		// Lokal değişken
 		if g.currentBB == nil {
@@ -653,8 +714,29 @@ func (g *IRGenerator) generateVarStatement(stmt *ast.VarStatement) {
 		alloca.SetName(varName)
 		g.symbolTable[varName] = alloca
 
+		// Hata ayıklama bilgisi ekle
+		if g.generateDebug {
+			pos := stmt.Pos()
+			localVar := g.debugInfo.CreateLocalVariable(
+				varName,
+				g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
+				pos.Line,
+				pos.Column,
+				varType,
+				0, // Parametre değil
+				0, // Hizalama
+			)
+			g.debugInfo.InsertDeclare(g.currentBB, alloca, localVar, &metadata.DIExpression{}, pos.Line, pos.Column)
+		}
+
 		// Değer atanmışsa, değeri ata
 		if stmt.Value != nil {
+			// Hata ayıklama bilgisi için konum bilgisini ayarla
+			if g.generateDebug && stmt.Value.Pos().IsValid() {
+				pos := stmt.Value.Pos()
+				g.debugInfo.SetLocation(pos.Line, pos.Column, g.sourceFile)
+			}
+
 			val := g.generateExpression(stmt.Value)
 			if val != nil {
 				g.currentBB.NewStore(val, alloca)
@@ -674,6 +756,12 @@ func (g *IRGenerator) generateReturnStatement(stmt *ast.ReturnStatement) {
 		return
 	}
 
+	// Hata ayıklama bilgisi için konum bilgisini ayarla
+	if g.generateDebug && stmt.Pos().IsValid() {
+		pos := stmt.Pos()
+		g.debugInfo.SetLocation(pos.Line, pos.Column, g.sourceFile)
+	}
+
 	// Dönüş değeri varsa değerlendir
 	if stmt.ReturnValue != nil {
 		retVal := g.generateExpression(stmt.ReturnValue)
@@ -689,14 +777,35 @@ func (g *IRGenerator) generateReturnStatement(stmt *ast.ReturnStatement) {
 }
 
 func (g *IRGenerator) generateBlockStatement(stmt *ast.BlockStatement) {
+	// Hata ayıklama bilgisi için sözcüksel blok oluştur
+	if g.generateDebug && stmt.Pos().IsValid() {
+		pos := stmt.Pos()
+		g.debugInfo.CreateLexicalBlock(
+			g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
+			pos.Line,
+			pos.Column,
+		)
+	}
+
 	// Blok içindeki tüm deyimleri değerlendir
 	for _, s := range stmt.Statements {
+		// Hata ayıklama bilgisi için konum bilgisini ayarla
+		if g.generateDebug && s.Pos().IsValid() {
+			pos := s.Pos()
+			g.debugInfo.SetLocation(pos.Line, pos.Column, g.sourceFile)
+		}
+
 		g.generateStatement(s)
 
 		// Eğer bir dönüş deyimi ile karşılaşıldıysa, sonraki deyimleri değerlendirme
 		if g.currentBB != nil && g.currentBB.Term != nil {
 			break
 		}
+	}
+
+	// Sözcüksel bloğu kapat
+	if g.generateDebug {
+		g.debugInfo.FinishLexicalBlock()
 	}
 }
 
@@ -795,57 +904,150 @@ func (g *IRGenerator) generateWhileStatement(stmt *ast.WhileStatement) {
 	g.currentBB = endBlock
 }
 
-func (g *IRGenerator) generateClassStatement(stmt *ast.ClassStatement) {
-	// Sınıf adını al
-	className := stmt.Name.Value
+// generateFunctionStatement, bir fonksiyon tanımlaması için IR üretir.
+func (g *IRGenerator) generateFunctionStatement(stmt *ast.FunctionStatement) {
+	// Fonksiyon adını al
+	funcName := stmt.Name.Value
 
-	// Şimdilik sınıfları basit bir struct olarak temsil ediyoruz
-	// Sınıf üyelerini topla
-	memberTypes := make([]types.Type, 0)
-	memberNames := make([]string, 0)
-
-	// Sınıf gövdesindeki ifadeleri işle
-	if stmt.Body != nil {
-		for _, s := range stmt.Body.Statements {
-			// Şimdilik sadece değişken üyeleri destekliyoruz
-			if varStmt, ok := s.(*ast.VarStatement); ok {
-				memberName := varStmt.Name.Value
-
-				// Üye tipini belirle
-				var memberType types.Type = types.I32 // Varsayılan olarak int32
-				if varStmt.Type != nil {
-					if typeIdent, ok := varStmt.Type.(*ast.Identifier); ok {
-						if t, exists := g.typeTable[typeIdent.Value]; exists {
-							memberType = t
-						}
-					}
+	// Parametre tiplerini belirle
+	paramTypes := make([]types.Type, len(stmt.Parameters))
+	for i, param := range stmt.Parameters {
+		// Parametre tipini belirle
+		if param.Type != nil {
+			if typeIdent, ok := param.Type.(*ast.Identifier); ok {
+				if t, exists := g.typeTable[typeIdent.Value]; exists {
+					paramTypes[i] = t
+				} else {
+					g.ReportError("Bilinmeyen tip: %s", typeIdent.Value)
+					paramTypes[i] = types.I32 // Varsayılan olarak int32
 				}
-
-				memberTypes = append(memberTypes, memberType)
-				memberNames = append(memberNames, memberName)
+			} else {
+				g.ReportError("Desteklenmeyen tip ifadesi: %T", param.Type)
+				paramTypes[i] = types.I32 // Varsayılan olarak int32
 			}
+		} else {
+			paramTypes[i] = types.I32 // Varsayılan olarak int32
 		}
 	}
 
-	// Struct tipini oluştur
-	structType := types.NewStruct(memberTypes...)
-
-	// Tipi kaydet
-	g.typeTable[className] = structType
-
-	// Sınıf metotlarını işle
-	if stmt.Body != nil {
-		for _, s := range stmt.Body.Statements {
-			if funcLit, ok := s.(*ast.ExpressionStatement); ok {
-				if fn, ok := funcLit.Expression.(*ast.FunctionLiteral); ok {
-					// Metot adını al
-					methodName := className + "_method"
-					_ = methodName // Şimdilik kullanmıyoruz
-
-					// Metodu oluştur
-					g.generateFunctionLiteral(fn)
-				}
+	// Dönüş tipini belirle
+	var returnType types.Type = types.I32 // Varsayılan olarak int32
+	if stmt.ReturnType != nil {
+		if typeIdent, ok := stmt.ReturnType.(*ast.Identifier); ok {
+			if t, exists := g.typeTable[typeIdent.Value]; exists {
+				returnType = t
+			} else {
+				g.ReportError("Bilinmeyen tip: %s", typeIdent.Value)
 			}
+		} else {
+			g.ReportError("Desteklenmeyen tip ifadesi: %T", stmt.ReturnType)
 		}
 	}
+
+	// Fonksiyonu oluştur
+	fn := g.module.NewFunc(funcName, returnType)
+
+	// Parametreleri ekle
+	for i, param := range stmt.Parameters {
+		paramName := param.Value
+		fn.Params = append(fn.Params, ir.NewParam(paramName, paramTypes[i]))
+	}
+
+	// Hata ayıklama bilgisi ekle
+	if g.generateDebug {
+		// Fonksiyon için hata ayıklama bilgisi oluştur
+		file := g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir)
+		pos := stmt.Pos()
+		g.debugInfo.CreateFunction(
+			fn,
+			funcName,
+			funcName,
+			file,
+			pos.Line,
+			false,
+			true,
+			pos.Line,
+			0, // Flags
+			false,
+		)
+	}
+
+	// Önceki durumu kaydet
+	prevFunc := g.currentFunc
+	prevBB := g.currentBB
+
+	// Yeni durumu ayarla
+	g.currentFunc = fn
+	entryBlock := fn.NewBlock("entry")
+	g.currentBB = entryBlock
+
+	// Parametreleri sembol tablosuna ekle
+	for i, param := range stmt.Parameters {
+		paramName := param.Value
+		paramVal := fn.Params[i]
+
+		// Parametre için yerel değişken oluştur
+		alloca := entryBlock.NewAlloca(paramTypes[i])
+		alloca.SetName(paramName + ".addr")
+		entryBlock.NewStore(paramVal, alloca)
+
+		// Hata ayıklama bilgisi ekle
+		if g.generateDebug {
+			pos := param.Pos()
+			localVar := g.debugInfo.CreateLocalVariable(
+				paramName,
+				g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
+				pos.Line,
+				pos.Column,
+				paramTypes[i],
+				i+1, // Parametre indeksi (1-tabanlı)
+				0,   // Hizalama
+			)
+			g.debugInfo.InsertDeclare(entryBlock, alloca, localVar, &metadata.DIExpression{}, pos.Line, pos.Column)
+		}
+
+		g.symbolTable[paramName] = alloca
+	}
+
+	// Fonksiyon gövdesini işle
+	if stmt.Body != nil {
+		// Hata ayıklama bilgisi için sözcüksel blok oluştur
+		if g.generateDebug {
+			pos := stmt.Body.Pos()
+			g.debugInfo.CreateLexicalBlock(
+				g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
+				pos.Line,
+				pos.Column,
+			)
+		}
+
+		g.generateBlockStatement(stmt.Body)
+
+		// Sözcüksel bloğu kapat
+		if g.generateDebug {
+			g.debugInfo.FinishLexicalBlock()
+		}
+	}
+
+	// Eğer son blok bir dönüş ifadesi ile bitmiyorsa, varsayılan dönüş ekle
+	if g.currentBB.Term == nil {
+		// Hata ayıklama bilgisi için konum bilgisini ayarla
+		if g.generateDebug {
+			g.debugInfo.SetLocation(stmt.Body.End().Line, stmt.Body.End().Column, g.sourceFile)
+		}
+
+		g.currentBB.NewRet(constant.NewInt(types.I32, 0))
+	}
+
+	// Fonksiyon hata ayıklama bilgisini tamamla
+	if g.generateDebug {
+		g.debugInfo.FinishFunction()
+	}
+
+	// Önceki durumu geri yükle
+	g.currentFunc = prevFunc
+	g.currentBB = prevBB
+
+	// Fonksiyonu sembol tablosuna ekle
+	g.symbolTable[funcName] = fn
 }

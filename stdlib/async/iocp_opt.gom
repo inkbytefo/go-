@@ -1,0 +1,259 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized IOCP
+package async
+
+import (
+    "syscall"
+    "unsafe"
+    "sync/atomic"
+    "time"
+    "errors"
+)
+
+// Windows için IOCP sabitleri
+const (
+    INVALID_HANDLE_VALUE = ^uintptr(0)
+    INFINITE             = 0xFFFFFFFF
+    IOC_OUT              = 0x40000000
+    IOC_IN               = 0x80000000
+    IOC_INOUT            = IOC_IN | IOC_OUT
+    IOC_WS2              = 0x08000000
+    SIO_BASE_HANDLE      = IOC_OUT | IOC_WS2 | 34
+)
+
+// OVERLAPPED, Windows OVERLAPPED yapısını temsil eder.
+class OVERLAPPED {
+    var Internal     uintptr
+    var InternalHigh uintptr
+    var Offset       uint32
+    var OffsetHigh   uint32
+    var HEvent       uintptr
+    var FD           int
+    var EventType    int
+}
+
+// OptimizedIOCPPoller, optimize edilmiş bir IOCP poller sağlar.
+class OptimizedIOCPPoller {
+    private:
+        var iocp uintptr
+        var events []OVERLAPPED
+        var maxEvents int
+        var stats MultiplexerStats
+        var closed bool
+        var fdToOverlapped map[int]*OVERLAPPED
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir OptimizedIOCPPoller oluşturur.
+        static func New(options MultiplexerOptions) (*OptimizedIOCPPoller, error) {
+            // IOCP oluştur
+            iocp, err := syscall.CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0)
+            if err != nil {
+                return nil, err
+            }
+            
+            poller := new OptimizedIOCPPoller()
+            poller.iocp = iocp
+            poller.maxEvents = options.MaxEvents
+            poller.events = make([]OVERLAPPED, options.MaxEvents)
+            poller.fdToOverlapped = make(map[int]*OVERLAPPED)
+            
+            return poller, nil
+        }
+        
+        // Add, bir dosya tanımlayıcısını IOCP'ye ekler.
+        func (p *OptimizedIOCPPoller) Add(fd int, events int) error {
+            if p.closed {
+                return errors.New("iocp: kapalı")
+            }
+            
+            p.mutex.Lock()
+            defer p.mutex.Unlock()
+            
+            // Dosya tanımlayıcısı zaten eklenmiş mi kontrol et
+            if _, ok := p.fdToOverlapped[fd]; ok {
+                return errors.New("iocp: dosya tanımlayıcısı zaten eklenmiş")
+            }
+            
+            // Dosya tanımlayıcısını HANDLE'a dönüştür
+            handle := syscall.Handle(fd)
+            
+            // Dosya tanımlayıcısını IOCP'ye ekle
+            _, err := syscall.CreateIoCompletionPort(uintptr(handle), p.iocp, uintptr(fd), 0)
+            if err != nil {
+                return err
+            }
+            
+            // OVERLAPPED yapısı oluştur
+            overlapped := new OVERLAPPED()
+            overlapped.FD = fd
+            overlapped.EventType = events
+            
+            // OVERLAPPED yapısını kaydet
+            p.fdToOverlapped[fd] = overlapped
+            
+            return nil
+        }
+        
+        // Remove, bir dosya tanımlayıcısını IOCP'den kaldırır.
+        func (p *OptimizedIOCPPoller) Remove(fd int) error {
+            if p.closed {
+                return errors.New("iocp: kapalı")
+            }
+            
+            p.mutex.Lock()
+            defer p.mutex.Unlock()
+            
+            // Dosya tanımlayıcısı eklenmiş mi kontrol et
+            if _, ok := p.fdToOverlapped[fd]; !ok {
+                return errors.New("iocp: dosya tanımlayıcısı bulunamadı")
+            }
+            
+            // OVERLAPPED yapısını kaldır
+            delete(p.fdToOverlapped, fd)
+            
+            // Not: Windows'ta IOCP'den bir dosya tanımlayıcısını kaldırmak için doğrudan bir yol yok
+            // Dosya tanımlayıcısı kapatıldığında otomatik olarak kaldırılır
+            
+            return nil
+        }
+        
+        // Modify, bir dosya tanımlayıcısının olaylarını değiştirir.
+        func (p *OptimizedIOCPPoller) Modify(fd int, events int) error {
+            if p.closed {
+                return errors.New("iocp: kapalı")
+            }
+            
+            p.mutex.Lock()
+            defer p.mutex.Unlock()
+            
+            // Dosya tanımlayıcısı eklenmiş mi kontrol et
+            overlapped, ok := p.fdToOverlapped[fd]
+            if !ok {
+                return errors.New("iocp: dosya tanımlayıcısı bulunamadı")
+            }
+            
+            // Olay tipini güncelle
+            overlapped.EventType = events
+            
+            return nil
+        }
+        
+        // Wait, olayları bekler.
+        func (p *OptimizedIOCPPoller) Wait(timeout int) ([]Event, error) {
+            if p.closed {
+                return nil, errors.New("iocp: kapalı")
+            }
+            
+            startTime := time.Now()
+            
+            // Timeout değerini ayarla
+            var timeoutMs uint32
+            if timeout < 0 {
+                timeoutMs = INFINITE
+            } else {
+                timeoutMs = uint32(timeout)
+            }
+            
+            // Olayları topla
+            var events []Event
+            var numEvents int
+            
+            for numEvents < p.maxEvents {
+                var bytes uint32
+                var key uintptr
+                var overlapped *OVERLAPPED
+                
+                // GetQueuedCompletionStatus çağrısı
+                err := syscall.GetQueuedCompletionStatus(p.iocp, &bytes, &key, &overlapped, timeoutMs)
+                
+                // İlk çağrı için tam timeout kullan, sonraki çağrılar için 0 (non-blocking)
+                timeoutMs = 0
+                
+                // Hata kontrolü
+                if err != nil && overlapped == nil {
+                    // Zaman aşımı
+                    break
+                }
+                
+                if overlapped != nil {
+                    // Olay oluştur
+                    event := Event{
+                        FD:    overlapped.FD,
+                        ID:    overlapped.FD,
+                        Type:  overlapped.EventType,
+                        Data:  nil,
+                        Error: err,
+                    }
+                    
+                    // Olayı listeye ekle
+                    events = append(events, event)
+                    numEvents++
+                } else {
+                    // Kuyrukta başka olay yok
+                    break
+                }
+            }
+            
+            waitTime := time.Since(startTime)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&p.stats.TotalWakeups, 1)
+            atomic.AddInt64((*int64)(&p.stats.TotalWaitTime), int64(waitTime))
+            
+            // Ortalama bekleme süresini güncelle
+            totalWakeups := atomic.LoadUint64(&p.stats.TotalWakeups)
+            if totalWakeups > 0 {
+                p.stats.AverageWaitTime = time.Duration(int64(p.stats.TotalWaitTime) / int64(totalWakeups))
+            }
+            
+            // Zaman aşımı kontrolü
+            if numEvents == 0 {
+                atomic.AddUint64(&p.stats.TotalTimeouts, 1)
+                return nil, nil
+            }
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&p.stats.TotalEvents, uint64(numEvents))
+            
+            // Ortalama olay sayısını güncelle
+            if totalWakeups > 0 {
+                p.stats.AverageEventsPerWakeup = float64(atomic.LoadUint64(&p.stats.TotalEvents)) / float64(totalWakeups)
+            }
+            
+            // Maksimum olay sayısını güncelle
+            if uint64(numEvents) > atomic.LoadUint64(&p.stats.MaxEventsPerWakeup) {
+                atomic.StoreUint64(&p.stats.MaxEventsPerWakeup, uint64(numEvents))
+            }
+            
+            return events, nil
+        }
+        
+        // Close, IOCP'yi kapatır.
+        func (p *OptimizedIOCPPoller) Close() error {
+            if p.closed {
+                return errors.New("iocp: zaten kapalı")
+            }
+            
+            p.closed = true
+            
+            return syscall.CloseHandle(syscall.Handle(p.iocp))
+        }
+        
+        // GetStats, poller istatistiklerini döndürür.
+        func (p *OptimizedIOCPPoller) GetStats() MultiplexerStats {
+            return MultiplexerStats{
+                TotalEvents:          atomic.LoadUint64(&p.stats.TotalEvents),
+                TotalWakeups:         atomic.LoadUint64(&p.stats.TotalWakeups),
+                TotalTimeouts:        atomic.LoadUint64(&p.stats.TotalTimeouts),
+                AverageEventsPerWakeup: p.stats.AverageEventsPerWakeup,
+                MaxEventsPerWakeup:   atomic.LoadUint64(&p.stats.MaxEventsPerWakeup),
+                TotalWaitTime:        p.stats.TotalWaitTime,
+                AverageWaitTime:      p.stats.AverageWaitTime,
+            }
+        }
+}
+
+// newOptimizedIOCPPoller, yeni bir OptimizedIOCPPoller oluşturur.
+func newOptimizedIOCPPoller(options MultiplexerOptions) (IOMultiplexer, error) {
+    return OptimizedIOCPPoller.New(options)
+}

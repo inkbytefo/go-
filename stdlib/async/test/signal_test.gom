@@ -1,0 +1,276 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Signal Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "os"
+    "syscall"
+    "sync"
+)
+
+// TestAsyncSignalBasic, AsyncSignal için temel testler içerir.
+func TestAsyncSignalBasic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncSignal oluştur
+    sig := async.AsyncSignal.New(loop)
+    
+    // Signal başlat
+    err = sig.Start()
+    if err != nil {
+        t.Fatalf("AsyncSignal başlatma hatası: %v", err)
+    }
+    
+    // Signal'ı tekrar başlat (hata vermeli)
+    err = sig.Start()
+    if err == nil {
+        t.Error("AsyncSignal iki kez başlatılabildi, hata bekleniyor")
+    }
+    
+    // Signal'ı durdur
+    err = sig.Stop()
+    if err != nil {
+        t.Fatalf("AsyncSignal durdurma hatası: %v", err)
+    }
+    
+    // Signal'ı tekrar durdur (hata vermeli)
+    err = sig.Stop()
+    if err == nil {
+        t.Error("AsyncSignal iki kez durdurulabildi, hata bekleniyor")
+    }
+}
+
+// TestAsyncSignalAddRemoveHandler, AsyncSignal.AddHandler ve RemoveHandler metodlarını test eder.
+func TestAsyncSignalAddRemoveHandler(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // AsyncSignal oluştur
+    sig := async.AsyncSignal.New(loop)
+    
+    // Signal başlat
+    err = sig.Start()
+    if err != nil {
+        t.Fatalf("AsyncSignal başlatma hatası: %v", err)
+    }
+    defer sig.Stop()
+    
+    // Handler çağrıldı mı kontrol etmek için değişken
+    var handlerCalled bool
+    var handlerMutex sync.Mutex
+    
+    // Handler fonksiyonu
+    handler := func(s async.Signal) {
+        handlerMutex.Lock()
+        defer handlerMutex.Unlock()
+        handlerCalled = true
+    }
+    
+    // Handler ekle
+    sig.AddHandler(async.SIGUSR1, handler)
+    
+    // Handler'ı kaldır
+    sig.RemoveHandler(async.SIGUSR1)
+    
+    // Sinyal gönder
+    err = async.SendSignal(os.Getpid(), async.SIGUSR1)
+    if err != nil {
+        // Windows'ta desteklenmiyorsa testi atla
+        if err.Error() == "async: Windows'ta sinyal gönderme henüz desteklenmiyor" {
+            t.Skip("Windows'ta sinyal gönderme desteklenmiyor")
+        }
+        t.Fatalf("SendSignal hatası: %v", err)
+    }
+    
+    // Handler'ın çağrılmaması için kısa bir süre bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // Handler çağrılmadı mı kontrol et
+    handlerMutex.Lock()
+    if handlerCalled {
+        t.Error("Handler kaldırılmasına rağmen çağrıldı")
+    }
+    handlerMutex.Unlock()
+}
+
+// TestWaitForSignal, WaitForSignal fonksiyonunu test eder.
+func TestWaitForSignal(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // WaitForSignal çağır
+    future := async.WaitForSignal(loop, async.SIGUSR1)
+    
+    // Sinyal gönder
+    err = async.SendSignal(os.Getpid(), async.SIGUSR1)
+    if err != nil {
+        // Windows'ta desteklenmiyorsa testi atla
+        if err.Error() == "async: Windows'ta sinyal gönderme henüz desteklenmiyor" {
+            t.Skip("Windows'ta sinyal gönderme desteklenmiyor")
+        }
+        t.Fatalf("SendSignal hatası: %v", err)
+    }
+    
+    // Sonucu kontrol et
+    signal, err := future.Get()
+    if err != nil {
+        t.Errorf("WaitForSignal hatası: %v", err)
+    }
+    
+    if signal != async.SIGUSR1 {
+        t.Errorf("Beklenen sinyal SIGUSR1, alınan: %v", signal)
+    }
+}
+
+// TestWaitForAnySignal, WaitForAnySignal fonksiyonunu test eder.
+func TestWaitForAnySignal(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // WaitForAnySignal çağır
+    signals := []async.Signal{async.SIGUSR1, async.SIGUSR2}
+    future := async.WaitForAnySignal(loop, signals)
+    
+    // Sinyal gönder
+    err = async.SendSignal(os.Getpid(), async.SIGUSR2)
+    if err != nil {
+        // Windows'ta desteklenmiyorsa testi atla
+        if err.Error() == "async: Windows'ta sinyal gönderme henüz desteklenmiyor" {
+            t.Skip("Windows'ta sinyal gönderme desteklenmiyor")
+        }
+        t.Fatalf("SendSignal hatası: %v", err)
+    }
+    
+    // Sonucu kontrol et
+    signal, err := future.Get()
+    if err != nil {
+        t.Errorf("WaitForAnySignal hatası: %v", err)
+    }
+    
+    if signal != async.SIGUSR2 {
+        t.Errorf("Beklenen sinyal SIGUSR2, alınan: %v", signal)
+    }
+}
+
+// TestOnSignal, OnSignal fonksiyonunu test eder.
+func TestOnSignal(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Handler çağrıldı mı kontrol etmek için değişken
+    var handlerCalled bool
+    var handlerMutex sync.Mutex
+    
+    // OnSignal çağır
+    cancel := async.OnSignal(loop, async.SIGUSR1, func(s async.Signal) {
+        handlerMutex.Lock()
+        defer handlerMutex.Unlock()
+        handlerCalled = true
+    })
+    
+    // Sinyal gönder
+    err = async.SendSignal(os.Getpid(), async.SIGUSR1)
+    if err != nil {
+        // Windows'ta desteklenmiyorsa testi atla
+        if err.Error() == "async: Windows'ta sinyal gönderme henüz desteklenmiyor" {
+            t.Skip("Windows'ta sinyal gönderme desteklenmiyor")
+        }
+        t.Fatalf("SendSignal hatası: %v", err)
+    }
+    
+    // Handler'ın çağrılması için kısa bir süre bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // Handler çağrıldı mı kontrol et
+    handlerMutex.Lock()
+    if !handlerCalled {
+        t.Error("Handler çağrılmadı")
+    }
+    handlerMutex.Unlock()
+    
+    // Handler'ı sıfırla
+    handlerMutex.Lock()
+    handlerCalled = false
+    handlerMutex.Unlock()
+    
+    // Handler'ı iptal et
+    cancel()
+    
+    // Sinyal tekrar gönder
+    err = async.SendSignal(os.Getpid(), async.SIGUSR1)
+    if err != nil {
+        t.Fatalf("SendSignal hatası: %v", err)
+    }
+    
+    // Handler'ın çağrılmaması için kısa bir süre bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // Handler çağrılmadı mı kontrol et
+    handlerMutex.Lock()
+    if handlerCalled {
+        t.Error("Handler iptal edilmesine rağmen çağrıldı")
+    }
+    handlerMutex.Unlock()
+}
+
+// TestIgnoreResetSignal, IgnoreSignal ve ResetSignal fonksiyonlarını test eder.
+func TestIgnoreResetSignal(t *testing.T) {
+    // Sinyali görmezden gel
+    async.IgnoreSignal(async.SIGUSR1)
+    
+    // Sinyali sıfırla
+    async.ResetSignal(async.SIGUSR1)
+}

@@ -1,0 +1,248 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Profiler
+package async
+
+import (
+    "os"
+    "runtime/pprof"
+    "time"
+    "fmt"
+    "sync/atomic"
+)
+
+// ProfilerMode, profilleme modunu belirtir.
+type ProfilerMode int
+
+const (
+    // CPUProfile, CPU profilleme modunu belirtir.
+    CPUProfile ProfilerMode = iota
+    
+    // MemProfile, bellek profilleme modunu belirtir.
+    MemProfile
+    
+    // BlockProfile, bloklanma profilleme modunu belirtir.
+    BlockProfile
+    
+    // GoroutineProfile, goroutine profilleme modunu belirtir.
+    GoroutineProfile
+)
+
+// Profiler, performans profilleme için kullanılan bir sınıftır.
+class Profiler {
+    private:
+        var cpuFile *os.File
+        var memFile *os.File
+        var blockFile *os.File
+        var goroutineFile *os.File
+        var isRunning bool
+        var sampleRate int
+        var enabled uint32
+    
+    public:
+        // New, yeni bir Profiler oluşturur.
+        static func New() *Profiler {
+            p := new Profiler()
+            p.isRunning = false
+            p.sampleRate = 100 // Varsayılan örnekleme oranı
+            atomic.StoreUint32(&p.enabled, 0)
+            
+            return p
+        }
+        
+        // Start, profillemeyi başlatır.
+        func (p *Profiler) Start(mode ProfilerMode, filename string) error {
+            if p.isRunning {
+                return fmt.Errorf("profiler: profilleme zaten çalışıyor")
+            }
+            
+            var err error
+            
+            switch mode {
+            case CPUProfile:
+                p.cpuFile, err = os.Create(filename)
+                if err != nil {
+                    return fmt.Errorf("profiler: CPU profil dosyası oluşturulamadı: %v", err)
+                }
+                
+                err = pprof.StartCPUProfile(p.cpuFile)
+                if err != nil {
+                    p.cpuFile.Close()
+                    return fmt.Errorf("profiler: CPU profilleme başlatılamadı: %v", err)
+                }
+                
+            case MemProfile:
+                p.memFile, err = os.Create(filename)
+                if err != nil {
+                    return fmt.Errorf("profiler: bellek profil dosyası oluşturulamadı: %v", err)
+                }
+                
+            case BlockProfile:
+                p.blockFile, err = os.Create(filename)
+                if err != nil {
+                    return fmt.Errorf("profiler: bloklanma profil dosyası oluşturulamadı: %v", err)
+                }
+                
+            case GoroutineProfile:
+                p.goroutineFile, err = os.Create(filename)
+                if err != nil {
+                    return fmt.Errorf("profiler: goroutine profil dosyası oluşturulamadı: %v", err)
+                }
+            }
+            
+            p.isRunning = true
+            atomic.StoreUint32(&p.enabled, 1)
+            
+            return nil
+        }
+        
+        // Stop, profillemeyi durdurur.
+        func (p *Profiler) Stop(mode ProfilerMode) error {
+            if !p.isRunning {
+                return fmt.Errorf("profiler: profilleme çalışmıyor")
+            }
+            
+            switch mode {
+            case CPUProfile:
+                pprof.StopCPUProfile()
+                if p.cpuFile != nil {
+                    p.cpuFile.Close()
+                    p.cpuFile = nil
+                }
+                
+            case MemProfile:
+                if p.memFile != nil {
+                    pprof.WriteHeapProfile(p.memFile)
+                    p.memFile.Close()
+                    p.memFile = nil
+                }
+                
+            case BlockProfile:
+                if p.blockFile != nil {
+                    pprof.Lookup("block").WriteTo(p.blockFile, 0)
+                    p.blockFile.Close()
+                    p.blockFile = nil
+                }
+                
+            case GoroutineProfile:
+                if p.goroutineFile != nil {
+                    pprof.Lookup("goroutine").WriteTo(p.goroutineFile, 0)
+                    p.goroutineFile.Close()
+                    p.goroutineFile = nil
+                }
+            }
+            
+            p.isRunning = false
+            atomic.StoreUint32(&p.enabled, 0)
+            
+            return nil
+        }
+        
+        // SetSampleRate, örnekleme oranını ayarlar.
+        func (p *Profiler) SetSampleRate(rate int) {
+            p.sampleRate = rate
+        }
+        
+        // IsEnabled, profillemenin etkin olup olmadığını kontrol eder.
+        func (p *Profiler) IsEnabled() bool {
+            return atomic.LoadUint32(&p.enabled) == 1
+        }
+        
+        // StartOperation, bir operasyonun başlangıcını işaretler.
+        // Bu metot, operasyonun ne kadar sürdüğünü ölçmek için kullanılır.
+        func (p *Profiler) StartOperation(name string) *Operation {
+            if !p.IsEnabled() {
+                return nil
+            }
+            
+            op := new Operation()
+            op.name = name
+            op.startTime = time.Now()
+            op.profiler = p
+            
+            return op
+        }
+}
+
+// Operation, bir operasyonun süresini ölçmek için kullanılan bir sınıftır.
+class Operation {
+    private:
+        var name string
+        var startTime time.Time
+        var profiler *Profiler
+    
+    public:
+        // End, operasyonun sonunu işaretler ve süresini döndürür.
+        func (op *Operation) End() time.Duration {
+            if op == nil {
+                return 0
+            }
+            
+            duration := time.Since(op.startTime)
+            
+            // Burada operasyon süresi kaydedilebilir veya raporlanabilir
+            
+            return duration
+        }
+}
+
+// GlobalProfiler, global bir profiler örneğidir.
+var GlobalProfiler = Profiler.New()
+
+// StartCPUProfile, CPU profillemeyi başlatır.
+func StartCPUProfile(filename string) error {
+    return GlobalProfiler.Start(CPUProfile, filename)
+}
+
+// StopCPUProfile, CPU profillemeyi durdurur.
+func StopCPUProfile() error {
+    return GlobalProfiler.Stop(CPUProfile)
+}
+
+// StartMemProfile, bellek profillemeyi başlatır.
+func StartMemProfile(filename string) error {
+    return GlobalProfiler.Start(MemProfile, filename)
+}
+
+// StopMemProfile, bellek profillemeyi durdurur.
+func StopMemProfile() error {
+    return GlobalProfiler.Stop(MemProfile)
+}
+
+// StartBlockProfile, bloklanma profillemeyi başlatır.
+func StartBlockProfile(filename string) error {
+    return GlobalProfiler.Start(BlockProfile, filename)
+}
+
+// StopBlockProfile, bloklanma profillemeyi durdurur.
+func StopBlockProfile() error {
+    return GlobalProfiler.Stop(BlockProfile)
+}
+
+// StartGoroutineProfile, goroutine profillemeyi başlatır.
+func StartGoroutineProfile(filename string) error {
+    return GlobalProfiler.Start(GoroutineProfile, filename)
+}
+
+// StopGoroutineProfile, goroutine profillemeyi durdurur.
+func StopGoroutineProfile() error {
+    return GlobalProfiler.Stop(GoroutineProfile)
+}
+
+// StartOperation, bir operasyonun başlangıcını işaretler.
+func StartOperation(name string) *Operation {
+    return GlobalProfiler.StartOperation(name)
+}
+
+// EnableProfiling, profillemeyi etkinleştirir.
+func EnableProfiling() {
+    atomic.StoreUint32(&GlobalProfiler.enabled, 1)
+}
+
+// DisableProfiling, profillemeyi devre dışı bırakır.
+func DisableProfiling() {
+    atomic.StoreUint32(&GlobalProfiler.enabled, 0)
+}
+
+// IsProfilingEnabled, profillemenin etkin olup olmadığını kontrol eder.
+func IsProfilingEnabled() bool {
+    return GlobalProfiler.IsEnabled()
+}

@@ -1,0 +1,735 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Buffer Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "bytes"
+    "math/rand"
+)
+
+// TestBufferPoolBasic, BufferPool için temel testler içerir.
+func TestBufferPoolBasic(t *testing.T) {
+    // BufferPool oluştur
+    pool := async.BufferPool.New()
+    
+    // Farklı boyutlarda tamponlar al
+    sizes := []int{32, 64, 128, 256, 512, 1024, 2048, 4096, 8192}
+    
+    for _, size := range sizes {
+        // Tampon al
+        buffer := pool.Get(size)
+        
+        // Tampon boyutunu kontrol et
+        if len(buffer) != size {
+            t.Errorf("Beklenen tampon boyutu %d, alınan: %d", size, len(buffer))
+        }
+        
+        // Tampon kapasitesini kontrol et (en küçük 2^n >= size)
+        expectedCap := size
+        if cap(buffer) < expectedCap {
+            t.Errorf("Beklenen tampon kapasitesi en az %d, alınan: %d", expectedCap, cap(buffer))
+        }
+        
+        // Tamponu havuza geri koy
+        pool.Put(buffer)
+    }
+    
+    // İstatistikleri kontrol et
+    stats := pool.GetStats()
+    
+    if stats["gets"] != uint64(len(sizes)) {
+        t.Errorf("Beklenen get sayısı %d, alınan: %d", len(sizes), stats["gets"])
+    }
+    
+    if stats["puts"] != uint64(len(sizes)) {
+        t.Errorf("Beklenen put sayısı %d, alınan: %d", len(sizes), stats["puts"])
+    }
+    
+    // İstatistikleri sıfırla
+    pool.ResetStats()
+    
+    // İstatistiklerin sıfırlandığını kontrol et
+    stats = pool.GetStats()
+    
+    if stats["gets"] != 0 || stats["puts"] != 0 || stats["misses"] != 0 || stats["allocs"] != 0 {
+        t.Errorf("İstatistikler sıfırlanmadı: %v", stats)
+    }
+}
+
+// TestBufferPoolReuse, BufferPool'un tamponları yeniden kullanmasını test eder.
+func TestBufferPoolReuse(t *testing.T) {
+    // BufferPool oluştur
+    pool := async.BufferPool.New()
+    
+    // İstatistikleri sıfırla
+    pool.ResetStats()
+    
+    // Tampon al
+    buffer1 := pool.Get(1024)
+    
+    // Tamponu doldur
+    for i := 0; i < len(buffer1); i++ {
+        buffer1[i] = byte(i % 256)
+    }
+    
+    // Tamponu havuza geri koy
+    pool.Put(buffer1)
+    
+    // Aynı boyutta başka bir tampon al
+    buffer2 := pool.Get(1024)
+    
+    // İstatistikleri kontrol et
+    stats := pool.GetStats()
+    
+    // İki get, bir put olmalı
+    if stats["gets"] != 2 {
+        t.Errorf("Beklenen get sayısı 2, alınan: %d", stats["gets"])
+    }
+    
+    if stats["puts"] != 1 {
+        t.Errorf("Beklenen put sayısı 1, alınan: %d", stats["puts"])
+    }
+    
+    // İkinci tampon, ilk tamponun yeniden kullanılmış hali olmalı
+    // Bu durumda yeni bir tahsis yapılmamalı
+    if stats["allocs"] > 1 {
+        t.Errorf("Beklenen tahsis sayısı en fazla 1, alınan: %d", stats["allocs"])
+    }
+    
+    // Tampon kapasitelerini kontrol et
+    if cap(buffer2) != cap(buffer1) {
+        t.Errorf("Tampon kapasiteleri eşleşmiyor: %d != %d", cap(buffer2), cap(buffer1))
+    }
+}
+
+// TestBufferPoolSizes, BufferPool'un farklı boyutlardaki tamponları doğru şekilde yönetmesini test eder.
+func TestBufferPoolSizes(t *testing.T) {
+    // BufferPool oluştur
+    pool := async.BufferPool.New()
+    
+    // İstatistikleri sıfırla
+    pool.ResetStats()
+    
+    // Çok küçük bir tampon al (havuzda olmayan bir boyut)
+    tinyBuffer := pool.Get(1)
+    
+    // Çok büyük bir tampon al (havuzda olmayan bir boyut)
+    hugeBuffer := pool.Get(32 * 1024 * 1024) // 32MB
+    
+    // Tamponları havuza geri koy
+    pool.Put(tinyBuffer)
+    pool.Put(hugeBuffer)
+    
+    // İstatistikleri kontrol et
+    stats := pool.GetStats()
+    
+    // İki get, iki put ve iki miss olmalı
+    if stats["gets"] != 2 {
+        t.Errorf("Beklenen get sayısı 2, alınan: %d", stats["gets"])
+    }
+    
+    if stats["puts"] != 2 {
+        t.Errorf("Beklenen put sayısı 2, alınan: %d", stats["puts"])
+    }
+    
+    // Havuzda olmayan boyutlar için miss olmalı
+    if stats["misses"] != 2 {
+        t.Errorf("Beklenen miss sayısı 2, alınan: %d", stats["misses"])
+    }
+    
+    // İki yeni tahsis yapılmalı
+    if stats["allocs"] != 2 {
+        t.Errorf("Beklenen tahsis sayısı 2, alınan: %d", stats["allocs"])
+    }
+}
+
+// TestBufferBasic, Buffer için temel testler içerir.
+func TestBufferBasic(t *testing.T) {
+    // Buffer oluştur
+    buffer := async.Buffer.New(1024)
+    
+    // Buffer boyutunu kontrol et
+    if buffer.Len() != 1024 {
+        t.Errorf("Beklenen buffer boyutu 1024, alınan: %d", buffer.Len())
+    }
+    
+    // Buffer kapasitesini kontrol et
+    if buffer.Cap() < 1024 {
+        t.Errorf("Beklenen buffer kapasitesi en az 1024, alınan: %d", buffer.Cap())
+    }
+    
+    // Buffer'ı doldur
+    data := buffer.Bytes()
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    // Buffer'ı sıfırla
+    buffer.Reset()
+    
+    // Buffer boyutunu kontrol et
+    if buffer.Len() != 0 {
+        t.Errorf("Beklenen buffer boyutu 0, alınan: %d", buffer.Len())
+    }
+    
+    // Buffer kapasitesini kontrol et
+    if buffer.Cap() < 1024 {
+        t.Errorf("Beklenen buffer kapasitesi en az 1024, alınan: %d", buffer.Cap())
+    }
+    
+    // Buffer'ı serbest bırak
+    buffer.Release()
+}
+
+// TestBufferResize, Buffer.Resize metodunu test eder.
+func TestBufferResize(t *testing.T) {
+    // Buffer oluştur
+    buffer := async.Buffer.New(1024)
+    
+    // Buffer'ı doldur
+    data := buffer.Bytes()
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    // Orijinal kapasiteyi kaydet
+    originalCap := buffer.Cap()
+    
+    // Buffer'ı küçült
+    buffer.Resize(512)
+    
+    // Buffer boyutunu kontrol et
+    if buffer.Len() != 512 {
+        t.Errorf("Beklenen buffer boyutu 512, alınan: %d", buffer.Len())
+    }
+    
+    // Buffer kapasitesini kontrol et (değişmemeli)
+    if buffer.Cap() != originalCap {
+        t.Errorf("Beklenen buffer kapasitesi %d, alınan: %d", originalCap, buffer.Cap())
+    }
+    
+    // İlk 512 byte'ın korunduğunu kontrol et
+    data = buffer.Bytes()
+    for i := 0; i < len(data); i++ {
+        if data[i] != byte(i % 256) {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, byte(i % 256), data[i])
+            break
+        }
+    }
+    
+    // Buffer'ı büyüt (kapasiteden büyük)
+    buffer.Resize(2048)
+    
+    // Buffer boyutunu kontrol et
+    if buffer.Len() != 2048 {
+        t.Errorf("Beklenen buffer boyutu 2048, alınan: %d", buffer.Len())
+    }
+    
+    // İlk 512 byte'ın korunduğunu kontrol et
+    data = buffer.Bytes()
+    for i := 0; i < 512; i++ {
+        if data[i] != byte(i % 256) {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, byte(i % 256), data[i])
+            break
+        }
+    }
+    
+    // Buffer'ı serbest bırak
+    buffer.Release()
+}
+
+// TestBufferedReaderBasic, BufferedReader için temel testler içerir.
+func TestBufferedReaderBasic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test verileri
+    testData := make([]byte, 16384) // 16KB
+    for i := 0; i < len(testData); i++ {
+        testData[i] = byte(i % 256)
+    }
+    
+    // MockReader oluştur
+    reader := new MockReader(testData)
+    
+    // BufferedReader oluştur
+    bufferedReader := async.BufferedReader.NewWithSize(reader, loop, 4096) // 4KB tampon
+    
+    // Küçük okuma
+    buffer := make([]byte, 1024)
+    n, err := bufferedReader.Read(buffer).Get()
+    if err != nil {
+        t.Errorf("BufferedReader.Read hatası: %v", err)
+    }
+    
+    if n != 1024 {
+        t.Errorf("Beklenen okunan byte sayısı 1024, alınan: %d", n)
+    }
+    
+    // Okunan verileri kontrol et
+    for i := 0; i < n; i++ {
+        if buffer[i] != testData[i] {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, testData[i], buffer[i])
+            break
+        }
+    }
+    
+    // Büyük okuma (tampon boyutundan büyük)
+    largeBuffer := make([]byte, 8192)
+    n, err = bufferedReader.Read(largeBuffer).Get()
+    if err != nil {
+        t.Errorf("BufferedReader.Read (büyük) hatası: %v", err)
+    }
+    
+    if n != 8192 {
+        t.Errorf("Beklenen okunan byte sayısı 8192, alınan: %d", n)
+    }
+    
+    // Okunan verileri kontrol et
+    for i := 0; i < n; i++ {
+        expectedByte := testData[i+1024]
+        if largeBuffer[i] != expectedByte {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, expectedByte, largeBuffer[i])
+            break
+        }
+    }
+    
+    // BufferedReader'ı kapat
+    closeErr, err := bufferedReader.Close().Get()
+    if err != nil {
+        t.Errorf("BufferedReader.Close hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("BufferedReader kapatma hatası: %v", closeErr)
+    }
+}
+
+// TestBufferedReaderReadByte, BufferedReader.ReadByte metodunu test eder.
+func TestBufferedReaderReadByte(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test verileri
+    testData := []byte{1, 2, 3, 4, 5}
+    
+    // MockReader oluştur
+    reader := new MockReader(testData)
+    
+    // BufferedReader oluştur
+    bufferedReader := async.BufferedReader.New(reader, loop)
+    
+    // Byte'ları tek tek oku
+    for i := 0; i < len(testData); i++ {
+        b, err := bufferedReader.ReadByte().Get()
+        if err != nil {
+            t.Errorf("BufferedReader.ReadByte hatası: %v", err)
+        }
+        
+        if b != testData[i] {
+            t.Errorf("Beklenen byte %d, alınan: %d", testData[i], b)
+        }
+    }
+    
+    // Tüm veriler okunduktan sonra EOF bekleniyor
+    _, err = bufferedReader.ReadByte().Get()
+    if err != async.ErrEOF {
+        t.Errorf("EOF hatası bekleniyor, alınan: %v", err)
+    }
+    
+    // BufferedReader'ı kapat
+    bufferedReader.Close().Get()
+}
+
+// TestBufferedReaderReadFull, BufferedReader.ReadFull metodunu test eder.
+func TestBufferedReaderReadFull(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Test verileri
+    testData := make([]byte, 8192)
+    for i := 0; i < len(testData); i++ {
+        testData[i] = byte(i % 256)
+    }
+    
+    // MockReader oluştur
+    reader := new MockReader(testData)
+    
+    // BufferedReader oluştur
+    bufferedReader := async.BufferedReader.NewWithSize(reader, loop, 1024) // 1KB tampon
+    
+    // Tampon boyutundan büyük okuma
+    buffer := make([]byte, 4096)
+    n, err := bufferedReader.ReadFull(buffer).Get()
+    if err != nil {
+        t.Errorf("BufferedReader.ReadFull hatası: %v", err)
+    }
+    
+    if n != 4096 {
+        t.Errorf("Beklenen okunan byte sayısı 4096, alınan: %d", n)
+    }
+    
+    // Okunan verileri kontrol et
+    for i := 0; i < n; i++ {
+        if buffer[i] != testData[i] {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, testData[i], buffer[i])
+            break
+        }
+    }
+    
+    // Kalan verileri oku
+    buffer = make([]byte, 4096)
+    n, err = bufferedReader.ReadFull(buffer).Get()
+    if err != nil {
+        t.Errorf("BufferedReader.ReadFull (kalan) hatası: %v", err)
+    }
+    
+    if n != 4096 {
+        t.Errorf("Beklenen okunan byte sayısı 4096, alınan: %d", n)
+    }
+    
+    // Okunan verileri kontrol et
+    for i := 0; i < n; i++ {
+        expectedByte := testData[i+4096]
+        if buffer[i] != expectedByte {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, expectedByte, buffer[i])
+            break
+        }
+    }
+    
+    // Tüm veriler okunduktan sonra EOF bekleniyor
+    buffer = make([]byte, 1)
+    _, err = bufferedReader.ReadFull(buffer).Get()
+    if err != async.ErrEOF {
+        t.Errorf("EOF hatası bekleniyor, alınan: %v", err)
+    }
+    
+    // BufferedReader'ı kapat
+    bufferedReader.Close().Get()
+}
+
+// TestBufferedWriterBasic, BufferedWriter için temel testler içerir.
+func TestBufferedWriterBasic(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // MockWriter oluştur
+    writer := new MockWriter()
+    
+    // BufferedWriter oluştur
+    bufferedWriter := async.BufferedWriter.NewWithSize(writer, loop, 4096) // 4KB tampon
+    
+    // Küçük yazma
+    data := make([]byte, 1024)
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    n, err := bufferedWriter.Write(data).Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Write hatası: %v", err)
+    }
+    
+    if n != 1024 {
+        t.Errorf("Beklenen yazılan byte sayısı 1024, alınan: %d", n)
+    }
+    
+    // Henüz flush yapılmadı, altta yatan writer'a yazılmamalı
+    if len(writer.data) > 0 {
+        t.Errorf("Altta yatan writer'a veri yazılmamalıydı, yazılan: %d byte", len(writer.data))
+    }
+    
+    // Flush
+    err = bufferedWriter.Flush().Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Flush hatası: %v", err)
+    }
+    
+    // Altta yatan writer'a yazılan verileri kontrol et
+    if len(writer.data) != 1024 {
+        t.Errorf("Beklenen yazılan byte sayısı 1024, alınan: %d", len(writer.data))
+    }
+    
+    for i := 0; i < len(data); i++ {
+        if writer.data[i] != data[i] {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, data[i], writer.data[i])
+            break
+        }
+    }
+    
+    // Büyük yazma (tampon boyutundan büyük)
+    largeData := make([]byte, 8192)
+    for i := 0; i < len(largeData); i++ {
+        largeData[i] = byte((i + 1000) % 256)
+    }
+    
+    // Writer'ı temizle
+    writer.data = nil
+    
+    n, err = bufferedWriter.Write(largeData).Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Write (büyük) hatası: %v", err)
+    }
+    
+    if n != 8192 {
+        t.Errorf("Beklenen yazılan byte sayısı 8192, alınan: %d", n)
+    }
+    
+    // Büyük veri doğrudan yazılmalı
+    if len(writer.data) != 8192 {
+        t.Errorf("Beklenen yazılan byte sayısı 8192, alınan: %d", len(writer.data))
+    }
+    
+    for i := 0; i < len(largeData); i++ {
+        if writer.data[i] != largeData[i] {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, largeData[i], writer.data[i])
+            break
+        }
+    }
+    
+    // BufferedWriter'ı kapat
+    closeErr, err := bufferedWriter.Close().Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Close hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("BufferedWriter kapatma hatası: %v", closeErr)
+    }
+}
+
+// TestBufferedWriterWriteByte, BufferedWriter.WriteByte metodunu test eder.
+func TestBufferedWriterWriteByte(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // MockWriter oluştur
+    writer := new MockWriter()
+    
+    // BufferedWriter oluştur
+    bufferedWriter := async.BufferedWriter.New(writer, loop)
+    
+    // Byte'ları tek tek yaz
+    testData := []byte{1, 2, 3, 4, 5}
+    
+    for _, b := range testData {
+        success, err := bufferedWriter.WriteByte(b).Get()
+        if err != nil {
+            t.Errorf("BufferedWriter.WriteByte hatası: %v", err)
+        }
+        
+        if !success {
+            t.Error("BufferedWriter.WriteByte başarısız oldu")
+        }
+    }
+    
+    // Henüz flush yapılmadı, altta yatan writer'a yazılmamalı
+    if len(writer.data) > 0 {
+        t.Errorf("Altta yatan writer'a veri yazılmamalıydı, yazılan: %d byte", len(writer.data))
+    }
+    
+    // Flush
+    err = bufferedWriter.Flush().Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Flush hatası: %v", err)
+    }
+    
+    // Altta yatan writer'a yazılan verileri kontrol et
+    if len(writer.data) != len(testData) {
+        t.Errorf("Beklenen yazılan byte sayısı %d, alınan: %d", len(testData), len(writer.data))
+    }
+    
+    for i := 0; i < len(testData); i++ {
+        if writer.data[i] != testData[i] {
+            t.Errorf("Veri bozulmuş: indeks %d, beklenen %d, alınan %d", i, testData[i], writer.data[i])
+            break
+        }
+    }
+    
+    // BufferedWriter'ı kapat
+    bufferedWriter.Close().Get()
+}
+
+// TestBufferedWriterFlush, BufferedWriter.Flush metodunu test eder.
+func TestBufferedWriterFlush(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // MockWriter oluştur
+    writer := new MockWriter()
+    
+    // BufferedWriter oluştur
+    bufferedWriter := async.BufferedWriter.NewWithSize(writer, loop, 4096) // 4KB tampon
+    
+    // Boş flush
+    err = bufferedWriter.Flush().Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Flush (boş) hatası: %v", err)
+    }
+    
+    // Veri yaz
+    data := make([]byte, 2048)
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    n, err := bufferedWriter.Write(data).Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Write hatası: %v", err)
+    }
+    
+    if n != 2048 {
+        t.Errorf("Beklenen yazılan byte sayısı 2048, alınan: %d", n)
+    }
+    
+    // Flush
+    err = bufferedWriter.Flush().Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Flush hatası: %v", err)
+    }
+    
+    // Altta yatan writer'a yazılan verileri kontrol et
+    if len(writer.data) != 2048 {
+        t.Errorf("Beklenen yazılan byte sayısı 2048, alınan: %d", len(writer.data))
+    }
+    
+    // Tekrar flush (boş olmalı)
+    err = bufferedWriter.Flush().Get()
+    if err != nil {
+        t.Errorf("BufferedWriter.Flush (tekrar) hatası: %v", err)
+    }
+    
+    // BufferedWriter'ı kapat
+    bufferedWriter.Close().Get()
+}
+
+// MockReader, AsyncReader arayüzünü implemente eden bir test sınıfıdır.
+class MockReader {
+    var data []byte
+    var position int
+    
+    func new(data []byte) *MockReader {
+        reader := new MockReader()
+        reader.data = data
+        reader.position = 0
+        return reader
+    }
+    
+    func (r *MockReader) Read(p []byte) *async.AsyncFuture<int> {
+        // EventLoop oluştur (test için)
+        loop, _ := async.EventLoop.New()
+        loop.Start()
+        defer loop.Stop()
+        
+        promise, future := async.AsyncPromise.New<int>(loop)
+        
+        // Tüm veriler okunduysa EOF
+        if r.position >= len(r.data) {
+            promise.Complete(0)
+            return future
+        }
+        
+        // Okunacak veri miktarını hesapla
+        remaining := len(r.data) - r.position
+        n := len(p)
+        if n > remaining {
+            n = remaining
+        }
+        
+        // Veriyi kopyala
+        copy(p, r.data[r.position:r.position+n])
+        r.position += n
+        
+        promise.Complete(n)
+        return future
+    }
+}
+
+// MockWriter, AsyncWriter arayüzünü implemente eden bir test sınıfıdır.
+class MockWriter {
+    var data []byte
+    
+    func (w *MockWriter) Write(p []byte) *async.AsyncFuture<int> {
+        // EventLoop oluştur (test için)
+        loop, _ := async.EventLoop.New()
+        loop.Start()
+        defer loop.Stop()
+        
+        promise, future := async.AsyncPromise.New<int>(loop)
+        
+        // Veriyi kopyala
+        if w.data == nil {
+            w.data = make([]byte, len(p))
+        } else {
+            oldData := w.data
+            w.data = make([]byte, len(oldData) + len(p))
+            copy(w.data, oldData)
+            copy(w.data[len(oldData):], p)
+        }
+        
+        promise.Complete(len(p))
+        return future
+    }
+}

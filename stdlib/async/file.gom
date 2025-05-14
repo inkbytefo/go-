@@ -1,0 +1,444 @@
+// GO-Minus Standart Kütüphane - Async Paketi - File
+package async
+
+import (
+    "os"
+    "syscall"
+    "sync"
+)
+
+// Dosya açma bayrakları
+const (
+    O_RDONLY = os.O_RDONLY
+    O_WRONLY = os.O_WRONLY
+    O_RDWR   = os.O_RDWR
+    O_APPEND = os.O_APPEND
+    O_CREATE = os.O_CREATE
+    O_EXCL   = os.O_EXCL
+    O_SYNC   = os.O_SYNC
+    O_TRUNC  = os.O_TRUNC
+)
+
+// Dosya izinleri
+const (
+    ModePerm = os.ModePerm
+)
+
+// AsyncFile, asenkron dosya işlemleri için bir sınıftır.
+class AsyncFile {
+    private:
+        var file *os.File
+        var fd int
+        var eventLoop *EventLoop
+        var readHandler AsyncHandler
+        var writeHandler AsyncHandler
+        var closed bool
+        var bufferPool *BufferPool
+        var mutex sync.Mutex
+
+    public:
+        // OpenFile, belirtilen bayraklar ve izinlerle bir dosya açar.
+        static func OpenFile(eventLoop *EventLoop, name string, flag int, perm os.FileMode) (*AsyncFile, error) {
+            // Dosyayı aç
+            file, err := os.OpenFile(name, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+
+            // Dosya tanımlayıcısını al
+            fd := int(file.Fd())
+
+            // Dosya tanımlayıcısını non-blocking olarak ayarla
+            err = setNonblock(fd)
+            if err != nil {
+                file.Close()
+                return nil, err
+            }
+
+            // AsyncFile oluştur
+            asyncFile := new AsyncFile()
+            asyncFile.file = file
+            asyncFile.fd = fd
+            asyncFile.eventLoop = eventLoop
+            asyncFile.closed = false
+            asyncFile.bufferPool = BufferPool.GetInstance()
+
+            // Okuma işleyicisi oluştur
+            asyncFile.readHandler = new fileReadHandler(asyncFile)
+
+            // Yazma işleyicisi oluştur
+            asyncFile.writeHandler = new fileWriteHandler(asyncFile)
+
+            return asyncFile, nil
+        }
+
+        // Open, bir dosyayı okuma modunda açar.
+        static func Open(eventLoop *EventLoop, name string) (*AsyncFile, error) {
+            return AsyncFile.OpenFile(eventLoop, name, O_RDONLY, 0)
+        }
+
+        // Create, bir dosya oluşturur veya keser.
+        static func Create(eventLoop *EventLoop, name string) (*AsyncFile, error) {
+            return AsyncFile.OpenFile(eventLoop, name, O_RDWR|O_CREATE|O_TRUNC, 0666)
+        }
+
+        // Read, dosyadan veri okur.
+        func (af *AsyncFile) Read(p []byte) *AsyncFuture<int> {
+            af.mutex.Lock()
+            defer af.mutex.Unlock()
+
+            if af.closed {
+                promise, future := AsyncPromise.New<int>(af.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<int>(af.eventLoop)
+
+            // Okuma işlemi başlat
+            n, err := af.file.Read(p)
+
+            if err == nil {
+                // Okuma başarılı
+                promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Dosya hazır değil, olayı bekle
+                readOp := new fileReadOperation()
+
+                // Tampon havuzundan tampon al (eğer kullanıcı tamponu yeterince büyük değilse)
+                if len(p) < 4096 {
+                    buffer := af.bufferPool.Get(4096)
+                    readOp.buffer = buffer
+                    readOp.userBuffer = p
+                    readOp.usePool = true
+                } else {
+                    readOp.buffer = p
+                    readOp.usePool = false
+                }
+
+                readOp.promise = promise
+
+                // Okuma işleyicisine ekle
+                af.readHandler.(*fileReadHandler).addOperation(readOp)
+
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := af.eventLoop.Register(af.fd, EventRead, af.readHandler)
+                if err != nil {
+                    if readOp.usePool {
+                        af.bufferPool.Put(readOp.buffer)
+                    }
+                    promise.CompleteWithError(err)
+                }
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+
+            return future
+        }
+
+        // Write, dosyaya veri yazar.
+        func (af *AsyncFile) Write(p []byte) *AsyncFuture<int> {
+            af.mutex.Lock()
+            defer af.mutex.Unlock()
+
+            if af.closed {
+                promise, future := AsyncPromise.New<int>(af.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<int>(af.eventLoop)
+
+            // Yazma işlemi başlat
+            n, err := af.file.Write(p)
+
+            if err == nil {
+                // Yazma başarılı
+                promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Dosya hazır değil, olayı bekle
+                writeOp := new fileWriteOperation()
+
+                // Tampon havuzundan tampon al ve veriyi kopyala
+                buffer := af.bufferPool.Get(len(p))
+                copy(buffer, p)
+                writeOp.buffer = buffer
+                writeOp.usePool = true
+                writeOp.promise = promise
+
+                // Yazma işleyicisine ekle
+                af.writeHandler.(*fileWriteHandler).addOperation(writeOp)
+
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := af.eventLoop.Register(af.fd, EventWrite, af.writeHandler)
+                if err != nil {
+                    af.bufferPool.Put(buffer)
+                    promise.CompleteWithError(err)
+                }
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+
+            return future
+        }
+
+        // ReadAt, belirtilen konumdan veri okur.
+        func (af *AsyncFile) ReadAt(p []byte, off int64) *AsyncFuture<int> {
+            if af.closed {
+                promise, future := AsyncPromise.New<int>(af.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            // Konumu ayarla
+            _, err := af.file.Seek(off, os.SEEK_SET)
+            if err != nil {
+                promise, future := AsyncPromise.New<int>(af.eventLoop)
+                promise.CompleteWithError(err)
+                return future
+            }
+
+            // Oku
+            return af.Read(p)
+        }
+
+        // WriteAt, belirtilen konuma veri yazar.
+        func (af *AsyncFile) WriteAt(p []byte, off int64) *AsyncFuture<int> {
+            if af.closed {
+                promise, future := AsyncPromise.New<int>(af.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            // Konumu ayarla
+            _, err := af.file.Seek(off, os.SEEK_SET)
+            if err != nil {
+                promise, future := AsyncPromise.New<int>(af.eventLoop)
+                promise.CompleteWithError(err)
+                return future
+            }
+
+            // Yaz
+            return af.Write(p)
+        }
+
+        // Seek, dosya konumunu ayarlar.
+        func (af *AsyncFile) Seek(offset int64, whence int) *AsyncFuture<int64> {
+            if af.closed {
+                promise, future := AsyncPromise.New<int64>(af.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<int64>(af.eventLoop)
+
+            // Konumu ayarla
+            pos, err := af.file.Seek(offset, whence)
+            if err != nil {
+                promise.CompleteWithError(err)
+            } else {
+                promise.Complete(pos)
+            }
+
+            return future
+        }
+
+        // Close, dosyayı kapatır.
+        func (af *AsyncFile) Close() *AsyncFuture<error> {
+            if af.closed {
+                promise, future := AsyncPromise.New<error>(af.eventLoop)
+                promise.Complete(nil)
+                return future
+            }
+
+            af.closed = true
+
+            promise, future := AsyncPromise.New<error>(af.eventLoop)
+
+            // Dosya tanımlayıcısını olay döngüsünden kaldır
+            af.eventLoop.Unregister(af.fd)
+
+            // Dosyayı kapat
+            err := af.file.Close()
+            if err != nil {
+                promise.Complete(err)
+            } else {
+                promise.Complete(nil)
+            }
+
+            return future
+        }
+
+        // Sync, dosya içeriğini diske yazılmasını sağlar.
+        func (af *AsyncFile) Sync() *AsyncFuture<error> {
+            if af.closed {
+                promise, future := AsyncPromise.New<error>(af.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<error>(af.eventLoop)
+
+            // Dosyayı senkronize et
+            err := af.file.Sync()
+            if err != nil {
+                promise.Complete(err)
+            } else {
+                promise.Complete(nil)
+            }
+
+            return future
+        }
+
+        // Name, dosyanın adını döndürür.
+        func (af *AsyncFile) Name() string {
+            return af.file.Name()
+        }
+
+        // Fd, dosya tanımlayıcısını döndürür.
+        func (af *AsyncFile) Fd() int {
+            return af.fd
+        }
+}
+
+// fileReadOperation, asenkron bir okuma işlemini temsil eder.
+class fileReadOperation {
+    var buffer []byte
+    var userBuffer []byte
+    var promise *AsyncPromise<int>
+    var usePool bool
+}
+
+// fileWriteOperation, asenkron bir yazma işlemini temsil eder.
+class fileWriteOperation {
+    var buffer []byte
+    var promise *AsyncPromise<int>
+    var usePool bool
+}
+
+// fileReadHandler, dosya okuma olaylarını işler.
+class fileReadHandler {
+    private:
+        var file *AsyncFile
+        var operations []*fileReadOperation
+
+    public:
+        // constructor
+        func new(file *AsyncFile) *fileReadHandler {
+            handler := new fileReadHandler()
+            handler.file = file
+            handler.operations = make([]*fileReadOperation, 0)
+            return handler
+        }
+
+        // OnEvent, bir okuma olayını işler.
+        func (h *fileReadHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+
+            // Okuma işlemi başlat
+            n, err := h.file.file.Read(op.buffer)
+
+            if err == nil {
+                // Okuma başarılı
+                if op.usePool {
+                    // Havuzdan alınan tamponu kullanıyorsa, veriyi kullanıcı tamponuna kopyala
+                    copyLen := n
+                    if copyLen > len(op.userBuffer) {
+                        copyLen = len(op.userBuffer)
+                    }
+                    copy(op.userBuffer, op.buffer[:copyLen])
+
+                    // Tamponu havuza geri koy
+                    h.file.bufferPool.Put(op.buffer)
+
+                    // Kullanıcı tamponuna kopyalanan veri miktarını döndür
+                    op.promise.Complete(copyLen)
+                } else {
+                    // Kullanıcı tamponu doğrudan kullanıldıysa
+                    op.promise.Complete(n)
+                }
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Dosya hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else {
+                // Diğer hatalar
+                if op.usePool {
+                    // Tamponu havuza geri koy
+                    h.file.bufferPool.Put(op.buffer)
+                }
+                op.promise.CompleteWithError(err)
+            }
+        }
+
+        // addOperation, bir okuma işlemi ekler.
+        func (h *fileReadHandler) addOperation(op *fileReadOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// fileWriteHandler, dosya yazma olaylarını işler.
+class fileWriteHandler {
+    private:
+        var file *AsyncFile
+        var operations []*fileWriteOperation
+
+    public:
+        // constructor
+        func new(file *AsyncFile) *fileWriteHandler {
+            handler := new fileWriteHandler()
+            handler.file = file
+            handler.operations = make([]*fileWriteOperation, 0)
+            return handler
+        }
+
+        // OnEvent, bir yazma olayını işler.
+        func (h *fileWriteHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+
+            // Yazma işlemi başlat
+            n, err := h.file.file.Write(op.buffer)
+
+            if err == nil {
+                // Yazma başarılı
+                if op.usePool {
+                    // Tamponu havuza geri koy
+                    h.file.bufferPool.Put(op.buffer)
+                }
+                op.promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Dosya hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else {
+                // Diğer hatalar
+                if op.usePool {
+                    // Tamponu havuza geri koy
+                    h.file.bufferPool.Put(op.buffer)
+                }
+                op.promise.CompleteWithError(err)
+            }
+        }
+
+        // addOperation, bir yazma işlemi ekler.
+        func (h *fileWriteHandler) addOperation(op *fileWriteOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// setNonblock, bir dosya tanımlayıcısını non-blocking olarak ayarlar.
+func setNonblock(fd int) error {
+    return syscall.SetNonblock(fd, true)
+}

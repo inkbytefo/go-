@@ -1,0 +1,289 @@
+// GO-Minus Örnek - Hibrit Akıllı Bellek Yönetimi Sistemi
+// Bu örnek, GO-Minus programlama dili için Hibrit Akıllı Bellek Yönetimi Sistemi'nin kullanımını gösterir.
+package main
+
+import (
+    "fmt"
+    "memory"
+    "time"
+)
+
+// Büyük bir veri yapısı
+struct LargeData {
+    buffer [1024]int
+}
+
+// Küçük bir veri yapısı
+struct SmallData {
+    value int
+    name string
+}
+
+// Otomatik bellek yönetimi örneği
+func automaticMemoryManagementExample() {
+    fmt.Println("Otomatik Bellek Yönetimi Örneği")
+    
+    // Otomatik bellek yönetimi
+    data := &LargeData{}
+    
+    // Veriyi kullan
+    for i := 0; i < 1024; i++ {
+        data.buffer[i] = i
+    }
+    
+    // Veriyi işle
+    sum := 0
+    for i := 0; i < 1024; i++ {
+        sum += data.buffer[i]
+    }
+    
+    fmt.Println("Toplam:", sum)
+    
+    // data otomatik olarak temizlenir
+}
+
+// Manuel bellek yönetimi örneği
+func manualMemoryManagementExample() {
+    fmt.Println("Manuel Bellek Yönetimi Örneği")
+    
+    unsafe {
+        // Manuel bellek ayırma
+        buffer := memory.Allocate(1024 * sizeof(int))
+        defer memory.Free(buffer)
+        
+        // Belleği kullan
+        intBuffer := (*[1024]int)(buffer)
+        
+        for i := 0; i < 1024; i++ {
+            intBuffer[i] = i
+        }
+        
+        // Veriyi işle
+        sum := 0
+        for i := 0; i < 1024; i++ {
+            sum += intBuffer[i]
+        }
+        
+        fmt.Println("Toplam:", sum)
+    }
+}
+
+// Bölgesel bellek yönetimi örneği
+func regionBasedMemoryManagementExample() {
+    fmt.Println("Bölgesel Bellek Yönetimi Örneği")
+    
+    // Bellek bölgesi tanımlama
+    region := memory.NewRegion()
+    defer region.Free()
+    
+    // Bu bölgedeki tüm bellek ayırmaları bölge ile birlikte serbest bırakılır
+    buffer := region.Allocate[int](1024)
+    
+    // Belleği kullan
+    for i := 0; i < 1024; i++ {
+        buffer[i] = i
+    }
+    
+    // Veriyi işle
+    sum := 0
+    for i := 0; i < 1024; i++ {
+        sum += buffer[i]
+    }
+    
+    fmt.Println("Toplam:", sum)
+    
+    // Bölge istatistiklerini göster
+    stats := region.GetStats()
+    fmt.Println("Bölge İstatistikleri:")
+    fmt.Println("  Toplam Boyut:", stats.TotalSize, "bayt")
+    fmt.Println("  Kullanılan Boyut:", stats.UsedSize, "bayt")
+    fmt.Println("  Blok Sayısı:", stats.BlockCount)
+    fmt.Println("  Ayırma İşlemi Sayısı:", stats.AllocationCount)
+}
+
+// Bellek havuzu örneği
+func memoryPoolExample() {
+    fmt.Println("Bellek Havuzu Örneği")
+    
+    // Özelleştirilmiş bellek havuzu şablonu
+    pool := memory.NewPool[SmallData](1000)
+    
+    // Havuzdan nesneler al ve kullan
+    objects := []*SmallData{}
+    
+    for i := 0; i < 100; i++ {
+        // Havuzdan nesne alma
+        obj := pool.Get()
+        
+        // Nesneyi kullan
+        obj.value = i
+        obj.name = fmt.Sprintf("Object %d", i)
+        
+        objects = append(objects, obj)
+    }
+    
+    // Nesneleri işle
+    sum := 0
+    for _, obj := range objects {
+        sum += obj.value
+        fmt.Println(obj.name, ":", obj.value)
+    }
+    
+    fmt.Println("Toplam:", sum)
+    
+    // Nesneleri havuza geri döndür
+    for _, obj := range objects {
+        pool.Return(obj)
+    }
+    
+    // Havuz istatistiklerini göster
+    stats := pool.GetStats()
+    fmt.Println("Havuz İstatistikleri:")
+    fmt.Println("  Kapasite:", stats.Capacity)
+    fmt.Println("  Kullanılabilir:", stats.Available)
+    fmt.Println("  Alınan Nesne Sayısı:", stats.GetCount)
+    fmt.Println("  Geri Döndürülen Nesne Sayısı:", stats.ReturnCount)
+}
+
+// Profil tabanlı otomatik optimizasyon örneği
+func profileBasedOptimizationExample() {
+    fmt.Println("Profil Tabanlı Otomatik Optimizasyon Örneği")
+    
+    // Profil tabanlı otomatik optimizasyon
+    memory.EnableProfiling(time.Second, "memory_profile.json")
+    
+    // Bellek kullanımı
+    for i := 0; i < 100; i++ {
+        // Bellek ayır
+        data := &LargeData{}
+        
+        // Veriyi kullan
+        for j := 0; j < 1024; j++ {
+            data.buffer[j] = i + j
+        }
+        
+        // Veriyi işle
+        sum := 0
+        for j := 0; j < 1024; j++ {
+            sum += data.buffer[j]
+        }
+        
+        if i % 10 == 0 {
+            fmt.Println("İterasyon", i, "Toplam:", sum)
+        }
+    }
+    
+    // Profil verilerini kaydet
+    memory.SaveProfile("memory_profile.json")
+    
+    // Bellek istatistiklerini göster
+    stats := memory.GetStats()
+    fmt.Println("Bellek İstatistikleri:")
+    fmt.Println("  Toplam Ayrılan:", stats.TotalAllocated, "bayt")
+    fmt.Println("  Toplam Serbest Bırakılan:", stats.TotalFreed, "bayt")
+    fmt.Println("  Şu Anda Kullanılan:", stats.CurrentUsage, "bayt")
+    fmt.Println("  En Yüksek Kullanım:", stats.PeakUsage, "bayt")
+    fmt.Println("  Ayırma İşlemi Sayısı:", stats.AllocationCount)
+    fmt.Println("  Serbest Bırakma İşlemi Sayısı:", stats.FreeCount)
+}
+
+// Hibrit bellek yönetimi örneği
+func hybridMemoryManagementExample() {
+    fmt.Println("Hibrit Bellek Yönetimi Örneği")
+    
+    // Otomatik bellek yönetimi
+    smallData := &SmallData{
+        value: 42,
+        name: "Otomatik Bellek",
+    }
+    
+    // Bölgesel bellek yönetimi
+    region := memory.NewRegion()
+    defer region.Free()
+    
+    // Bu bölgedeki tüm bellek ayırmaları bölge ile birlikte serbest bırakılır
+    largeBuffer := region.Allocate[int](1024 * 1024)
+    
+    // Bellek havuzu
+    pool := memory.NewPool[SmallData](1000)
+    
+    // Havuzdan nesneler al
+    pooledObjects := []*SmallData{}
+    
+    for i := 0; i < 100; i++ {
+        obj := pool.Get()
+        obj.value = i
+        obj.name = fmt.Sprintf("Havuz Nesnesi %d", i)
+        
+        pooledObjects = append(pooledObjects, obj)
+    }
+    
+    // Manuel bellek yönetimi
+    unsafe {
+        // Manuel bellek ayırma
+        manualBuffer := memory.Allocate(1024 * sizeof(int))
+        defer memory.Free(manualBuffer)
+        
+        // Belleği kullan
+        intBuffer := (*[1024]int)(manualBuffer)
+        
+        for i := 0; i < 1024; i++ {
+            intBuffer[i] = i
+        }
+        
+        // Veriyi işle
+        sum := 0
+        for i := 0; i < 1024; i++ {
+            sum += intBuffer[i]
+        }
+        
+        fmt.Println("Manuel Bellek Toplamı:", sum)
+    }
+    
+    // Otomatik bellek kullanımı
+    fmt.Println("Otomatik Bellek:", smallData.name, ":", smallData.value)
+    
+    // Bölgesel bellek kullanımı
+    sum := 0
+    for i := 0; i < 1024; i++ {
+        largeBuffer[i] = i
+        sum += largeBuffer[i]
+    }
+    
+    fmt.Println("Bölgesel Bellek Toplamı:", sum)
+    
+    // Havuz nesnelerini kullan
+    poolSum := 0
+    for _, obj := range pooledObjects {
+        poolSum += obj.value
+    }
+    
+    fmt.Println("Havuz Nesneleri Toplamı:", poolSum)
+    
+    // Havuz nesnelerini geri döndür
+    for _, obj := range pooledObjects {
+        pool.Return(obj)
+    }
+}
+
+func main() {
+    fmt.Println("GO-Minus Hibrit Akıllı Bellek Yönetimi Sistemi Örneği")
+    fmt.Println("====================================================")
+    
+    automaticMemoryManagementExample()
+    fmt.Println()
+    
+    manualMemoryManagementExample()
+    fmt.Println()
+    
+    regionBasedMemoryManagementExample()
+    fmt.Println()
+    
+    memoryPoolExample()
+    fmt.Println()
+    
+    profileBasedOptimizationExample()
+    fmt.Println()
+    
+    hybridMemoryManagementExample()
+}

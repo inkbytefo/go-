@@ -1,0 +1,639 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Socket
+package async
+
+import (
+    "net"
+    "os"
+    "syscall"
+    "time"
+    "sync"
+)
+
+// AsyncSocket, asenkron ağ işlemleri için bir sınıftır.
+class AsyncSocket {
+    private:
+        var conn net.Conn
+        var fd int
+        var eventLoop *EventLoop
+        var readHandler AsyncHandler
+        var writeHandler AsyncHandler
+        var closed bool
+        var bufferPool *BufferPool
+        var mutex sync.Mutex
+
+    public:
+        // Dial, belirtilen ağ ve adresle bir bağlantı kurar.
+        static func Dial(eventLoop *EventLoop, network string, address string) (*AsyncSocket, error) {
+            // Bağlantı kur
+            conn, err := net.Dial(network, address)
+            if err != nil {
+                return nil, err
+            }
+
+            // Dosya tanımlayıcısını al
+            fd := socketFd(conn)
+
+            // Dosya tanımlayıcısını non-blocking olarak ayarla
+            err = setNonblock(fd)
+            if err != nil {
+                conn.Close()
+                return nil, err
+            }
+
+            // AsyncSocket oluştur
+            asyncSocket := new AsyncSocket()
+            asyncSocket.conn = conn
+            asyncSocket.fd = fd
+            asyncSocket.eventLoop = eventLoop
+            asyncSocket.closed = false
+            asyncSocket.bufferPool = BufferPool.GetInstance()
+
+            // Okuma işleyicisi oluştur
+            asyncSocket.readHandler = new socketReadHandler(asyncSocket)
+
+            // Yazma işleyicisi oluştur
+            asyncSocket.writeHandler = new socketWriteHandler(asyncSocket)
+
+            return asyncSocket, nil
+        }
+
+        // DialTimeout, belirtilen ağ ve adresle bir bağlantı kurar ve zaman aşımı ayarlar.
+        static func DialTimeout(eventLoop *EventLoop, network string, address string, timeout time.Duration) (*AsyncSocket, error) {
+            // Bağlantı kur
+            conn, err := net.DialTimeout(network, address, timeout)
+            if err != nil {
+                return nil, err
+            }
+
+            // Dosya tanımlayıcısını al
+            fd := socketFd(conn)
+
+            // Dosya tanımlayıcısını non-blocking olarak ayarla
+            err = setNonblock(fd)
+            if err != nil {
+                conn.Close()
+                return nil, err
+            }
+
+            // AsyncSocket oluştur
+            asyncSocket := new AsyncSocket()
+            asyncSocket.conn = conn
+            asyncSocket.fd = fd
+            asyncSocket.eventLoop = eventLoop
+            asyncSocket.closed = false
+            asyncSocket.bufferPool = BufferPool.GetInstance()
+
+            // Okuma işleyicisi oluştur
+            asyncSocket.readHandler = new socketReadHandler(asyncSocket)
+
+            // Yazma işleyicisi oluştur
+            asyncSocket.writeHandler = new socketWriteHandler(asyncSocket)
+
+            return asyncSocket, nil
+        }
+
+        // Read, soket bağlantısından veri okur.
+        func (as *AsyncSocket) Read(p []byte) *AsyncFuture<int> {
+            as.mutex.Lock()
+            defer as.mutex.Unlock()
+
+            if as.closed {
+                promise, future := AsyncPromise.New<int>(as.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<int>(as.eventLoop)
+
+            // Okuma işlemi başlat
+            n, err := as.conn.Read(p)
+
+            if err == nil {
+                // Okuma başarılı
+                promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Soket hazır değil, olayı bekle
+                readOp := new socketReadOperation()
+
+                // Tampon havuzundan tampon al (eğer kullanıcı tamponu yeterince büyük değilse)
+                if len(p) < 4096 {
+                    buffer := as.bufferPool.Get(4096)
+                    readOp.buffer = buffer
+                    readOp.userBuffer = p
+                    readOp.usePool = true
+                } else {
+                    readOp.buffer = p
+                    readOp.usePool = false
+                }
+
+                readOp.promise = promise
+
+                // Okuma işleyicisine ekle
+                as.readHandler.(*socketReadHandler).addOperation(readOp)
+
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := as.eventLoop.Register(as.fd, EventRead, as.readHandler)
+                if err != nil {
+                    if readOp.usePool {
+                        as.bufferPool.Put(readOp.buffer)
+                    }
+                    promise.CompleteWithError(err)
+                }
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+
+            return future
+        }
+
+        // Write, soket bağlantısına veri yazar.
+        func (as *AsyncSocket) Write(p []byte) *AsyncFuture<int> {
+            as.mutex.Lock()
+            defer as.mutex.Unlock()
+
+            if as.closed {
+                promise, future := AsyncPromise.New<int>(as.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<int>(as.eventLoop)
+
+            // Yazma işlemi başlat
+            n, err := as.conn.Write(p)
+
+            if err == nil {
+                // Yazma başarılı
+                promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Soket hazır değil, olayı bekle
+                writeOp := new socketWriteOperation()
+
+                // Tampon havuzundan tampon al ve veriyi kopyala
+                buffer := as.bufferPool.Get(len(p))
+                copy(buffer, p)
+                writeOp.buffer = buffer
+                writeOp.usePool = true
+                writeOp.promise = promise
+
+                // Yazma işleyicisine ekle
+                as.writeHandler.(*socketWriteHandler).addOperation(writeOp)
+
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := as.eventLoop.Register(as.fd, EventWrite, as.writeHandler)
+                if err != nil {
+                    as.bufferPool.Put(buffer)
+                    promise.CompleteWithError(err)
+                }
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+
+            return future
+        }
+
+        // Close, soket bağlantısını kapatır.
+        func (as *AsyncSocket) Close() *AsyncFuture<error> {
+            if as.closed {
+                promise, future := AsyncPromise.New<error>(as.eventLoop)
+                promise.Complete(nil)
+                return future
+            }
+
+            as.closed = true
+
+            promise, future := AsyncPromise.New<error>(as.eventLoop)
+
+            // Dosya tanımlayıcısını olay döngüsünden kaldır
+            as.eventLoop.Unregister(as.fd)
+
+            // Bağlantıyı kapat
+            err := as.conn.Close()
+            if err != nil {
+                promise.Complete(err)
+            } else {
+                promise.Complete(nil)
+            }
+
+            return future
+        }
+
+        // LocalAddr, yerel ağ adresini döndürür.
+        func (as *AsyncSocket) LocalAddr() net.Addr {
+            return as.conn.LocalAddr()
+        }
+
+        // RemoteAddr, uzak ağ adresini döndürür.
+        func (as *AsyncSocket) RemoteAddr() net.Addr {
+            return as.conn.RemoteAddr()
+        }
+
+        // SetDeadline, okuma ve yazma işlemleri için son tarih ayarlar.
+        func (as *AsyncSocket) SetDeadline(t time.Time) error {
+            return as.conn.SetDeadline(t)
+        }
+
+        // SetReadDeadline, okuma işlemleri için son tarih ayarlar.
+        func (as *AsyncSocket) SetReadDeadline(t time.Time) error {
+            return as.conn.SetReadDeadline(t)
+        }
+
+        // SetWriteDeadline, yazma işlemleri için son tarih ayarlar.
+        func (as *AsyncSocket) SetWriteDeadline(t time.Time) error {
+            return as.conn.SetWriteDeadline(t)
+        }
+}
+
+// AsyncListener, asenkron ağ dinleyicisi için bir sınıftır.
+class AsyncListener {
+    private:
+        var listener net.Listener
+        var fd int
+        var eventLoop *EventLoop
+        var acceptHandler AsyncHandler
+        var closed bool
+
+    public:
+        // Listen, belirtilen ağ ve adresle bir dinleyici oluşturur.
+        static func Listen(eventLoop *EventLoop, network string, address string) (*AsyncListener, error) {
+            // Dinleyici oluştur
+            listener, err := net.Listen(network, address)
+            if err != nil {
+                return nil, err
+            }
+
+            // Dosya tanımlayıcısını al
+            fd := listenerFd(listener)
+
+            // Dosya tanımlayıcısını non-blocking olarak ayarla
+            err = setNonblock(fd)
+            if err != nil {
+                listener.Close()
+                return nil, err
+            }
+
+            // AsyncListener oluştur
+            asyncListener := new AsyncListener()
+            asyncListener.listener = listener
+            asyncListener.fd = fd
+            asyncListener.eventLoop = eventLoop
+            asyncListener.closed = false
+
+            // Kabul işleyicisi oluştur
+            asyncListener.acceptHandler = new listenerAcceptHandler(asyncListener)
+
+            return asyncListener, nil
+        }
+
+        // Accept, bir bağlantı kabul eder.
+        func (al *AsyncListener) Accept() *AsyncFuture<*AsyncSocket> {
+            if al.closed {
+                promise, future := AsyncPromise.New<*AsyncSocket>(al.eventLoop)
+                promise.CompleteWithError(ErrClosed)
+                return future
+            }
+
+            promise, future := AsyncPromise.New<*AsyncSocket>(al.eventLoop)
+
+            // Kabul işlemi başlat
+            conn, err := al.listener.Accept()
+
+            if err == nil {
+                // Kabul başarılı
+
+                // Dosya tanımlayıcısını al
+                fd := socketFd(conn)
+
+                // Dosya tanımlayıcısını non-blocking olarak ayarla
+                err = setNonblock(fd)
+                if err != nil {
+                    conn.Close()
+                    promise.CompleteWithError(err)
+                    return future
+                }
+
+                // AsyncSocket oluştur
+                asyncSocket := new AsyncSocket()
+                asyncSocket.conn = conn
+                asyncSocket.fd = fd
+                asyncSocket.eventLoop = al.eventLoop
+                asyncSocket.closed = false
+
+                // Okuma işleyicisi oluştur
+                asyncSocket.readHandler = new socketReadHandler(asyncSocket)
+
+                // Yazma işleyicisi oluştur
+                asyncSocket.writeHandler = new socketWriteHandler(asyncSocket)
+
+                promise.Complete(asyncSocket)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Dinleyici hazır değil, olayı bekle
+                acceptOp := new listenerAcceptOperation()
+                acceptOp.promise = promise
+
+                // Kabul işleyicisine ekle
+                al.acceptHandler.(*listenerAcceptHandler).addOperation(acceptOp)
+
+                // Dosya tanımlayıcısını olay döngüsüne kaydet
+                _, err := al.eventLoop.Register(al.fd, EventRead, al.acceptHandler)
+                if err != nil {
+                    promise.CompleteWithError(err)
+                }
+            } else {
+                // Diğer hatalar
+                promise.CompleteWithError(err)
+            }
+
+            return future
+        }
+
+        // Close, dinleyiciyi kapatır.
+        func (al *AsyncListener) Close() *AsyncFuture<error> {
+            if al.closed {
+                promise, future := AsyncPromise.New<error>(al.eventLoop)
+                promise.Complete(nil)
+                return future
+            }
+
+            al.closed = true
+
+            promise, future := AsyncPromise.New<error>(al.eventLoop)
+
+            // Dosya tanımlayıcısını olay döngüsünden kaldır
+            al.eventLoop.Unregister(al.fd)
+
+            // Dinleyiciyi kapat
+            err := al.listener.Close()
+            if err != nil {
+                promise.Complete(err)
+            } else {
+                promise.Complete(nil)
+            }
+
+            return future
+        }
+
+        // Addr, dinleyicinin ağ adresini döndürür.
+        func (al *AsyncListener) Addr() net.Addr {
+            return al.listener.Addr()
+        }
+}
+
+// socketReadOperation, asenkron bir soket okuma işlemini temsil eder.
+class socketReadOperation {
+    var buffer []byte
+    var userBuffer []byte
+    var promise *AsyncPromise<int>
+    var usePool bool
+}
+
+// socketWriteOperation, asenkron bir soket yazma işlemini temsil eder.
+class socketWriteOperation {
+    var buffer []byte
+    var promise *AsyncPromise<int>
+    var usePool bool
+}
+
+// listenerAcceptOperation, asenkron bir dinleyici kabul işlemini temsil eder.
+class listenerAcceptOperation {
+    var promise *AsyncPromise<*AsyncSocket>
+}
+
+// socketReadHandler, soket okuma olaylarını işler.
+class socketReadHandler {
+    private:
+        var socket *AsyncSocket
+        var operations []*socketReadOperation
+
+    public:
+        // constructor
+        func new(socket *AsyncSocket) *socketReadHandler {
+            handler := new socketReadHandler()
+            handler.socket = socket
+            handler.operations = make([]*socketReadOperation, 0)
+            return handler
+        }
+
+        // OnEvent, bir okuma olayını işler.
+        func (h *socketReadHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+
+            // Okuma işlemi başlat
+            n, err := h.socket.conn.Read(op.buffer)
+
+            if err == nil {
+                // Okuma başarılı
+                if op.usePool {
+                    // Havuzdan alınan tamponu kullanıyorsa, veriyi kullanıcı tamponuna kopyala
+                    copyLen := n
+                    if copyLen > len(op.userBuffer) {
+                        copyLen = len(op.userBuffer)
+                    }
+                    copy(op.userBuffer, op.buffer[:copyLen])
+
+                    // Tamponu havuza geri koy
+                    h.socket.bufferPool.Put(op.buffer)
+
+                    // Kullanıcı tamponuna kopyalanan veri miktarını döndür
+                    op.promise.Complete(copyLen)
+                } else {
+                    // Kullanıcı tamponu doğrudan kullanıldıysa
+                    op.promise.Complete(n)
+                }
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Soket hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else {
+                // Diğer hatalar
+                if op.usePool {
+                    // Tamponu havuza geri koy
+                    h.socket.bufferPool.Put(op.buffer)
+                }
+                op.promise.CompleteWithError(err)
+            }
+        }
+
+        // addOperation, bir okuma işlemi ekler.
+        func (h *socketReadHandler) addOperation(op *socketReadOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// socketWriteHandler, soket yazma olaylarını işler.
+class socketWriteHandler {
+    private:
+        var socket *AsyncSocket
+        var operations []*socketWriteOperation
+
+    public:
+        // constructor
+        func new(socket *AsyncSocket) *socketWriteHandler {
+            handler := new socketWriteHandler()
+            handler.socket = socket
+            handler.operations = make([]*socketWriteOperation, 0)
+            return handler
+        }
+
+        // OnEvent, bir yazma olayını işler.
+        func (h *socketWriteHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+
+            // Yazma işlemi başlat
+            n, err := h.socket.conn.Write(op.buffer)
+
+            if err == nil {
+                // Yazma başarılı
+                if op.usePool {
+                    // Tamponu havuza geri koy
+                    h.socket.bufferPool.Put(op.buffer)
+                }
+                op.promise.Complete(n)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Soket hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else {
+                // Diğer hatalar
+                if op.usePool {
+                    // Tamponu havuza geri koy
+                    h.socket.bufferPool.Put(op.buffer)
+                }
+                op.promise.CompleteWithError(err)
+            }
+        }
+
+        // addOperation, bir yazma işlemi ekler.
+        func (h *socketWriteHandler) addOperation(op *socketWriteOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// listenerAcceptHandler, dinleyici kabul olaylarını işler.
+class listenerAcceptHandler {
+    private:
+        var listener *AsyncListener
+        var operations []*listenerAcceptOperation
+
+    public:
+        // constructor
+        func new(listener *AsyncListener) *listenerAcceptHandler {
+            handler := new listenerAcceptHandler()
+            handler.listener = listener
+            handler.operations = make([]*listenerAcceptOperation, 0)
+            return handler
+        }
+
+        // OnEvent, bir kabul olayını işler.
+        func (h *listenerAcceptHandler) OnEvent(event Event) {
+            if len(h.operations) == 0 {
+                return
+            }
+
+            // İlk işlemi al
+            op := h.operations[0]
+            h.operations = h.operations[1:]
+
+            // Kabul işlemi başlat
+            conn, err := h.listener.listener.Accept()
+
+            if err == nil {
+                // Kabul başarılı
+
+                // Dosya tanımlayıcısını al
+                fd := socketFd(conn)
+
+                // Dosya tanımlayıcısını non-blocking olarak ayarla
+                err = setNonblock(fd)
+                if err != nil {
+                    conn.Close()
+                    op.promise.CompleteWithError(err)
+                    return
+                }
+
+                // AsyncSocket oluştur
+                asyncSocket := new AsyncSocket()
+                asyncSocket.conn = conn
+                asyncSocket.fd = fd
+                asyncSocket.eventLoop = h.listener.eventLoop
+                asyncSocket.closed = false
+
+                // Okuma işleyicisi oluştur
+                asyncSocket.readHandler = new socketReadHandler(asyncSocket)
+
+                // Yazma işleyicisi oluştur
+                asyncSocket.writeHandler = new socketWriteHandler(asyncSocket)
+
+                op.promise.Complete(asyncSocket)
+            } else if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+                // Dinleyici hala hazır değil, işlemi tekrar kuyruğa ekle
+                h.operations = append(h.operations, op)
+            } else {
+                // Diğer hatalar
+                op.promise.CompleteWithError(err)
+            }
+        }
+
+        // addOperation, bir kabul işlemi ekler.
+        func (h *listenerAcceptHandler) addOperation(op *listenerAcceptOperation) {
+            h.operations = append(h.operations, op)
+        }
+}
+
+// socketFd, bir net.Conn'dan dosya tanımlayıcısını alır.
+func socketFd(conn net.Conn) int {
+    // Platform bağımlı implementasyon
+    // Bu, gerçek implementasyonda daha karmaşık olacaktır
+
+    // TCP bağlantısı için
+    if tcpConn, ok := conn.(*net.TCPConn); ok {
+        file, err := tcpConn.File()
+        if err != nil {
+            return -1
+        }
+        defer file.Close()
+        return int(file.Fd())
+    }
+
+    // UDP bağlantısı için
+    if udpConn, ok := conn.(*net.UDPConn); ok {
+        file, err := udpConn.File()
+        if err != nil {
+            return -1
+        }
+        defer file.Close()
+        return int(file.Fd())
+    }
+
+    return -1
+}
+
+// listenerFd, bir net.Listener'dan dosya tanımlayıcısını alır.
+func listenerFd(listener net.Listener) int {
+    // Platform bağımlı implementasyon
+    // Bu, gerçek implementasyonda daha karmaşık olacaktır
+
+    // TCP dinleyicisi için
+    if tcpListener, ok := listener.(*net.TCPListener); ok {
+        file, err := tcpListener.File()
+        if err != nil {
+            return -1
+        }
+        defer file.Close()
+        return int(file.Fd())
+    }
+
+    return -1
+}

@@ -1,0 +1,552 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Buffer
+package async
+
+import (
+    "sync"
+    "sync/atomic"
+)
+
+// BufferPool, bellek tahsisini ve GC baskısını azaltmak için tampon havuzu sağlar.
+// Bu sınıf, farklı boyutlardaki tamponlar için havuzlar yönetir.
+class BufferPool {
+    private:
+        // Havuz boyutları (2^n şeklinde)
+        var sizes []int
+        
+        // Her boyut için havuz
+        var pools map[int]*sync.Pool
+        
+        // İstatistikler
+        var gets uint64
+        var puts uint64
+        var misses uint64
+        var allocs uint64
+        
+        // Singleton instance
+        static var instance *BufferPool
+        static var once sync.Once
+    
+    public:
+        // GetInstance, BufferPool singleton örneğini döndürür.
+        static func GetInstance() *BufferPool {
+            BufferPool.once.Do(func() {
+                BufferPool.instance = BufferPool.New()
+            })
+            
+            return BufferPool.instance
+        }
+        
+        // New, yeni bir BufferPool oluşturur.
+        static func New() *BufferPool {
+            pool := new BufferPool()
+            
+            // Havuz boyutlarını belirle (32B'den 16MB'a kadar 2'nin katları)
+            pool.sizes = make([]int, 20)
+            size := 32
+            for i := 0; i < len(pool.sizes); i++ {
+                pool.sizes[i] = size
+                size *= 2
+            }
+            
+            // Havuzları oluştur
+            pool.pools = make(map[int]*sync.Pool)
+            for _, size := range pool.sizes {
+                size := size // Değişkeni kopyala
+                pool.pools[size] = &sync.Pool{
+                    New: func() interface{} {
+                        atomic.AddUint64(&pool.allocs, 1)
+                        return make([]byte, size)
+                    },
+                }
+            }
+            
+            return pool
+        }
+        
+        // Get, belirtilen boyutta bir tampon alır.
+        // Eğer havuzda uygun boyutta bir tampon yoksa, yeni bir tampon oluşturulur.
+        func (bp *BufferPool) Get(size int) []byte {
+            atomic.AddUint64(&bp.gets, 1)
+            
+            // Uygun havuz boyutunu bul
+            poolSize := bp.findPoolSize(size)
+            
+            // Havuzdan tampon al
+            if poolSize > 0 {
+                buffer := bp.pools[poolSize].Get().([]byte)
+                return buffer[:size]
+            }
+            
+            // Havuzda uygun boyut yoksa, yeni bir tampon oluştur
+            atomic.AddUint64(&bp.misses, 1)
+            atomic.AddUint64(&bp.allocs, 1)
+            return make([]byte, size)
+        }
+        
+        // Put, bir tamponu havuza geri koyar.
+        // Tampon, orijinal kapasitesine göre uygun havuza yerleştirilir.
+        func (bp *BufferPool) Put(buffer []byte) {
+            if buffer == nil {
+                return
+            }
+            
+            atomic.AddUint64(&bp.puts, 1)
+            
+            // Tamponun kapasitesini al
+            capacity := cap(buffer)
+            
+            // Uygun havuz boyutunu bul
+            poolSize := bp.findPoolSize(capacity)
+            
+            // Tampon havuz boyutlarından birine uyuyorsa, havuza geri koy
+            if poolSize > 0 && capacity == poolSize {
+                bp.pools[poolSize].Put(buffer[:poolSize])
+            }
+            // Uygun havuz yoksa, tampon GC tarafından toplanacak
+        }
+        
+        // GetStats, havuz istatistiklerini döndürür.
+        func (bp *BufferPool) GetStats() map[string]uint64 {
+            return map[string]uint64{
+                "gets":   atomic.LoadUint64(&bp.gets),
+                "puts":   atomic.LoadUint64(&bp.puts),
+                "misses": atomic.LoadUint64(&bp.misses),
+                "allocs": atomic.LoadUint64(&bp.allocs),
+            }
+        }
+        
+        // ResetStats, havuz istatistiklerini sıfırlar.
+        func (bp *BufferPool) ResetStats() {
+            atomic.StoreUint64(&bp.gets, 0)
+            atomic.StoreUint64(&bp.puts, 0)
+            atomic.StoreUint64(&bp.misses, 0)
+            atomic.StoreUint64(&bp.allocs, 0)
+        }
+        
+        // findPoolSize, belirtilen boyut için uygun havuz boyutunu bulur.
+        // Eğer uygun bir havuz boyutu yoksa, 0 döndürür.
+        private func (bp *BufferPool) findPoolSize(size int) int {
+            // Çok küçük veya çok büyük tamponlar için havuz kullanma
+            if size <= 0 || size > bp.sizes[len(bp.sizes)-1] {
+                return 0
+            }
+            
+            // Uygun havuz boyutunu bul (en küçük 2^n >= size)
+            for _, poolSize := range bp.sizes {
+                if poolSize >= size {
+                    return poolSize
+                }
+            }
+            
+            return 0
+        }
+}
+
+// Buffer, yeniden kullanılabilir bir tampon sağlar.
+// Bu sınıf, BufferPool'dan alınan bir tamponu sarar ve kullanım sonrası otomatik olarak havuza geri döndürür.
+class Buffer {
+    private:
+        var buffer []byte
+        var pool *BufferPool
+    
+    public:
+        // New, belirtilen boyutta yeni bir Buffer oluşturur.
+        static func New(size int) *Buffer {
+            return Buffer.NewWithPool(size, BufferPool.GetInstance())
+        }
+        
+        // NewWithPool, belirtilen havuzdan belirtilen boyutta yeni bir Buffer oluşturur.
+        static func NewWithPool(size int, pool *BufferPool) *Buffer {
+            buf := new Buffer()
+            buf.buffer = pool.Get(size)
+            buf.pool = pool
+            
+            return buf
+        }
+        
+        // Bytes, tamponu döndürür.
+        func (b *Buffer) Bytes() []byte {
+            return b.buffer
+        }
+        
+        // Len, tamponun uzunluğunu döndürür.
+        func (b *Buffer) Len() int {
+            return len(b.buffer)
+        }
+        
+        // Cap, tamponun kapasitesini döndürür.
+        func (b *Buffer) Cap() int {
+            return cap(b.buffer)
+        }
+        
+        // Reset, tamponu sıfırlar.
+        func (b *Buffer) Reset() {
+            b.buffer = b.buffer[:0]
+        }
+        
+        // Resize, tamponun boyutunu değiştirir.
+        // Eğer yeni boyut mevcut kapasiteden büyükse, yeni bir tampon oluşturulur.
+        func (b *Buffer) Resize(size int) {
+            if size <= cap(b.buffer) {
+                b.buffer = b.buffer[:size]
+            } else {
+                // Mevcut tamponu havuza geri koy
+                oldBuffer := b.buffer
+                
+                // Yeni tampon al
+                b.buffer = b.pool.Get(size)
+                
+                // Eski verileri kopyala
+                copy(b.buffer, oldBuffer)
+                
+                // Eski tamponu havuza geri koy
+                b.pool.Put(oldBuffer)
+            }
+        }
+        
+        // Release, tamponu havuza geri koyar.
+        // Bu metot, Buffer'ın kullanımı bittikten sonra çağrılmalıdır.
+        func (b *Buffer) Release() {
+            if b.buffer != nil {
+                b.pool.Put(b.buffer)
+                b.buffer = nil
+            }
+        }
+}
+
+// BufferedReader, bir AsyncReader'ı saran ve tamponlama ekleyen bir sınıftır.
+// Bu sınıf, BufferPool'dan alınan tamponları kullanarak bellek tahsisini azaltır.
+class BufferedReader {
+    private:
+        var reader AsyncReader
+        var buffer *Buffer
+        var readPos int
+        var writePos int
+        var eventLoop *EventLoop
+    
+    public:
+        // New, yeni bir BufferedReader oluşturur.
+        static func New(reader AsyncReader, eventLoop *EventLoop) *BufferedReader {
+            return BufferedReader.NewWithSize(reader, eventLoop, 8192) // 8KB varsayılan tampon boyutu
+        }
+        
+        // NewWithSize, belirtilen tampon boyutuyla yeni bir BufferedReader oluşturur.
+        static func NewWithSize(reader AsyncReader, eventLoop *EventLoop, bufferSize int) *BufferedReader {
+            br := new BufferedReader()
+            br.reader = reader
+            br.buffer = Buffer.New(bufferSize)
+            br.readPos = 0
+            br.writePos = 0
+            br.eventLoop = eventLoop
+            
+            return br
+        }
+        
+        // Read, tampondan veri okur.
+        // Eğer tamponda yeterli veri yoksa, altta yatan reader'dan daha fazla veri okur.
+        func (br *BufferedReader) Read(p []byte) *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(br.eventLoop)
+            
+            // Tamponda veri varsa, doğrudan kopyala
+            if br.readPos < br.writePos {
+                n := copy(p, br.buffer.Bytes()[br.readPos:br.writePos])
+                br.readPos += n
+                
+                // Tampon boşaldıysa, pozisyonları sıfırla
+                if br.readPos >= br.writePos {
+                    br.readPos = 0
+                    br.writePos = 0
+                }
+                
+                promise.Complete(n)
+                return future
+            }
+            
+            // Tamponda veri yoksa, altta yatan reader'dan oku
+            br.fillBuffer().Then(func(n int) {
+                // Okuma başarısız olduysa veya EOF ise
+                if n <= 0 {
+                    promise.Complete(0)
+                    return
+                }
+                
+                // Tamponda veri var, tekrar dene
+                readFuture := br.Read(p)
+                
+                readFuture.Then(func(n int) {
+                    promise.Complete(n)
+                }).Catch(func(err error) {
+                    promise.CompleteWithError(err)
+                })
+            }).Catch(func(err error) {
+                promise.CompleteWithError(err)
+            })
+            
+            return future
+        }
+        
+        // ReadByte, tampondan bir byte okur.
+        func (br *BufferedReader) ReadByte() *AsyncFuture<byte> {
+            promise, future := AsyncPromise.New<byte>(br.eventLoop)
+            
+            // Tek byte için tampon
+            p := make([]byte, 1)
+            
+            // Oku
+            br.Read(p).Then(func(n int) {
+                if n <= 0 {
+                    promise.CompleteWithError(ErrEOF)
+                    return
+                }
+                
+                promise.Complete(p[0])
+            }).Catch(func(err error) {
+                promise.CompleteWithError(err)
+            })
+            
+            return future
+        }
+        
+        // ReadFull, belirtilen tamponu tamamen doldurana kadar okur.
+        func (br *BufferedReader) ReadFull(p []byte) *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(br.eventLoop)
+            
+            // Toplam okunan byte sayısı
+            totalRead := 0
+            
+            // Okuma işlevi
+            var readMore func()
+            readMore = func() {
+                // Kalan byte'ları oku
+                remaining := p[totalRead:]
+                
+                br.Read(remaining).Then(func(n int) {
+                    // Okuma başarısız olduysa veya EOF ise
+                    if n <= 0 {
+                        if totalRead == 0 {
+                            promise.CompleteWithError(ErrEOF)
+                        } else {
+                            promise.CompleteWithError(ErrUnexpectedEOF)
+                        }
+                        return
+                    }
+                    
+                    // Okunan byte sayısını güncelle
+                    totalRead += n
+                    
+                    // Tampon tamamen doldu mu kontrol et
+                    if totalRead < len(p) {
+                        // Daha fazla oku
+                        readMore()
+                    } else {
+                        // Tamamlandı
+                        promise.Complete(totalRead)
+                    }
+                }).Catch(func(err error) {
+                    promise.CompleteWithError(err)
+                })
+            }
+            
+            // Okumaya başla
+            readMore()
+            
+            return future
+        }
+        
+        // Close, BufferedReader'ı kapatır ve kaynakları serbest bırakır.
+        func (br *BufferedReader) Close() *AsyncFuture<error> {
+            // Tamponu serbest bırak
+            if br.buffer != nil {
+                br.buffer.Release()
+                br.buffer = nil
+            }
+            
+            // Altta yatan reader'ı kapat
+            if closer, ok := br.reader.(AsyncCloser); ok {
+                return closer.Close()
+            }
+            
+            // Kapatılabilir değilse, başarılı döndür
+            promise, future := AsyncPromise.New<error>(br.eventLoop)
+            promise.Complete(nil)
+            return future
+        }
+        
+        // fillBuffer, altta yatan reader'dan tampona veri okur.
+        private func (br *BufferedReader) fillBuffer() *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(br.eventLoop)
+            
+            // Tampon pozisyonlarını sıfırla
+            br.readPos = 0
+            br.writePos = 0
+            
+            // Altta yatan reader'dan oku
+            br.reader.Read(br.buffer.Bytes()).Then(func(n int) {
+                br.writePos = n
+                promise.Complete(n)
+            }).Catch(func(err error) {
+                promise.CompleteWithError(err)
+            })
+            
+            return future
+        }
+}
+
+// BufferedWriter, bir AsyncWriter'ı saran ve tamponlama ekleyen bir sınıftır.
+// Bu sınıf, BufferPool'dan alınan tamponları kullanarak bellek tahsisini azaltır.
+class BufferedWriter {
+    private:
+        var writer AsyncWriter
+        var buffer *Buffer
+        var size int
+        var eventLoop *EventLoop
+    
+    public:
+        // New, yeni bir BufferedWriter oluşturur.
+        static func New(writer AsyncWriter, eventLoop *EventLoop) *BufferedWriter {
+            return BufferedWriter.NewWithSize(writer, eventLoop, 8192) // 8KB varsayılan tampon boyutu
+        }
+        
+        // NewWithSize, belirtilen tampon boyutuyla yeni bir BufferedWriter oluşturur.
+        static func NewWithSize(writer AsyncWriter, eventLoop *EventLoop, bufferSize int) *BufferedWriter {
+            bw := new BufferedWriter()
+            bw.writer = writer
+            bw.buffer = Buffer.New(bufferSize)
+            bw.size = 0
+            bw.eventLoop = eventLoop
+            
+            return bw
+        }
+        
+        // Write, tampona veri yazar.
+        // Eğer tampon dolarsa, altta yatan writer'a yazılır.
+        func (bw *BufferedWriter) Write(p []byte) *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(bw.eventLoop)
+            
+            // Yazılacak veri tampondan büyükse, doğrudan yaz
+            if len(p) >= cap(bw.buffer.Bytes()) {
+                // Önce tamponu boşalt
+                bw.Flush().Then(func(interface{}) {
+                    // Doğrudan yaz
+                    bw.writer.Write(p).Then(func(n int) {
+                        promise.Complete(n)
+                    }).Catch(func(err error) {
+                        promise.CompleteWithError(err)
+                    })
+                }).Catch(func(err error) {
+                    promise.CompleteWithError(err)
+                })
+                
+                return future
+            }
+            
+            // Tampon dolacaksa, önce boşalt
+            if bw.size+len(p) > cap(bw.buffer.Bytes()) {
+                bw.Flush().Then(func(interface{}) {
+                    // Tampona yaz
+                    n := copy(bw.buffer.Bytes()[bw.size:], p)
+                    bw.size += n
+                    promise.Complete(n)
+                }).Catch(func(err error) {
+                    promise.CompleteWithError(err)
+                })
+                
+                return future
+            }
+            
+            // Tampona yaz
+            n := copy(bw.buffer.Bytes()[bw.size:], p)
+            bw.size += n
+            promise.Complete(n)
+            
+            return future
+        }
+        
+        // WriteByte, tampona bir byte yazar.
+        func (bw *BufferedWriter) WriteByte(b byte) *AsyncFuture<bool> {
+            promise, future := AsyncPromise.New<bool>(bw.eventLoop)
+            
+            // Tek byte için tampon
+            p := []byte{b}
+            
+            // Yaz
+            bw.Write(p).Then(func(n int) {
+                if n <= 0 {
+                    promise.CompleteWithError(ErrIO)
+                    return
+                }
+                
+                promise.Complete(true)
+            }).Catch(func(err error) {
+                promise.CompleteWithError(err)
+            })
+            
+            return future
+        }
+        
+        // Flush, tamponu altta yatan writer'a yazar.
+        func (bw *BufferedWriter) Flush() *AsyncFuture<interface{}> {
+            promise, future := AsyncPromise.New<interface{}>(bw.eventLoop)
+            
+            // Tampon boşsa, başarılı döndür
+            if bw.size <= 0 {
+                promise.Complete(nil)
+                return future
+            }
+            
+            // Tamponu yaz
+            bw.writer.Write(bw.buffer.Bytes()[:bw.size]).Then(func(n int) {
+                if n < bw.size {
+                    promise.CompleteWithError(ErrShortWrite)
+                    return
+                }
+                
+                // Tampon pozisyonunu sıfırla
+                bw.size = 0
+                
+                promise.Complete(nil)
+            }).Catch(func(err error) {
+                promise.CompleteWithError(err)
+            })
+            
+            return future
+        }
+        
+        // Close, BufferedWriter'ı kapatır ve kaynakları serbest bırakır.
+        func (bw *BufferedWriter) Close() *AsyncFuture<error> {
+            promise, future := AsyncPromise.New<error>(bw.eventLoop)
+            
+            // Tamponu boşalt
+            bw.Flush().Then(func(interface{}) {
+                // Tamponu serbest bırak
+                if bw.buffer != nil {
+                    bw.buffer.Release()
+                    bw.buffer = nil
+                }
+                
+                // Altta yatan writer'ı kapat
+                if closer, ok := bw.writer.(AsyncCloser); ok {
+                    closer.Close().Then(func(err error) {
+                        promise.Complete(err)
+                    }).Catch(func(err error) {
+                        promise.CompleteWithError(err)
+                    })
+                } else {
+                    // Kapatılabilir değilse, başarılı döndür
+                    promise.Complete(nil)
+                }
+            }).Catch(func(err error) {
+                promise.CompleteWithError(err)
+            })
+            
+            return future
+        }
+}
+
+// Hata sabitleri
+var (
+    ErrEOF           = errors.New("async: EOF")
+    ErrUnexpectedEOF = errors.New("async: beklenmeyen EOF")
+    ErrShortWrite    = errors.New("async: kısa yazma")
+    ErrIO            = errors.New("async: I/O hatası")
+)

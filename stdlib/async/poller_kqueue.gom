@@ -1,0 +1,237 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Kqueue Poller
+package async
+
+import (
+    "errors"
+    "os"
+    "syscall"
+    "time"
+)
+
+// macOS/BSD için kqueue sabitleri
+const (
+    EVFILT_READ  = -1
+    EVFILT_WRITE = -2
+    EV_ADD      = 0x1
+    EV_DELETE   = 0x2
+    EV_ENABLE   = 0x4
+    EV_DISABLE  = 0x8
+    EV_ONESHOT  = 0x10
+    EV_CLEAR    = 0x20
+    EV_EOF      = 0x8000
+    EV_ERROR    = 0x4000
+)
+
+// KqueuePoller, macOS/BSD kqueue API'sini kullanarak bir poller implementasyonu sağlar.
+class KqueuePoller {
+    private:
+        var kq int
+        var events []syscall.Kevent_t
+        var changes []syscall.Kevent_t
+        var fdToID map[int]int
+        var closed bool
+
+    public:
+        // newKqueuePoller, yeni bir KqueuePoller oluşturur.
+        static func newKqueuePoller() (*KqueuePoller, error) {
+            // Kqueue dosya tanımlayıcısı oluştur
+            kq, err := syscall.Kqueue()
+            if err != nil {
+                return nil, os.NewSyscallError("kqueue", err)
+            }
+            
+            // Kqueue dosya tanımlayıcısını close-on-exec olarak ayarla
+            _, err = syscall.Fcntl(kq, syscall.F_SETFD, syscall.FD_CLOEXEC)
+            if err != nil {
+                syscall.Close(kq)
+                return nil, os.NewSyscallError("fcntl", err)
+            }
+            
+            poller := new KqueuePoller()
+            poller.kq = kq
+            poller.events = make([]syscall.Kevent_t, 128)
+            poller.changes = make([]syscall.Kevent_t, 0, 64)
+            poller.fdToID = make(map[int]int)
+            poller.closed = false
+            
+            return poller, nil
+        }
+
+        // Add, bir dosya tanımlayıcısını kqueue örneğine ekler.
+        func (kp *KqueuePoller) Add(fd int, events int) error {
+            if kp.closed {
+                return ErrClosed
+            }
+            
+            // Değişiklikleri hazırla
+            var changes []syscall.Kevent_t
+            
+            // Okuma olayı
+            if events&EventRead != 0 {
+                readEvent := syscall.Kevent_t{
+                    Ident:  uint64(fd),
+                    Filter: EVFILT_READ,
+                    Flags:  EV_ADD | EV_ENABLE | EV_CLEAR,
+                }
+                changes = append(changes, readEvent)
+            }
+            
+            // Yazma olayı
+            if events&EventWrite != 0 {
+                writeEvent := syscall.Kevent_t{
+                    Ident:  uint64(fd),
+                    Filter: EVFILT_WRITE,
+                    Flags:  EV_ADD | EV_ENABLE | EV_CLEAR,
+                }
+                changes = append(changes, writeEvent)
+            }
+            
+            // Değişiklikleri uygula
+            _, err := syscall.Kevent(kp.kq, changes, nil, nil)
+            if err != nil {
+                return os.NewSyscallError("kevent", err)
+            }
+            
+            // Dosya tanımlayıcısını ID'ye eşle
+            kp.fdToID[fd] = fd
+            
+            return nil
+        }
+
+        // Remove, bir dosya tanımlayıcısını kqueue örneğinden kaldırır.
+        func (kp *KqueuePoller) Remove(fd int) error {
+            if kp.closed {
+                return ErrClosed
+            }
+            
+            // Değişiklikleri hazırla
+            var changes []syscall.Kevent_t
+            
+            // Okuma olayını kaldır
+            readEvent := syscall.Kevent_t{
+                Ident:  uint64(fd),
+                Filter: EVFILT_READ,
+                Flags:  EV_DELETE,
+            }
+            changes = append(changes, readEvent)
+            
+            // Yazma olayını kaldır
+            writeEvent := syscall.Kevent_t{
+                Ident:  uint64(fd),
+                Filter: EVFILT_WRITE,
+                Flags:  EV_DELETE,
+            }
+            changes = append(changes, writeEvent)
+            
+            // Değişiklikleri uygula
+            _, err := syscall.Kevent(kp.kq, changes, nil, nil)
+            if err != nil {
+                // ENOENT hatası, dosya tanımlayıcısı zaten kaldırılmış olabilir
+                if err != syscall.ENOENT {
+                    return os.NewSyscallError("kevent", err)
+                }
+            }
+            
+            // Dosya tanımlayıcısı-ID eşlemesini kaldır
+            delete(kp.fdToID, fd)
+            
+            return nil
+        }
+
+        // Modify, bir dosya tanımlayıcısının kqueue olaylarını değiştirir.
+        func (kp *KqueuePoller) Modify(fd int, events int) error {
+            if kp.closed {
+                return ErrClosed
+            }
+            
+            // Önce kaldır, sonra ekle
+            err := kp.Remove(fd)
+            if err != nil {
+                return err
+            }
+            
+            return kp.Add(fd, events)
+        }
+
+        // Wait, kqueue olaylarını bekler.
+        func (kp *KqueuePoller) Wait(timeout int) ([]Event, error) {
+            if kp.closed {
+                return nil, ErrClosed
+            }
+            
+            // Zaman aşımını ayarla
+            var ts *syscall.Timespec
+            if timeout >= 0 {
+                ts = new(syscall.Timespec)
+                ts.Sec = timeout / 1000
+                ts.Nsec = (timeout % 1000) * 1000000
+            }
+            
+            // Kqueue olaylarını bekle
+            n, err := syscall.Kevent(kp.kq, nil, kp.events, ts)
+            if err != nil {
+                if err == syscall.EINTR {
+                    // Sinyal kesintisi, boş olay listesi döndür
+                    return []Event{}, nil
+                }
+                return nil, os.NewSyscallError("kevent", err)
+            }
+            
+            // Olayları dönüştür
+            events := make([]Event, n)
+            for i := 0; i < n; i++ {
+                kqueueEvent := kp.events[i]
+                fd := int(kqueueEvent.Ident)
+                
+                // Olay türünü belirle
+                eventType := 0
+                if kqueueEvent.Filter == EVFILT_READ {
+                    eventType |= EventRead
+                }
+                if kqueueEvent.Filter == EVFILT_WRITE {
+                    eventType |= EventWrite
+                }
+                if kqueueEvent.Flags&EV_EOF != 0 || kqueueEvent.Flags&EV_ERROR != 0 {
+                    eventType |= EventError
+                }
+                
+                // ID'yi bul
+                id, ok := kp.fdToID[fd]
+                if !ok {
+                    // Bilinmeyen dosya tanımlayıcısı, atla
+                    continue
+                }
+                
+                // Olayı oluştur
+                events[i] = Event{
+                    Type: eventType,
+                    Data: fd,
+                    ID:   id,
+                }
+            }
+            
+            return events, nil
+        }
+
+        // Close, kqueue örneğini kapatır.
+        func (kp *KqueuePoller) Close() error {
+            if kp.closed {
+                return nil
+            }
+            
+            kp.closed = true
+            
+            // Kqueue dosya tanımlayıcısını kapat
+            err := syscall.Close(kp.kq)
+            if err != nil {
+                return os.NewSyscallError("close", err)
+            }
+            
+            return nil
+        }
+}
+
+// newKqueuePoller, yeni bir KqueuePoller oluşturur.
+func newKqueuePoller() (Poller, error) {
+    return KqueuePoller.newKqueuePoller()
+}

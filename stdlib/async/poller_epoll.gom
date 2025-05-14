@@ -1,0 +1,208 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Epoll Poller
+package async
+
+import (
+    "errors"
+    "os"
+    "syscall"
+    "unsafe"
+)
+
+// Linux için epoll sabitleri
+const (
+    EPOLLIN      = 0x1
+    EPOLLOUT     = 0x4
+    EPOLLERR     = 0x8
+    EPOLLHUP     = 0x10
+    EPOLLRDHUP   = 0x2000
+    EPOLLONESHOT = 0x40000000
+    EPOLLET      = 0x80000000
+)
+
+// EpollPoller, Linux epoll API'sini kullanarak bir poller implementasyonu sağlar.
+class EpollPoller {
+    private:
+        var epfd int
+        var events []syscall.EpollEvent
+        var fdToID map[int]int
+        var closed bool
+
+    public:
+        // newEpollPoller, yeni bir EpollPoller oluşturur.
+        static func newEpollPoller() (*EpollPoller, error) {
+            // Epoll dosya tanımlayıcısı oluştur
+            epfd, err := syscall.EpollCreate1(0)
+            if err != nil {
+                return nil, os.NewSyscallError("epoll_create1", err)
+            }
+            
+            poller := new EpollPoller()
+            poller.epfd = epfd
+            poller.events = make([]syscall.EpollEvent, 128)
+            poller.fdToID = make(map[int]int)
+            poller.closed = false
+            
+            return poller, nil
+        }
+
+        // Add, bir dosya tanımlayıcısını epoll örneğine ekler.
+        func (ep *EpollPoller) Add(fd int, events int) error {
+            if ep.closed {
+                return ErrClosed
+            }
+            
+            // Epoll olaylarını dönüştür
+            var epollEvents uint32
+            if events&EventRead != 0 {
+                epollEvents |= EPOLLIN
+            }
+            if events&EventWrite != 0 {
+                epollEvents |= EPOLLOUT
+            }
+            
+            // Edge-triggered modunu etkinleştir
+            epollEvents |= EPOLLET
+            
+            // Epoll olayını oluştur
+            event := syscall.EpollEvent{
+                Events: epollEvents,
+                Fd:     int32(fd),
+            }
+            
+            // Dosya tanımlayıcısını epoll örneğine ekle
+            err := syscall.EpollCtl(ep.epfd, syscall.EPOLL_CTL_ADD, fd, &event)
+            if err != nil {
+                return os.NewSyscallError("epoll_ctl", err)
+            }
+            
+            // Dosya tanımlayıcısını ID'ye eşle
+            ep.fdToID[fd] = fd
+            
+            return nil
+        }
+
+        // Remove, bir dosya tanımlayıcısını epoll örneğinden kaldırır.
+        func (ep *EpollPoller) Remove(fd int) error {
+            if ep.closed {
+                return ErrClosed
+            }
+            
+            // Dosya tanımlayıcısını epoll örneğinden kaldır
+            err := syscall.EpollCtl(ep.epfd, syscall.EPOLL_CTL_DEL, fd, nil)
+            if err != nil {
+                return os.NewSyscallError("epoll_ctl", err)
+            }
+            
+            // Dosya tanımlayıcısı-ID eşlemesini kaldır
+            delete(ep.fdToID, fd)
+            
+            return nil
+        }
+
+        // Modify, bir dosya tanımlayıcısının epoll olaylarını değiştirir.
+        func (ep *EpollPoller) Modify(fd int, events int) error {
+            if ep.closed {
+                return ErrClosed
+            }
+            
+            // Epoll olaylarını dönüştür
+            var epollEvents uint32
+            if events&EventRead != 0 {
+                epollEvents |= EPOLLIN
+            }
+            if events&EventWrite != 0 {
+                epollEvents |= EPOLLOUT
+            }
+            
+            // Edge-triggered modunu etkinleştir
+            epollEvents |= EPOLLET
+            
+            // Epoll olayını oluştur
+            event := syscall.EpollEvent{
+                Events: epollEvents,
+                Fd:     int32(fd),
+            }
+            
+            // Dosya tanımlayıcısının epoll olaylarını değiştir
+            err := syscall.EpollCtl(ep.epfd, syscall.EPOLL_CTL_MOD, fd, &event)
+            if err != nil {
+                return os.NewSyscallError("epoll_ctl", err)
+            }
+            
+            return nil
+        }
+
+        // Wait, epoll olaylarını bekler.
+        func (ep *EpollPoller) Wait(timeout int) ([]Event, error) {
+            if ep.closed {
+                return nil, ErrClosed
+            }
+            
+            // Epoll olaylarını bekle
+            n, err := syscall.EpollWait(ep.epfd, ep.events, timeout)
+            if err != nil {
+                if err == syscall.EINTR {
+                    // Sinyal kesintisi, boş olay listesi döndür
+                    return []Event{}, nil
+                }
+                return nil, os.NewSyscallError("epoll_wait", err)
+            }
+            
+            // Olayları dönüştür
+            events := make([]Event, n)
+            for i := 0; i < n; i++ {
+                epollEvent := ep.events[i]
+                fd := int(epollEvent.Fd)
+                
+                // Olay türünü belirle
+                eventType := 0
+                if epollEvent.Events&EPOLLIN != 0 {
+                    eventType |= EventRead
+                }
+                if epollEvent.Events&EPOLLOUT != 0 {
+                    eventType |= EventWrite
+                }
+                if epollEvent.Events&(EPOLLERR|EPOLLHUP|EPOLLRDHUP) != 0 {
+                    eventType |= EventError
+                }
+                
+                // ID'yi bul
+                id, ok := ep.fdToID[fd]
+                if !ok {
+                    // Bilinmeyen dosya tanımlayıcısı, atla
+                    continue
+                }
+                
+                // Olayı oluştur
+                events[i] = Event{
+                    Type: eventType,
+                    Data: fd,
+                    ID:   id,
+                }
+            }
+            
+            return events, nil
+        }
+
+        // Close, epoll örneğini kapatır.
+        func (ep *EpollPoller) Close() error {
+            if ep.closed {
+                return nil
+            }
+            
+            ep.closed = true
+            
+            // Epoll dosya tanımlayıcısını kapat
+            err := syscall.Close(ep.epfd)
+            if err != nil {
+                return os.NewSyscallError("close", err)
+            }
+            
+            return nil
+        }
+}
+
+// newEpollPoller, yeni bir EpollPoller oluşturur.
+func newEpollPoller() (Poller, error) {
+    return EpollPoller.newEpollPoller()
+}

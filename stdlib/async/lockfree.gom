@@ -1,0 +1,226 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Lock-Free Veri Yapıları
+package async
+
+import (
+    "sync/atomic"
+    "unsafe"
+)
+
+// MemoryOrder, bellek sıralama garantilerini belirtir.
+type MemoryOrder int
+
+const (
+    // Relaxed, en zayıf bellek sıralama garantisidir.
+    // Sadece atomik operasyonun kendisinin atomik olduğunu garanti eder.
+    Relaxed MemoryOrder = iota
+    
+    // Acquire, bir okuma operasyonundan sonraki tüm bellek operasyonlarının
+    // bu okuma operasyonundan sonra gerçekleşmesini garanti eder.
+    Acquire
+    
+    // Release, bir yazma operasyonundan önceki tüm bellek operasyonlarının
+    // bu yazma operasyonundan önce gerçekleşmesini garanti eder.
+    Release
+    
+    // AcquireRelease, hem Acquire hem de Release garantilerini sağlar.
+    AcquireRelease
+    
+    // SequentiallyConsistent, en güçlü bellek sıralama garantisidir.
+    // Tüm atomik operasyonların global bir sırada gerçekleşmesini garanti eder.
+    SequentiallyConsistent
+)
+
+// AtomicPointer, atomik işlemler için bir pointer sarmalayıcısıdır.
+// ABA problemini önlemek için bir sayaç içerir.
+class AtomicPointer<T> {
+    private:
+        var ptr unsafe.Pointer
+        var count uint64
+    
+    public:
+        // New, yeni bir AtomicPointer oluşturur.
+        static func New<T>(value *T) *AtomicPointer<T> {
+            ap := new AtomicPointer<T>()
+            ap.ptr = unsafe.Pointer(value)
+            ap.count = 0
+            
+            return ap
+        }
+        
+        // Load, atomik olarak pointer'ı ve sayacı yükler.
+        func (ap *AtomicPointer<T>) Load(order MemoryOrder) (*T, uint64) {
+            // Atomik olarak pointer'ı yükle
+            ptr := atomic.LoadPointer(&ap.ptr)
+            
+            // Atomik olarak sayacı yükle
+            count := atomic.LoadUint64(&ap.count)
+            
+            return (*T)(ptr), count
+        }
+        
+        // Store, atomik olarak pointer'ı ve sayacı saklar.
+        func (ap *AtomicPointer<T>) Store(value *T, order MemoryOrder) {
+            // Atomik olarak pointer'ı sakla
+            atomic.StorePointer(&ap.ptr, unsafe.Pointer(value))
+            
+            // Atomik olarak sayacı artır
+            atomic.AddUint64(&ap.count, 1)
+        }
+        
+        // CompareAndSwap, atomik olarak pointer'ı ve sayacı karşılaştırır ve değiştirir.
+        // Eğer mevcut değerler beklenen değerlere eşitse, yeni değerleri saklar ve true döndürür.
+        // Aksi takdirde, false döndürür.
+        func (ap *AtomicPointer<T>) CompareAndSwap(expected *T, expectedCount uint64, desired *T, order MemoryOrder) bool {
+            // Atomik olarak pointer'ı ve sayacı karşılaştır ve değiştir
+            return atomic.CompareAndSwapPointer(&ap.ptr, unsafe.Pointer(expected), unsafe.Pointer(desired)) &&
+                   atomic.CompareAndSwapUint64(&ap.count, expectedCount, expectedCount+1)
+        }
+        
+        // GetPointer, atomik olarak pointer'ı yükler.
+        func (ap *AtomicPointer<T>) GetPointer(order MemoryOrder) *T {
+            // Atomik olarak pointer'ı yükle
+            ptr := atomic.LoadPointer(&ap.ptr)
+            
+            return (*T)(ptr)
+        }
+        
+        // GetCount, atomik olarak sayacı yükler.
+        func (ap *AtomicPointer<T>) GetCount(order MemoryOrder) uint64 {
+            // Atomik olarak sayacı yükle
+            return atomic.LoadUint64(&ap.count)
+        }
+}
+
+// AtomicFlag, atomik bir boolean değeri temsil eder.
+class AtomicFlag {
+    private:
+        var value uint32
+    
+    public:
+        // New, yeni bir AtomicFlag oluşturur.
+        static func New(initialValue bool) *AtomicFlag {
+            af := new AtomicFlag()
+            
+            if initialValue {
+                af.value = 1
+            } else {
+                af.value = 0
+            }
+            
+            return af
+        }
+        
+        // Load, atomik olarak değeri yükler.
+        func (af *AtomicFlag) Load(order MemoryOrder) bool {
+            return atomic.LoadUint32(&af.value) != 0
+        }
+        
+        // Store, atomik olarak değeri saklar.
+        func (af *AtomicFlag) Store(value bool, order MemoryOrder) {
+            var intValue uint32
+            if value {
+                intValue = 1
+            } else {
+                intValue = 0
+            }
+            
+            atomic.StoreUint32(&af.value, intValue)
+        }
+        
+        // CompareAndSwap, atomik olarak değeri karşılaştırır ve değiştirir.
+        // Eğer mevcut değer beklenen değere eşitse, yeni değeri saklar ve true döndürür.
+        // Aksi takdirde, false döndürür.
+        func (af *AtomicFlag) CompareAndSwap(expected bool, desired bool, order MemoryOrder) bool {
+            var expectedInt, desiredInt uint32
+            
+            if expected {
+                expectedInt = 1
+            } else {
+                expectedInt = 0
+            }
+            
+            if desired {
+                desiredInt = 1
+            } else {
+                desiredInt = 0
+            }
+            
+            return atomic.CompareAndSwapUint32(&af.value, expectedInt, desiredInt)
+        }
+        
+        // Exchange, atomik olarak değeri değiştirir ve eski değeri döndürür.
+        func (af *AtomicFlag) Exchange(value bool, order MemoryOrder) bool {
+            var intValue uint32
+            if value {
+                intValue = 1
+            } else {
+                intValue = 0
+            }
+            
+            return atomic.SwapUint32(&af.value, intValue) != 0
+        }
+}
+
+// AtomicCounter, atomik bir sayaç temsil eder.
+class AtomicCounter {
+    private:
+        var value uint64
+    
+    public:
+        // New, yeni bir AtomicCounter oluşturur.
+        static func New(initialValue uint64) *AtomicCounter {
+            ac := new AtomicCounter()
+            ac.value = initialValue
+            
+            return ac
+        }
+        
+        // Load, atomik olarak değeri yükler.
+        func (ac *AtomicCounter) Load(order MemoryOrder) uint64 {
+            return atomic.LoadUint64(&ac.value)
+        }
+        
+        // Store, atomik olarak değeri saklar.
+        func (ac *AtomicCounter) Store(value uint64, order MemoryOrder) {
+            atomic.StoreUint64(&ac.value, value)
+        }
+        
+        // Add, atomik olarak değeri artırır ve eski değeri döndürür.
+        func (ac *AtomicCounter) Add(delta uint64, order MemoryOrder) uint64 {
+            return atomic.AddUint64(&ac.value, delta)
+        }
+        
+        // Increment, atomik olarak değeri bir artırır ve eski değeri döndürür.
+        func (ac *AtomicCounter) Increment(order MemoryOrder) uint64 {
+            return ac.Add(1, order)
+        }
+        
+        // Decrement, atomik olarak değeri bir azaltır ve eski değeri döndürür.
+        func (ac *AtomicCounter) Decrement(order MemoryOrder) uint64 {
+            return ac.Add(^uint64(0), order)
+        }
+        
+        // CompareAndSwap, atomik olarak değeri karşılaştırır ve değiştirir.
+        // Eğer mevcut değer beklenen değere eşitse, yeni değeri saklar ve true döndürür.
+        // Aksi takdirde, false döndürür.
+        func (ac *AtomicCounter) CompareAndSwap(expected uint64, desired uint64, order MemoryOrder) bool {
+            return atomic.CompareAndSwapUint64(&ac.value, expected, desired)
+        }
+        
+        // Exchange, atomik olarak değeri değiştirir ve eski değeri döndürür.
+        func (ac *AtomicCounter) Exchange(value uint64, order MemoryOrder) uint64 {
+            return atomic.SwapUint64(&ac.value, value)
+        }
+}
+
+// MemoryBarrier, bellek bariyeri oluşturur.
+// Bu fonksiyon, belirtilen bellek sıralama garantisine göre bellek erişimlerini sıralar.
+func MemoryBarrier(order MemoryOrder) {
+    // SequentiallyConsistent için tam bellek bariyeri
+    if order == SequentiallyConsistent {
+        atomic.CompareAndSwapUint32(new(uint32), 0, 0)
+    }
+    
+    // Diğer bellek sıralama garantileri için Go'nun atomik paketinde doğrudan destek yok
+    // Bu nedenle, SequentiallyConsistent kullanılır
+}

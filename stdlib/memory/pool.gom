@@ -1,0 +1,187 @@
+// GO-Minus Standart Kütüphane - Memory Paketi - Pool
+// Bu dosya, GO-Minus programlama dili için bellek havuzu şablonları (Memory Pool Templates) implementasyonunu içerir.
+package memory
+
+import (
+    "sync"
+    "unsafe"
+)
+
+// PoolStats, bellek havuzunun istatistiklerini içerir.
+struct PoolStats {
+    // TotalSize, toplam bellek boyutu (bayt cinsinden).
+    TotalSize uint64
+    
+    // UsedSize, kullanılan bellek boyutu (bayt cinsinden).
+    UsedSize uint64
+    
+    // ItemSize, her bir öğenin boyutu (bayt cinsinden).
+    ItemSize uint64
+    
+    // Capacity, havuzun kapasitesi (öğe sayısı).
+    Capacity uint64
+    
+    // Available, kullanılabilir öğe sayısı.
+    Available uint64
+    
+    // GetCount, havuzdan alınan öğe sayısı.
+    GetCount uint64
+    
+    // ReturnCount, havuza geri döndürülen öğe sayısı.
+    ReturnCount uint64
+}
+
+// PoolItem, bellek havuzundaki bir öğeyi temsil eder.
+struct PoolItem<T> {
+    // Data, öğenin verisi.
+    Data T
+    
+    // Next, sonraki öğe.
+    Next *PoolItem<T>
+}
+
+// Pool, bellek havuzu şablonudur.
+// Bu sınıf, belirli bir tipte nesneler için bellek havuzu sağlar.
+class Pool<T> {
+    private:
+        var items *PoolItem<T>
+        var capacity uint64
+        var available uint64
+        var itemSize uint64
+        var stats PoolStats
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir Pool örneği oluşturur.
+        static func New(capacity uint64) *Pool<T> {
+            if capacity == 0 {
+                capacity = 1024 // Varsayılan kapasite: 1024 öğe
+            }
+            
+            itemSize := uint64(unsafe.Sizeof(T{}))
+            
+            pool := &Pool<T>{
+                capacity: capacity,
+                available: 0,
+                itemSize: itemSize,
+                stats: PoolStats{
+                    ItemSize: itemSize,
+                    Capacity: capacity,
+                    Available: 0,
+                },
+            }
+            
+            return pool
+        }
+        
+        // Get, havuzdan bir öğe alır.
+        // Eğer havuzda kullanılabilir öğe yoksa, yeni bir öğe oluşturur.
+        func Get() *T {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            var item *PoolItem<T>
+            
+            // Havuzda kullanılabilir öğe varsa, onu kullan
+            if this.items != null {
+                item = this.items
+                this.items = item.Next
+                this.available--
+                this.stats.Available = this.available
+            } else {
+                // Yeni bir öğe oluştur
+                item = &PoolItem<T>{}
+                this.stats.TotalSize += this.itemSize
+            }
+            
+            this.stats.UsedSize += this.itemSize
+            this.stats.GetCount++
+            
+            // Öğenin adresini döndür
+            return &item.Data
+        }
+        
+        // Return, bir öğeyi havuza geri döndürür.
+        func Return(ptr *T) {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Eğer havuz kapasitesi doluysa, öğeyi serbest bırak
+            if this.available >= this.capacity {
+                this.stats.UsedSize -= this.itemSize
+                return
+            }
+            
+            // PoolItem yapısının adresini hesapla
+            itemPtr := unsafe.Pointer(uintptr(unsafe.Pointer(ptr)) - unsafe.Offsetof(PoolItem<T>{}.Data))
+            item := (*PoolItem<T>)(itemPtr)
+            
+            // Öğeyi havuza ekle
+            item.Next = this.items
+            this.items = item
+            this.available++
+            
+            this.stats.Available = this.available
+            this.stats.UsedSize -= this.itemSize
+            this.stats.ReturnCount++
+        }
+        
+        // GetStats, bellek havuzunun istatistiklerini döndürür.
+        func GetStats() PoolStats {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            return this.stats
+        }
+        
+        // Clear, havuzu temizler.
+        func Clear() {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            this.items = null
+            this.available = 0
+            
+            this.stats.Available = 0
+            this.stats.UsedSize = 0
+            this.stats.GetCount = 0
+            this.stats.ReturnCount = 0
+        }
+        
+        // Resize, havuzun kapasitesini değiştirir.
+        func Resize(newCapacity uint64) {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            if newCapacity < this.available {
+                // Kapasiteyi azaltıyorsak, fazla öğeleri serbest bırak
+                var item *PoolItem<T>
+                var next *PoolItem<T>
+                var count uint64 = 0
+                
+                item = this.items
+                this.items = null
+                
+                // Yeni kapasiteye kadar öğeleri yeni listeye ekle
+                for item != null && count < newCapacity {
+                    next = item.Next
+                    item.Next = this.items
+                    this.items = item
+                    item = next
+                    count++
+                }
+                
+                this.available = count
+                this.stats.Available = count
+                this.stats.TotalSize -= (this.available - count) * this.itemSize
+            }
+            
+            this.capacity = newCapacity
+            this.stats.Capacity = newCapacity
+        }
+}
+
+// NewPool, yeni bir Pool örneği oluşturur.
+func NewPool<T>(capacity uint64) *Pool<T> {
+    return Pool<T>.New(capacity)
+}

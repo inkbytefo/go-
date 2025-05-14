@@ -1,0 +1,198 @@
+// GO-Minus Standart Kütüphane - Async Paketi - IOCP Poller
+package async
+
+import (
+    "errors"
+    "os"
+    "syscall"
+    "unsafe"
+)
+
+// Windows için IOCP sabitleri
+const (
+    INVALID_HANDLE_VALUE = ^uintptr(0)
+    INFINITE             = 0xFFFFFFFF
+    IOC_OUT              = 0x40000000
+    IOC_IN               = 0x80000000
+    IOC_INOUT            = IOC_IN | IOC_OUT
+    IOC_WS2              = 0x08000000
+)
+
+// Windows için IOCP yapıları
+type OVERLAPPED struct {
+    Internal     uintptr
+    InternalHigh uintptr
+    Offset       uint32
+    OffsetHigh   uint32
+    HEvent       uintptr
+}
+
+type WSABUF struct {
+    Len uint32
+    Buf *byte
+}
+
+// IOCPPoller, Windows IOCP API'sini kullanarak bir poller implementasyonu sağlar.
+class IOCPPoller {
+    private:
+        var iocp uintptr
+        var handles map[uintptr]int
+        var closed bool
+
+    public:
+        // newIOCPPoller, yeni bir IOCPPoller oluşturur.
+        static func newIOCPPoller() (*IOCPPoller, error) {
+            // IOCP oluştur
+            iocp, err := syscall.CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0)
+            if err != nil {
+                return nil, os.NewSyscallError("CreateIoCompletionPort", err)
+            }
+            
+            poller := new IOCPPoller()
+            poller.iocp = iocp
+            poller.handles = make(map[uintptr]int)
+            poller.closed = false
+            
+            return poller, nil
+        }
+
+        // Add, bir handle'ı IOCP'ye ekler.
+        func (ip *IOCPPoller) Add(fd int, events int) error {
+            if ip.closed {
+                return ErrClosed
+            }
+            
+            // Windows handle'ını al
+            handle := syscall.Handle(fd)
+            
+            // Handle'ı IOCP'ye ekle
+            _, err := syscall.CreateIoCompletionPort(uintptr(handle), ip.iocp, uintptr(fd), 0)
+            if err != nil {
+                return os.NewSyscallError("CreateIoCompletionPort", err)
+            }
+            
+            // Handle'ı kaydet
+            ip.handles[uintptr(handle)] = fd
+            
+            return nil
+        }
+
+        // Remove, bir handle'ı IOCP'den kaldırır.
+        func (ip *IOCPPoller) Remove(fd int) error {
+            if ip.closed {
+                return ErrClosed
+            }
+            
+            // Windows handle'ını al
+            handle := syscall.Handle(fd)
+            
+            // Handle'ı kaldır
+            delete(ip.handles, uintptr(handle))
+            
+            // Not: Windows'ta bir handle'ı IOCP'den kaldırmak için doğrudan bir API yoktur.
+            // Handle'ı kapatmak, IOCP'den de kaldırır.
+            
+            return nil
+        }
+
+        // Modify, bir handle'ın IOCP olaylarını değiştirir.
+        func (ip *IOCPPoller) Modify(fd int, events int) error {
+            if ip.closed {
+                return ErrClosed
+            }
+            
+            // Windows'ta IOCP olaylarını değiştirmek için doğrudan bir API yoktur.
+            // Asenkron işlemleri başlatırken olaylar belirtilir.
+            
+            return nil
+        }
+
+        // Wait, IOCP olaylarını bekler.
+        func (ip *IOCPPoller) Wait(timeout int) ([]Event, error) {
+            if ip.closed {
+                return nil, ErrClosed
+            }
+            
+            // Zaman aşımını ayarla
+            var ms uint32
+            if timeout < 0 {
+                ms = INFINITE
+            } else {
+                ms = uint32(timeout)
+            }
+            
+            // IOCP olayını bekle
+            var bytes uint32
+            var completionKey uintptr
+            var overlapped *OVERLAPPED
+            
+            err := syscall.GetQueuedCompletionStatus(ip.iocp, &bytes, &completionKey, &overlapped, ms)
+            
+            // Zaman aşımı kontrolü
+            if err == syscall.WAIT_TIMEOUT {
+                return []Event{}, nil
+            }
+            
+            // Hata kontrolü
+            if err != nil && overlapped == nil {
+                return nil, os.NewSyscallError("GetQueuedCompletionStatus", err)
+            }
+            
+            // Olayı oluştur
+            events := make([]Event, 1)
+            
+            // Olay türünü belirle
+            eventType := 0
+            if bytes > 0 {
+                eventType |= EventRead
+            } else {
+                eventType |= EventWrite
+            }
+            
+            if err != nil {
+                eventType |= EventError
+            }
+            
+            // ID'yi bul
+            fd, ok := ip.handles[completionKey]
+            if !ok {
+                // Bilinmeyen handle, boş olay listesi döndür
+                return []Event{}, nil
+            }
+            
+            // Olayı oluştur
+            events[0] = Event{
+                Type: eventType,
+                Data: fd,
+                ID:   fd,
+            }
+            
+            if err != nil {
+                events[0].Error = os.NewSyscallError("GetQueuedCompletionStatus", err)
+            }
+            
+            return events, nil
+        }
+
+        // Close, IOCP örneğini kapatır.
+        func (ip *IOCPPoller) Close() error {
+            if ip.closed {
+                return nil
+            }
+            
+            ip.closed = true
+            
+            // IOCP handle'ını kapat
+            err := syscall.CloseHandle(syscall.Handle(ip.iocp))
+            if err != nil {
+                return os.NewSyscallError("CloseHandle", err)
+            }
+            
+            return nil
+        }
+}
+
+// newIOCPPoller, yeni bir IOCPPoller oluşturur.
+func newIOCPPoller() (Poller, error) {
+    return IOCPPoller.newIOCPPoller()
+}

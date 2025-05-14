@@ -1,0 +1,211 @@
+// GO-Minus Standart Kütüphane - Async Paketi - EventLoop Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "os"
+    "syscall"
+)
+
+// TestEventLoopCreation, EventLoop oluşturmayı test eder.
+func TestEventLoopCreation(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop nil olmamalı
+    if loop == nil {
+        t.Fatal("EventLoop nil")
+    }
+}
+
+// TestEventLoopStartStop, EventLoop başlatma ve durdurma işlemlerini test eder.
+func TestEventLoopStartStop(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    
+    // EventLoop durdur
+    err = loop.Stop()
+    if err != nil {
+        t.Fatalf("EventLoop durdurma hatası: %v", err)
+    }
+    
+    // EventLoop tekrar başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop tekrar başlatma hatası: %v", err)
+    }
+    
+    // EventLoop tekrar durdur
+    err = loop.Stop()
+    if err != nil {
+        t.Fatalf("EventLoop tekrar durdurma hatası: %v", err)
+    }
+}
+
+// TestEventLoopDoubleStart, EventLoop'u iki kez başlatmayı test eder.
+func TestEventLoopDoubleStart(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    
+    // EventLoop tekrar başlat (hata vermeli)
+    err = loop.Start()
+    if err == nil {
+        t.Fatal("EventLoop iki kez başlatılabildi, hata bekleniyor")
+    }
+    
+    // EventLoop durdur
+    err = loop.Stop()
+    if err != nil {
+        t.Fatalf("EventLoop durdurma hatası: %v", err)
+    }
+}
+
+// TestEventLoopDoubleStop, EventLoop'u iki kez durdurmayı test eder.
+func TestEventLoopDoubleStop(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    
+    // EventLoop durdur
+    err = loop.Stop()
+    if err != nil {
+        t.Fatalf("EventLoop durdurma hatası: %v", err)
+    }
+    
+    // EventLoop tekrar durdur (hata vermeli)
+    err = loop.Stop()
+    if err == nil {
+        t.Fatal("EventLoop iki kez durdurulabildi, hata bekleniyor")
+    }
+}
+
+// TestEventLoopWakeup, EventLoop uyandırma işlemini test eder.
+func TestEventLoopWakeup(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    
+    // EventLoop uyandır
+    loop.Wakeup()
+    
+    // Kısa bir süre bekle
+    time.Sleep(100 * time.Millisecond)
+    
+    // EventLoop durdur
+    err = loop.Stop()
+    if err != nil {
+        t.Fatalf("EventLoop durdurma hatası: %v", err)
+    }
+}
+
+// TestEventLoopRegisterUnregister, dosya tanımlayıcısı kaydetme ve kaldırma işlemlerini test eder.
+func TestEventLoopRegisterUnregister(t *testing.T) {
+    // Geçici bir dosya oluştur
+    file, err := os.CreateTemp("", "eventloop_test")
+    if err != nil {
+        t.Fatalf("Geçici dosya oluşturma hatası: %v", err)
+    }
+    defer file.Close()
+    defer os.Remove(file.Name())
+    
+    // Dosya tanımlayıcısını al
+    fd := int(file.Fd())
+    
+    // Dosya tanımlayıcısını non-blocking olarak ayarla
+    err = syscall.SetNonblock(fd, true)
+    if err != nil {
+        t.Fatalf("Dosya tanımlayıcısını non-blocking olarak ayarlama hatası: %v", err)
+    }
+    
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    
+    // Test işleyicisi oluştur
+    handler := new testHandler()
+    
+    // Dosya tanımlayıcısını kaydet
+    id, err := loop.Register(fd, async.EventRead, handler)
+    if err != nil {
+        t.Fatalf("Dosya tanımlayıcısı kaydetme hatası: %v", err)
+    }
+    
+    // ID geçerli olmalı
+    if id <= 0 {
+        t.Fatalf("Geçersiz kayıt ID'si: %d", id)
+    }
+    
+    // Dosya tanımlayıcısını kaldır
+    err = loop.Unregister(id)
+    if err != nil {
+        t.Fatalf("Dosya tanımlayıcısı kaldırma hatası: %v", err)
+    }
+    
+    // Geçersiz ID ile kaldırmayı dene (hata vermeli)
+    err = loop.Unregister(9999)
+    if err == nil {
+        t.Fatal("Geçersiz ID ile kaldırma başarılı oldu, hata bekleniyor")
+    }
+    
+    // EventLoop durdur
+    err = loop.Stop()
+    if err != nil {
+        t.Fatalf("EventLoop durdurma hatası: %v", err)
+    }
+}
+
+// testHandler, test için bir AsyncHandler implementasyonu.
+class testHandler {
+    var eventCount int
+    
+    func (h *testHandler) OnEvent(event async.Event) {
+        h.eventCount++
+    }
+}

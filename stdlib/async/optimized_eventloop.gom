@@ -1,0 +1,692 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized EventLoop
+package async
+
+import (
+    "sync"
+    "time"
+    "errors"
+    "runtime"
+    "sync/atomic"
+)
+
+// CPUInfo, CPU bilgilerini içerir.
+class CPUInfo {
+    var NumCPU int
+    var NumPhysicalCores int
+    var NumLogicalCores int
+    var CacheLineSize int
+    var L1CacheSize int
+    var L2CacheSize int
+    var L3CacheSize int
+    
+    // GetCPUInfo, CPU bilgilerini döndürür.
+    static func GetCPUInfo() *CPUInfo {
+        info := new CPUInfo()
+        info.NumCPU = runtime.NumCPU()
+        info.NumPhysicalCores = runtime.NumCPU() // Basitleştirilmiş
+        info.NumLogicalCores = runtime.NumCPU()
+        info.CacheLineSize = CacheLineSize
+        
+        // Varsayılan değerler (platform bağımlı olarak değişebilir)
+        info.L1CacheSize = 32 * 1024      // 32 KB
+        info.L2CacheSize = 256 * 1024     // 256 KB
+        info.L3CacheSize = 8 * 1024 * 1024 // 8 MB
+        
+        return info
+    }
+}
+
+// WorkStealingQueue, iş çalma algoritması kullanan bir kuyruk implementasyonudur.
+class WorkStealingQueue<T> {
+    private:
+        var items []T
+        var head int64
+        var tail int64
+        var mask int64
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir WorkStealingQueue oluşturur.
+        static func New<T>(capacity int) *WorkStealingQueue<T> {
+            // Capacity değeri 2'nin katı olmalıdır
+            if capacity & (capacity - 1) != 0 {
+                capacity = nextPowerOfTwo(capacity)
+            }
+            
+            q := new WorkStealingQueue<T>()
+            q.items = make([]T, capacity)
+            q.head = 0
+            q.tail = 0
+            q.mask = int64(capacity - 1)
+            
+            return q
+        }
+        
+        // PushBottom, kuyruğun sonuna bir eleman ekler (üretici tarafından çağrılır).
+        func (q *WorkStealingQueue<T>) PushBottom(value T) {
+            tail := atomic.LoadInt64(&q.tail)
+            
+            // Kuyruk dolu mu kontrol et
+            if tail - atomic.LoadInt64(&q.head) > q.mask {
+                // Kuyruk dolu, genişlet
+                q.grow()
+            }
+            
+            q.items[tail & q.mask] = value
+            atomic.StoreInt64(&q.tail, tail + 1)
+        }
+        
+        // PopBottom, kuyruğun sonundan bir eleman çıkarır (üretici tarafından çağrılır).
+        func (q *WorkStealingQueue<T>) PopBottom() (T, bool) {
+            tail := atomic.LoadInt64(&q.tail) - 1
+            atomic.StoreInt64(&q.tail, tail)
+            
+            head := atomic.LoadInt64(&q.head)
+            
+            if head <= tail {
+                // Kuyrukta en az bir eleman var
+                value := q.items[tail & q.mask]
+                
+                if head == tail {
+                    // Son eleman
+                    if !atomic.CompareAndSwapInt64(&q.head, head, head + 1) {
+                        // Başka bir thread tarafından çalındı
+                        var zero T
+                        return zero, false
+                    }
+                    
+                    atomic.StoreInt64(&q.tail, tail + 1)
+                }
+                
+                return value, true
+            } else {
+                // Kuyruk boş
+                atomic.StoreInt64(&q.tail, tail + 1)
+                var zero T
+                return zero, false
+            }
+        }
+        
+        // StealTop, kuyruğun başından bir eleman çalar (tüketici tarafından çağrılır).
+        func (q *WorkStealingQueue<T>) StealTop() (T, bool) {
+            head := atomic.LoadInt64(&q.head)
+            tail := atomic.LoadInt64(&q.tail)
+            
+            if head < tail {
+                // Kuyrukta en az bir eleman var
+                value := q.items[head & q.mask]
+                
+                if atomic.CompareAndSwapInt64(&q.head, head, head + 1) {
+                    return value, true
+                }
+            }
+            
+            // Kuyruk boş veya çalma başarısız
+            var zero T
+            return zero, false
+        }
+        
+        // Size, kuyruktaki eleman sayısını döndürür.
+        func (q *WorkStealingQueue<T>) Size() int {
+            head := atomic.LoadInt64(&q.head)
+            tail := atomic.LoadInt64(&q.tail)
+            
+            return int(tail - head)
+        }
+        
+        // IsEmpty, kuyruğun boş olup olmadığını kontrol eder.
+        func (q *WorkStealingQueue<T>) IsEmpty() bool {
+            return q.Size() == 0
+        }
+        
+        // grow, kuyruğu genişletir.
+        private func (q *WorkStealingQueue<T>) grow() {
+            q.mutex.Lock()
+            defer q.mutex.Unlock()
+            
+            head := atomic.LoadInt64(&q.head)
+            tail := atomic.LoadInt64(&q.tail)
+            
+            size := tail - head
+            
+            if size <= q.mask {
+                // Başka bir thread tarafından genişletilmiş
+                return
+            }
+            
+            // Yeni dizi oluştur (2 kat büyük)
+            newCapacity := (q.mask + 1) * 2
+            newItems := make([]T, newCapacity)
+            
+            // Elemanları kopyala
+            for i := int64(0); i < size; i++ {
+                newItems[i] = q.items[(head + i) & q.mask]
+            }
+            
+            // Yeni diziyi ayarla
+            q.items = newItems
+            q.mask = newCapacity - 1
+            atomic.StoreInt64(&q.head, 0)
+            atomic.StoreInt64(&q.tail, size)
+        }
+}
+
+// OptimizedThreadPool, iş parçacığı havuzunu temsil eder.
+class OptimizedThreadPool {
+    private:
+        var workers []*Worker
+        var queues []*WorkStealingQueue<Task>
+        var numWorkers int
+        var isRunning bool
+        var mutex sync.Mutex
+        var stopChan chan struct{}
+        var cpuInfo *CPUInfo
+        var idleWorkers int32
+        var totalTasks int64
+        var completedTasks int64
+    
+    public:
+        // New, yeni bir OptimizedThreadPool oluşturur.
+        static func New(numWorkers int) *OptimizedThreadPool {
+            if numWorkers <= 0 {
+                cpuInfo := CPUInfo.GetCPUInfo()
+                numWorkers = cpuInfo.NumLogicalCores
+            }
+            
+            pool := new OptimizedThreadPool()
+            pool.numWorkers = numWorkers
+            pool.workers = make([]*Worker, numWorkers)
+            pool.queues = make([]*WorkStealingQueue<Task>, numWorkers)
+            pool.isRunning = false
+            pool.stopChan = make(chan struct{})
+            pool.cpuInfo = CPUInfo.GetCPUInfo()
+            
+            // İş çalma kuyrukları oluştur
+            for i := 0; i < numWorkers; i++ {
+                pool.queues[i] = WorkStealingQueue.New<Task>(1024)
+            }
+            
+            return pool
+        }
+        
+        // Start, iş parçacığı havuzunu başlatır.
+        func (pool *OptimizedThreadPool) Start() {
+            pool.mutex.Lock()
+            defer pool.mutex.Unlock()
+            
+            if pool.isRunning {
+                return
+            }
+            
+            pool.isRunning = true
+            
+            // İş parçacıklarını oluştur ve başlat
+            for i := 0; i < pool.numWorkers; i++ {
+                worker := Worker.New(i, pool)
+                pool.workers[i] = worker
+                
+                go worker.Run()
+            }
+        }
+        
+        // Stop, iş parçacığı havuzunu durdurur.
+        func (pool *OptimizedThreadPool) Stop() {
+            pool.mutex.Lock()
+            defer pool.mutex.Unlock()
+            
+            if !pool.isRunning {
+                return
+            }
+            
+            pool.isRunning = false
+            
+            // Durdurma sinyali gönder
+            close(pool.stopChan)
+            
+            // İş parçacıklarının durmasını bekle
+            for _, worker := range pool.workers {
+                worker.Stop()
+            }
+        }
+        
+        // Submit, bir görevi iş parçacığı havuzuna gönderir.
+        func (pool *OptimizedThreadPool) Submit(task Task) {
+            if !pool.isRunning {
+                return
+            }
+            
+            // Toplam görev sayısını artır
+            atomic.AddInt64(&pool.totalTasks, 1)
+            
+            // En az yüklü iş parçacığını bul
+            workerID := pool.findLeastLoadedWorker()
+            
+            // Görevi kuyruğa ekle
+            pool.queues[workerID].PushBottom(task)
+            
+            // İş parçacığını uyandır
+            pool.workers[workerID].Wakeup()
+        }
+        
+        // findLeastLoadedWorker, en az yüklü iş parçacığını bulur.
+        private func (pool *OptimizedThreadPool) findLeastLoadedWorker() int {
+            minLoad := pool.queues[0].Size()
+            minWorkerID := 0
+            
+            for i := 1; i < pool.numWorkers; i++ {
+                load := pool.queues[i].Size()
+                
+                if load < minLoad {
+                    minLoad = load
+                    minWorkerID = i
+                }
+            }
+            
+            return minWorkerID
+        }
+        
+        // GetQueue, belirtilen iş parçacığının kuyruğunu döndürür.
+        func (pool *OptimizedThreadPool) GetQueue(workerID int) *WorkStealingQueue<Task> {
+            return pool.queues[workerID]
+        }
+        
+        // GetStopChan, durdurma kanalını döndürür.
+        func (pool *OptimizedThreadPool) GetStopChan() chan struct{} {
+            return pool.stopChan
+        }
+        
+        // MarkWorkerIdle, bir iş parçacığını boşta olarak işaretler.
+        func (pool *OptimizedThreadPool) MarkWorkerIdle() {
+            atomic.AddInt32(&pool.idleWorkers, 1)
+        }
+        
+        // MarkWorkerBusy, bir iş parçacığını meşgul olarak işaretler.
+        func (pool *OptimizedThreadPool) MarkWorkerBusy() {
+            atomic.AddInt32(&pool.idleWorkers, -1)
+        }
+        
+        // MarkTaskCompleted, bir görevin tamamlandığını işaretler.
+        func (pool *OptimizedThreadPool) MarkTaskCompleted() {
+            atomic.AddInt64(&pool.completedTasks, 1)
+        }
+        
+        // GetStats, iş parçacığı havuzu istatistiklerini döndürür.
+        func (pool *OptimizedThreadPool) GetStats() map[string]interface{} {
+            return map[string]interface{}{
+                "numWorkers":     pool.numWorkers,
+                "idleWorkers":    atomic.LoadInt32(&pool.idleWorkers),
+                "totalTasks":     atomic.LoadInt64(&pool.totalTasks),
+                "completedTasks": atomic.LoadInt64(&pool.completedTasks),
+                "pendingTasks":   atomic.LoadInt64(&pool.totalTasks) - atomic.LoadInt64(&pool.completedTasks),
+            }
+        }
+}
+
+// Worker, iş parçacığı havuzundaki bir iş parçacığını temsil eder.
+class Worker {
+    private:
+        var id int
+        var pool *OptimizedThreadPool
+        var wakeupChan chan struct{}
+        var isRunning bool
+    
+    public:
+        // New, yeni bir Worker oluşturur.
+        static func New(id int, pool *OptimizedThreadPool) *Worker {
+            worker := new Worker()
+            worker.id = id
+            worker.pool = pool
+            worker.wakeupChan = make(chan struct{}, 1)
+            worker.isRunning = true
+            
+            return worker
+        }
+        
+        // Run, iş parçacığını çalıştırır.
+        func (w *Worker) Run() {
+            // CPU çekirdeğine bağla (CPU affinity)
+            // Not: GO-Minus'ta doğrudan CPU affinity desteği yok
+            
+            for w.isRunning {
+                // Görev almaya çalış
+                task, ok := w.getTask()
+                
+                if ok {
+                    // Görevi işle
+                    w.pool.MarkWorkerBusy()
+                    task.Execute()
+                    w.pool.MarkTaskCompleted()
+                    w.pool.MarkWorkerIdle()
+                } else {
+                    // Boşta bekle
+                    w.pool.MarkWorkerIdle()
+                    
+                    // Uyandırma sinyali veya durdurma sinyali bekle
+                    select {
+                    case <-w.wakeupChan:
+                        // Uyandırma sinyali alındı
+                    case <-w.pool.GetStopChan():
+                        // Durdurma sinyali alındı
+                        w.isRunning = false
+                    case <-time.After(10 * time.Millisecond):
+                        // Zaman aşımı, tekrar görev almaya çalış
+                    }
+                }
+            }
+        }
+        
+        // Stop, iş parçacığını durdurur.
+        func (w *Worker) Stop() {
+            w.isRunning = false
+            w.Wakeup()
+        }
+        
+        // Wakeup, iş parçacığını uyandırır.
+        func (w *Worker) Wakeup() {
+            select {
+            case w.wakeupChan <- struct{}{}:
+            default:
+            }
+        }
+        
+        // getTask, bir görev alır.
+        private func (w *Worker) getTask() (Task, bool) {
+            // Önce kendi kuyruğundan görev almaya çalış
+            queue := w.pool.GetQueue(w.id)
+            task, ok := queue.PopBottom()
+            
+            if ok {
+                return task, true
+            }
+            
+            // Kendi kuyruğu boşsa, diğer kuyrukları çalmaya çalış
+            for i := 0; i < w.pool.numWorkers; i++ {
+                if i == w.id {
+                    continue
+                }
+                
+                otherQueue := w.pool.GetQueue(i)
+                task, ok := otherQueue.StealTop()
+                
+                if ok {
+                    return task, true
+                }
+            }
+            
+            // Hiçbir kuyrukta görev bulunamadı
+            var zero Task
+            return zero, false
+        }
+}
+
+// Task, iş parçacığı havuzu tarafından işlenecek bir görevi temsil eder.
+interface Task {
+    func Execute()
+}
+
+// OptimizedEventLoop, CPU kullanımını optimize edilmiş bir olay döngüsüdür.
+class OptimizedEventLoop {
+    private:
+        var poller Poller
+        var running bool
+        var mutex sync.Mutex
+        var wakeupChan chan struct{}
+        var handlers map[int]AsyncHandler
+        var nextID int
+        var stopChan chan struct{}
+        var threadPool *OptimizedThreadPool
+        var taskQueue *WorkStealingQueue<EventTask>
+        var pendingTasks *AtomicCounter
+        var batchSize int
+        var pollTimeout int
+    
+    public:
+        // New, yeni bir OptimizedEventLoop oluşturur.
+        static func New() (*OptimizedEventLoop, error) {
+            // Platform bağımsız poller oluştur
+            poller, err := newPoller()
+            if err != nil {
+                return nil, err
+            }
+            
+            // CPU bilgilerini al
+            cpuInfo := CPUInfo.GetCPUInfo()
+            
+            loop := new OptimizedEventLoop()
+            loop.poller = poller
+            loop.running = false
+            loop.wakeupChan = make(chan struct{}, 1)
+            loop.handlers = make(map[int]AsyncHandler)
+            loop.nextID = 1
+            loop.stopChan = make(chan struct{})
+            loop.threadPool = OptimizedThreadPool.New(cpuInfo.NumLogicalCores)
+            loop.taskQueue = WorkStealingQueue.New<EventTask>(4096)
+            loop.pendingTasks = AtomicCounter.New(0)
+            loop.batchSize = 100
+            loop.pollTimeout = 10 // 10ms
+            
+            return loop, nil
+        }
+        
+        // Start, olay döngüsünü başlatır.
+        func (loop *OptimizedEventLoop) Start() error {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            if loop.running {
+                return errors.New("async: olay döngüsü zaten çalışıyor")
+            }
+            
+            loop.running = true
+            
+            // İş parçacığı havuzunu başlat
+            loop.threadPool.Start()
+            
+            // Olay döngüsünü başlat
+            go loop.run()
+            
+            return nil
+        }
+        
+        // Stop, olay döngüsünü durdurur.
+        func (loop *OptimizedEventLoop) Stop() error {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            if !loop.running {
+                return errors.New("async: olay döngüsü çalışmıyor")
+            }
+            
+            loop.running = false
+            
+            // Olay döngüsünü durdur
+            close(loop.stopChan)
+            
+            // İş parçacığı havuzunu durdur
+            loop.threadPool.Stop()
+            
+            return nil
+        }
+        
+        // Register, bir dosya tanımlayıcısını olay döngüsüne kaydeder.
+        func (loop *OptimizedEventLoop) Register(fd int, events int, handler AsyncHandler) (int, error) {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            // Poller'a kaydet
+            err := loop.poller.Add(fd, events)
+            if err != nil {
+                return 0, err
+            }
+            
+            // Handler'ı kaydet
+            id := loop.nextID
+            loop.handlers[id] = handler
+            loop.nextID++
+            
+            return id, nil
+        }
+        
+        // Unregister, bir dosya tanımlayıcısını olay döngüsünden kaldırır.
+        func (loop *OptimizedEventLoop) Unregister(id int) error {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            handler, ok := loop.handlers[id]
+            if !ok {
+                return errors.New("async: geçersiz tanımlayıcı")
+            }
+            
+            // TODO: Poller'dan kaldır
+            
+            // Handler'ı kaldır
+            delete(loop.handlers, id)
+            
+            return nil
+        }
+        
+        // Wakeup, olay döngüsünü uyandırır.
+        func (loop *OptimizedEventLoop) Wakeup() {
+            select {
+            case loop.wakeupChan <- struct{}{}:
+            default:
+            }
+        }
+        
+        // Post, bir olayı olay döngüsüne gönderir.
+        func (loop *OptimizedEventLoop) Post(event Event, handler AsyncHandler) {
+            // Yeni bir görev oluştur
+            task := EventTask{
+                Event: event,
+                Handler: handler,
+            }
+            
+            // Görevi kuyruğa ekle
+            loop.taskQueue.PushBottom(task)
+            
+            // Bekleyen görev sayısını artır
+            loop.pendingTasks.Increment(Relaxed)
+            
+            // Olay döngüsünü uyandır
+            loop.Wakeup()
+        }
+        
+        // SetBatchSize, toplu işlem boyutunu ayarlar.
+        func (loop *OptimizedEventLoop) SetBatchSize(size int) {
+            if size <= 0 {
+                size = 100
+            }
+            
+            loop.batchSize = size
+        }
+        
+        // SetPollTimeout, poller zaman aşımını ayarlar.
+        func (loop *OptimizedEventLoop) SetPollTimeout(timeout int) {
+            if timeout <= 0 {
+                timeout = 10
+            }
+            
+            loop.pollTimeout = timeout
+        }
+        
+        // run, olay döngüsünün ana döngüsüdür.
+        private func (loop *OptimizedEventLoop) run() {
+            for {
+                // Olayları bekle
+                events, err := loop.poller.Wait(loop.pollTimeout)
+                
+                // Durdurma sinyali kontrol et
+                select {
+                case <-loop.stopChan:
+                    return
+                default:
+                }
+                
+                // Uyanma sinyali kontrol et
+                select {
+                case <-loop.wakeupChan:
+                    // Uyanma sinyali alındı
+                default:
+                }
+                
+                // Bekleyen görevleri işle
+                loop.processPendingTasks()
+                
+                if err != nil {
+                    // Hata işleme
+                    continue
+                }
+                
+                // Olayları işle
+                for _, event := range events {
+                    // Handler'ı bul
+                    loop.mutex.Lock()
+                    handler, ok := loop.handlers[event.ID]
+                    loop.mutex.Unlock()
+                    
+                    if ok {
+                        // Olayı kuyruğa ekle
+                        loop.Post(event, handler)
+                    }
+                }
+            }
+        }
+        
+        // processPendingTasks, bekleyen görevleri işler.
+        private func (loop *OptimizedEventLoop) processPendingTasks() {
+            // Bekleyen görev sayısını kontrol et
+            pendingCount := loop.pendingTasks.Load(Relaxed)
+            
+            // Bekleyen görev yoksa, çık
+            if pendingCount == 0 {
+                return
+            }
+            
+            // Bekleyen görevleri işle (en fazla batchSize görev)
+            maxTasks := uint64(loop.batchSize)
+            if pendingCount < maxTasks {
+                maxTasks = pendingCount
+            }
+            
+            // Görevleri toplu olarak al
+            tasks := make([]EventTask, 0, maxTasks)
+            
+            for i := uint64(0); i < maxTasks; i++ {
+                // Kuyruktan bir görev al
+                task, ok := loop.taskQueue.PopBottom()
+                
+                if !ok {
+                    // Kuyruk boş, çık
+                    break
+                }
+                
+                // Bekleyen görev sayısını azalt
+                loop.pendingTasks.Decrement(Relaxed)
+                
+                // Görevi listeye ekle
+                tasks = append(tasks, task)
+            }
+            
+            // Görevleri iş parçacığı havuzuna gönder
+            for _, task := range tasks {
+                // Görevi kopyala (closure için)
+                eventTask := task
+                
+                // Görevi iş parçacığı havuzuna gönder
+                loop.threadPool.Submit(TaskWrapper{
+                    execute: func() {
+                        eventTask.Handler.OnEvent(eventTask.Event)
+                    },
+                })
+            }
+        }
+}
+
+// TaskWrapper, Task arayüzünü implemente eden bir sarmalayıcıdır.
+class TaskWrapper {
+    var execute func()
+    
+    func (tw TaskWrapper) Execute() {
+        tw.execute()
+    }
+}

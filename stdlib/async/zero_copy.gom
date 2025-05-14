@@ -1,0 +1,316 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Zero Copy IO
+package async
+
+import (
+    "os"
+    "syscall"
+    "unsafe"
+    "sync/atomic"
+    "errors"
+)
+
+// ZeroCopyMode, zero-copy modunu belirtir.
+type ZeroCopyMode int
+
+const (
+    // SendFileMode, sendfile sistem çağrısını kullanır.
+    SendFileMode ZeroCopyMode = iota
+    
+    // SpliceMode, splice sistem çağrısını kullanır.
+    SpliceMode
+    
+    // TeeMode, tee sistem çağrısını kullanır.
+    TeeMode
+    
+    // MMapMode, mmap sistem çağrısını kullanır.
+    MMapMode
+)
+
+// ZeroCopyStats, zero-copy istatistiklerini içerir.
+class ZeroCopyStats {
+    var TotalSendFile uint64
+    var TotalSplice uint64
+    var TotalTee uint64
+    var TotalMMap uint64
+    var BytesSent uint64
+    var BytesRead uint64
+}
+
+// ZeroCopyOptions, zero-copy seçeneklerini belirtir.
+class ZeroCopyOptions {
+    var Mode ZeroCopyMode
+    var ChunkSize int
+    var UseDirectIO bool
+}
+
+// MMapRegion, mmap ile eşlenmiş bir bellek bölgesini temsil eder.
+class MMapRegion {
+    var Data []byte
+    var Length int
+    var Offset int64
+    var File *os.File
+    var Flags int
+}
+
+// OptimizedZeroCopy, optimize edilmiş zero-copy I/O işlemleri sağlar.
+class OptimizedZeroCopy {
+    private:
+        var stats ZeroCopyStats
+        var options ZeroCopyOptions
+    
+    public:
+        // New, yeni bir OptimizedZeroCopy oluşturur.
+        static func New(options ZeroCopyOptions) *OptimizedZeroCopy {
+            if options.ChunkSize <= 0 {
+                options.ChunkSize = 64 * 1024 // 64KB
+            }
+            
+            zc := new OptimizedZeroCopy()
+            zc.options = options
+            
+            return zc
+        }
+        
+        // SendFile, bir dosyayı doğrudan bir sokete gönderir.
+        func (zc *OptimizedZeroCopy) SendFile(dst *os.File, src *os.File, offset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.TotalSendFile, 1)
+            
+            // sendfile sistem çağrısı
+            n, err := syscall.Sendfile(int(dst.Fd()), int(src.Fd()), &offset, count)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.BytesSent, uint64(n))
+            
+            return int64(n), err
+        }
+        
+        // Splice, bir dosya tanımlayıcısından diğerine veri kopyalar.
+        func (zc *OptimizedZeroCopy) Splice(dst *os.File, src *os.File, dstOffset int64, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.TotalSplice, 1)
+            
+            // Pipe oluştur
+            r, w, err := os.Pipe()
+            if err != nil {
+                return 0, err
+            }
+            defer r.Close()
+            defer w.Close()
+            
+            // splice sistem çağrısı (src -> pipe)
+            var written int64
+            var total int64
+            
+            for total < int64(count) {
+                // Kalan baytları hesapla
+                remaining := int64(count) - total
+                
+                // Chunk boyutunu ayarla
+                chunkSize := int(remaining)
+                if chunkSize > zc.options.ChunkSize {
+                    chunkSize = zc.options.ChunkSize
+                }
+                
+                // splice sistem çağrısı (src -> pipe)
+                n, err := syscall.Splice(int(src.Fd()), &srcOffset, int(w.Fd()), nil, chunkSize, 0)
+                if err != nil {
+                    return total, err
+                }
+                
+                if n == 0 {
+                    break
+                }
+                
+                // splice sistem çağrısı (pipe -> dst)
+                written, err = syscall.Splice(int(r.Fd()), nil, int(dst.Fd()), &dstOffset, int(n), 0)
+                if err != nil {
+                    return total, err
+                }
+                
+                total += written
+            }
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.BytesSent, uint64(total))
+            
+            return total, nil
+        }
+        
+        // Tee, bir pipe'dan diğerine veri kopyalar.
+        func (zc *OptimizedZeroCopy) Tee(dst *os.File, src *os.File, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.TotalTee, 1)
+            
+            // tee sistem çağrısı
+            n, err := syscall.Tee(int(src.Fd()), int(dst.Fd()), count, 0)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.BytesSent, uint64(n))
+            
+            return int64(n), err
+        }
+        
+        // MMap, bir dosyayı belleğe eşler.
+        func (zc *OptimizedZeroCopy) MMap(file *os.File, offset int64, length int, prot int, flags int) (*MMapRegion, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.TotalMMap, 1)
+            
+            // mmap sistem çağrısı
+            data, err := syscall.Mmap(int(file.Fd()), offset, length, prot, flags)
+            if err != nil {
+                return nil, err
+            }
+            
+            // MMapRegion oluştur
+            region := new MMapRegion()
+            region.Data = data
+            region.Length = length
+            region.Offset = offset
+            region.File = file
+            region.Flags = flags
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zc.stats.BytesRead, uint64(length))
+            
+            return region, nil
+        }
+        
+        // MUnmap, bir bellek bölgesini eşlemeden kaldırır.
+        func (zc *OptimizedZeroCopy) MUnmap(region *MMapRegion) error {
+            if region == nil {
+                return errors.New("zero copy: geçersiz bölge")
+            }
+            
+            return syscall.Munmap(region.Data)
+        }
+        
+        // CopyFileRange, bir dosyadan diğerine veri kopyalar.
+        func (zc *OptimizedZeroCopy) CopyFileRange(dst *os.File, dstOffset int64, src *os.File, srcOffset int64, count int) (int64, error) {
+            // copy_file_range sistem çağrısı
+            return syscall.CopyFileRange(int(src.Fd()), &srcOffset, int(dst.Fd()), &dstOffset, count, 0)
+        }
+        
+        // GetStats, zero-copy istatistiklerini döndürür.
+        func (zc *OptimizedZeroCopy) GetStats() ZeroCopyStats {
+            return ZeroCopyStats{
+                TotalSendFile: atomic.LoadUint64(&zc.stats.TotalSendFile),
+                TotalSplice:   atomic.LoadUint64(&zc.stats.TotalSplice),
+                TotalTee:      atomic.LoadUint64(&zc.stats.TotalTee),
+                TotalMMap:     atomic.LoadUint64(&zc.stats.TotalMMap),
+                BytesSent:     atomic.LoadUint64(&zc.stats.BytesSent),
+                BytesRead:     atomic.LoadUint64(&zc.stats.BytesRead),
+            }
+        }
+}
+
+// DirectIOFile, doğrudan I/O için kullanılan bir dosya sağlar.
+class DirectIOFile {
+    private:
+        var file *os.File
+        var alignment int
+        var buffer []byte
+    
+    public:
+        // Open, doğrudan I/O için bir dosya açar.
+        static func Open(path string, flag int, perm os.FileMode) (*DirectIOFile, error) {
+            // O_DIRECT bayrağını ekle
+            flag |= syscall.O_DIRECT
+            
+            // Dosyayı aç
+            file, err := os.OpenFile(path, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+            
+            // DirectIOFile oluştur
+            dio := new DirectIOFile()
+            dio.file = file
+            dio.alignment = 512 // Varsayılan hizalama
+            
+            return dio, nil
+        }
+        
+        // Read, dosyadan veri okur.
+        func (dio *DirectIOFile) Read(p []byte) (int, error) {
+            // Hizalama kontrolü
+            if len(p) % dio.alignment != 0 {
+                // Hizalanmış tampon oluştur
+                alignedSize := (len(p) + dio.alignment - 1) & ^(dio.alignment - 1)
+                
+                if dio.buffer == nil || len(dio.buffer) < alignedSize {
+                    dio.buffer = make([]byte, alignedSize)
+                }
+                
+                // Hizalanmış tampondan oku
+                n, err := dio.file.Read(dio.buffer[:alignedSize])
+                if err != nil {
+                    return 0, err
+                }
+                
+                // Verileri kopyala
+                copy(p, dio.buffer[:n])
+                
+                return n, nil
+            }
+            
+            // Doğrudan oku
+            return dio.file.Read(p)
+        }
+        
+        // Write, dosyaya veri yazar.
+        func (dio *DirectIOFile) Write(p []byte) (int, error) {
+            // Hizalama kontrolü
+            if len(p) % dio.alignment != 0 {
+                // Hizalanmış tampon oluştur
+                alignedSize := (len(p) + dio.alignment - 1) & ^(dio.alignment - 1)
+                
+                if dio.buffer == nil || len(dio.buffer) < alignedSize {
+                    dio.buffer = make([]byte, alignedSize)
+                }
+                
+                // Verileri kopyala
+                copy(dio.buffer, p)
+                
+                // Hizalanmış tampona yaz
+                return dio.file.Write(dio.buffer[:alignedSize])
+            }
+            
+            // Doğrudan yaz
+            return dio.file.Write(p)
+        }
+        
+        // Close, dosyayı kapatır.
+        func (dio *DirectIOFile) Close() error {
+            return dio.file.Close()
+        }
+        
+        // Fd, dosya tanımlayıcısını döndürür.
+        func (dio *DirectIOFile) Fd() uintptr {
+            return dio.file.Fd()
+        }
+        
+        // Name, dosya adını döndürür.
+        func (dio *DirectIOFile) Name() string {
+            return dio.file.Name()
+        }
+        
+        // SetAlignment, hizalama değerini ayarlar.
+        func (dio *DirectIOFile) SetAlignment(alignment int) {
+            dio.alignment = alignment
+        }
+}
+
+// GlobalZeroCopy, global bir OptimizedZeroCopy örneğidir.
+var GlobalZeroCopy *OptimizedZeroCopy
+
+// InitGlobalZeroCopy, global OptimizedZeroCopy örneğini başlatır.
+func InitGlobalZeroCopy() {
+    options := ZeroCopyOptions{
+        Mode:       SendFileMode,
+        ChunkSize:  64 * 1024, // 64KB
+        UseDirectIO: false,
+    }
+    
+    GlobalZeroCopy = OptimizedZeroCopy.New(options)
+}

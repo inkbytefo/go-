@@ -1,0 +1,226 @@
+// GO-Minus Örnek - Yaşam Süresi Analizi (Lifetime Analysis)
+// Bu örnek, GO-Minus programlama dili için yaşam süresi analizinin kullanımını gösterir.
+package main
+
+import (
+    "fmt"
+    "memory"
+    "unsafe"
+)
+
+// Örnek veri yapısı
+struct Person {
+    name string
+    age int
+}
+
+// Bellek sızıntısı örneği
+func memoryLeakExample() {
+    fmt.Println("Bellek Sızıntısı Örneği")
+    
+    // Yaşam süresi analizini etkinleştir
+    memory.EnableLifetimeAnalysis()
+    
+    // Yeni bir kapsama gir
+    memory.EnterScope("memoryLeakExample")
+    
+    // Bellek ayır
+    ptr := unsafe.Pointer(new(Person))
+    
+    // Değişkeni bildir
+    memory.DeclareVariable("person", "Person", ptr, uint64(unsafe.Sizeof(Person{})), true)
+    
+    // Bellek sızıntısı kontrolü
+    leaks := memory.CheckForLeaks()
+    
+    fmt.Println("Bellek Sızıntısı Sayısı:", len(leaks))
+    for i, leak := range leaks {
+        fmt.Printf("Sızıntı %d: %s (%s)\n", i+1, leak.Name, leak.Type)
+    }
+    
+    // Kapsamdan çık
+    memory.ExitScope()
+    
+    // Yaşam süresi analizini devre dışı bırak
+    memory.DisableLifetimeAnalysis()
+}
+
+// Dangling pointer örneği
+func danglingPointerExample() {
+    fmt.Println("Dangling Pointer Örneği")
+    
+    // Yaşam süresi analizini etkinleştir
+    memory.EnableLifetimeAnalysis()
+    
+    // Yeni bir kapsama gir
+    memory.EnterScope("danglingPointerExample")
+    
+    // İç içe kapsamlar
+    {
+        // Yeni bir kapsama gir
+        memory.EnterScope("innerScope")
+        
+        // Bellek ayır
+        ptr := unsafe.Pointer(new(Person))
+        
+        // Değişkeni bildir
+        personVar := memory.DeclareVariable("innerPerson", "Person", ptr, uint64(unsafe.Sizeof(Person{})), true)
+        
+        // Dış kapsama referans ekle
+        outerPtr := unsafe.Pointer(new(unsafe.Pointer))
+        *(*unsafe.Pointer)(outerPtr) = ptr
+        
+        // Dış kapsam değişkenini bildir
+        outerVar := memory.DeclareVariable("outerPointer", "unsafe.Pointer", outerPtr, uint64(unsafe.Sizeof(unsafe.Pointer(nil))), true)
+        
+        // Referans ekle
+        memory.AddReference(outerVar, personVar)
+        
+        // Kapsamdan çık
+        memory.ExitScope()
+    }
+    
+    // Dangling pointer kontrolü
+    danglingPointers := memory.CheckForDanglingPointers()
+    
+    fmt.Println("Dangling Pointer Sayısı:", len(danglingPointers))
+    for i, dp := range danglingPointers {
+        fmt.Printf("Dangling Pointer %d: %s (%s)\n", i+1, dp.Name, dp.Type)
+    }
+    
+    // Kapsamdan çık
+    memory.ExitScope()
+    
+    // Yaşam süresi analizini devre dışı bırak
+    memory.DisableLifetimeAnalysis()
+}
+
+// Güvenli referans örneği
+func safeReferenceExample() {
+    fmt.Println("Güvenli Referans Örneği")
+    
+    // Yaşam süresi analizini etkinleştir
+    memory.EnableLifetimeAnalysis()
+    
+    // Yeni bir kapsama gir
+    memory.EnterScope("safeReferenceExample")
+    
+    // Bellek ayır
+    ownerPtr := unsafe.Pointer(new(Person))
+    
+    // Sahibi bildir
+    ownerVar := memory.DeclareVariable("owner", "Person", ownerPtr, uint64(unsafe.Sizeof(Person{})), true)
+    
+    // Referans oluştur
+    refPtr := unsafe.Pointer(new(unsafe.Pointer))
+    *(*unsafe.Pointer)(refPtr) = ownerPtr
+    
+    // Referansı bildir
+    refVar := memory.DeclareVariable("reference", "unsafe.Pointer", refPtr, uint64(unsafe.Sizeof(unsafe.Pointer(nil))), false)
+    
+    // Referans ekle
+    memory.AddReference(refVar, ownerVar)
+    
+    // Bellek sızıntısı kontrolü
+    leaks := memory.CheckForLeaks()
+    
+    fmt.Println("Bellek Sızıntısı Sayısı:", len(leaks))
+    for i, leak := range leaks {
+        fmt.Printf("Sızıntı %d: %s (%s)\n", i+1, leak.Name, leak.Type)
+    }
+    
+    // Dangling pointer kontrolü
+    danglingPointers := memory.CheckForDanglingPointers()
+    
+    fmt.Println("Dangling Pointer Sayısı:", len(danglingPointers))
+    for i, dp := range danglingPointers {
+        fmt.Printf("Dangling Pointer %d: %s (%s)\n", i+1, dp.Name, dp.Type)
+    }
+    
+    // Referansı kaldır
+    memory.RemoveReference(refVar, ownerVar)
+    
+    // Kapsamdan çık
+    memory.ExitScope()
+    
+    // Yaşam süresi analizini devre dışı bırak
+    memory.DisableLifetimeAnalysis()
+}
+
+// Yaşam süresi analizi örneği
+func lifetimeAnalysisExample() {
+    fmt.Println("Yaşam Süresi Analizi Örneği")
+    
+    // Yaşam süresi analizini etkinleştir
+    memory.EnableLifetimeAnalysis()
+    
+    // Yeni bir kapsama gir
+    memory.EnterScope("lifetimeAnalysisExample")
+    
+    // Bellek ayır
+    ptr1 := unsafe.Pointer(new(Person))
+    ptr2 := unsafe.Pointer(new(Person))
+    ptr3 := unsafe.Pointer(new(Person))
+    
+    // Değişkenleri bildir
+    var1 := memory.DeclareVariable("person1", "Person", ptr1, uint64(unsafe.Sizeof(Person{})), true)
+    var2 := memory.DeclareVariable("person2", "Person", ptr2, uint64(unsafe.Sizeof(Person{})), true)
+    var3 := memory.DeclareVariable("person3", "Person", ptr3, uint64(unsafe.Sizeof(Person{})), true)
+    
+    // Referanslar oluştur
+    ref1to2Ptr := unsafe.Pointer(new(unsafe.Pointer))
+    *(*unsafe.Pointer)(ref1to2Ptr) = ptr2
+    
+    ref2to3Ptr := unsafe.Pointer(new(unsafe.Pointer))
+    *(*unsafe.Pointer)(ref2to3Ptr) = ptr3
+    
+    // Referansları bildir
+    ref1to2Var := memory.DeclareVariable("ref1to2", "unsafe.Pointer", ref1to2Ptr, uint64(unsafe.Sizeof(unsafe.Pointer(nil))), false)
+    ref2to3Var := memory.DeclareVariable("ref2to3", "unsafe.Pointer", ref2to3Ptr, uint64(unsafe.Sizeof(unsafe.Pointer(nil))), false)
+    
+    // Referanslar ekle
+    memory.AddReference(ref1to2Var, var2)
+    memory.AddReference(ref2to3Var, var3)
+    
+    // Bellek sızıntısı kontrolü
+    leaks := memory.CheckForLeaks()
+    
+    fmt.Println("Bellek Sızıntısı Sayısı:", len(leaks))
+    for i, leak := range leaks {
+        fmt.Printf("Sızıntı %d: %s (%s)\n", i+1, leak.Name, leak.Type)
+    }
+    
+    // Dangling pointer kontrolü
+    danglingPointers := memory.CheckForDanglingPointers()
+    
+    fmt.Println("Dangling Pointer Sayısı:", len(danglingPointers))
+    for i, dp := range danglingPointers {
+        fmt.Printf("Dangling Pointer %d: %s (%s)\n", i+1, dp.Name, dp.Type)
+    }
+    
+    // Referansları kaldır
+    memory.RemoveReference(ref1to2Var, var2)
+    memory.RemoveReference(ref2to3Var, var3)
+    
+    // Kapsamdan çık
+    memory.ExitScope()
+    
+    // Yaşam süresi analizini devre dışı bırak
+    memory.DisableLifetimeAnalysis()
+}
+
+func main() {
+    fmt.Println("GO-Minus Yaşam Süresi Analizi Örneği")
+    fmt.Println("====================================")
+    
+    memoryLeakExample()
+    fmt.Println()
+    
+    danglingPointerExample()
+    fmt.Println()
+    
+    safeReferenceExample()
+    fmt.Println()
+    
+    lifetimeAnalysisExample()
+}

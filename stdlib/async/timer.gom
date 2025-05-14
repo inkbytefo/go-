@@ -1,0 +1,389 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Timer
+package async
+
+import (
+    "time"
+    "container/heap"
+    "sync"
+)
+
+// TimerEvent, bir zamanlayıcı olayını temsil eder.
+class TimerEvent {
+    var ID int
+    var When time.Time
+    var Callback func()
+    var Periodic bool
+    var Period time.Duration
+    var Cancelled bool
+}
+
+// timerHeap, zamanlayıcı olaylarını sıralamak için bir öncelik kuyruğudur.
+class timerHeap {
+    private:
+        var events []*TimerEvent
+    
+    public:
+        // Heap arayüzü implementasyonu
+        func Len() int {
+            return len(this.events)
+        }
+        
+        func Less(i, j int) bool {
+            return this.events[i].When.Before(this.events[j].When)
+        }
+        
+        func Swap(i, j int) {
+            this.events[i], this.events[j] = this.events[j], this.events[i]
+        }
+        
+        func Push(x interface{}) {
+            event := x.(*TimerEvent)
+            this.events = append(this.events, event)
+        }
+        
+        func Pop() interface{} {
+            old := this.events
+            n := len(old)
+            event := old[n-1]
+            this.events = old[0 : n-1]
+            return event
+        }
+        
+        func Peek() *TimerEvent {
+            if len(this.events) == 0 {
+                return nil
+            }
+            return this.events[0]
+        }
+}
+
+// AsyncTimer, asenkron zamanlayıcı işlemleri için bir sınıftır.
+class AsyncTimer {
+    private:
+        var eventLoop *EventLoop
+        var timerHeap timerHeap
+        var mutex sync.Mutex
+        var nextID int
+        var wakeupChan chan struct{}
+        var running bool
+        var stopChan chan struct{}
+    
+    public:
+        // New, yeni bir AsyncTimer oluşturur.
+        static func New(eventLoop *EventLoop) *AsyncTimer {
+            timer := new AsyncTimer()
+            timer.eventLoop = eventLoop
+            timer.timerHeap = timerHeap{events: make([]*TimerEvent, 0)}
+            timer.nextID = 1
+            timer.wakeupChan = make(chan struct{}, 1)
+            timer.running = false
+            timer.stopChan = make(chan struct{})
+            
+            return timer
+        }
+        
+        // Start, zamanlayıcıyı başlatır.
+        func (timer *AsyncTimer) Start() error {
+            timer.mutex.Lock()
+            defer timer.mutex.Unlock()
+            
+            if timer.running {
+                return errors.New("async: zamanlayıcı zaten çalışıyor")
+            }
+            
+            timer.running = true
+            
+            // Zamanlayıcı döngüsünü başlat
+            go timer.run()
+            
+            return nil
+        }
+        
+        // Stop, zamanlayıcıyı durdurur.
+        func (timer *AsyncTimer) Stop() error {
+            timer.mutex.Lock()
+            defer timer.mutex.Unlock()
+            
+            if !timer.running {
+                return errors.New("async: zamanlayıcı çalışmıyor")
+            }
+            
+            timer.running = false
+            
+            // Zamanlayıcı döngüsünü durdur
+            close(timer.stopChan)
+            
+            return nil
+        }
+        
+        // Schedule, belirtilen süre sonra çalışacak bir zamanlayıcı olayı planlar.
+        func (timer *AsyncTimer) Schedule(delay time.Duration, callback func()) int {
+            return timer.scheduleInternal(time.Now().Add(delay), callback, false, 0)
+        }
+        
+        // ScheduleAt, belirtilen zamanda çalışacak bir zamanlayıcı olayı planlar.
+        func (timer *AsyncTimer) ScheduleAt(when time.Time, callback func()) int {
+            return timer.scheduleInternal(when, callback, false, 0)
+        }
+        
+        // SchedulePeriodic, belirtilen süre aralıklarıyla çalışacak periyodik bir zamanlayıcı olayı planlar.
+        func (timer *AsyncTimer) SchedulePeriodic(period time.Duration, callback func()) int {
+            return timer.scheduleInternal(time.Now().Add(period), callback, true, period)
+        }
+        
+        // Cancel, belirtilen ID'ye sahip zamanlayıcı olayını iptal eder.
+        func (timer *AsyncTimer) Cancel(id int) bool {
+            timer.mutex.Lock()
+            defer timer.mutex.Unlock()
+            
+            // Tüm olayları kontrol et
+            for i := 0; i < len(timer.timerHeap.events); i++ {
+                event := timer.timerHeap.events[i]
+                if event.ID == id {
+                    event.Cancelled = true
+                    timer.wakeup()
+                    return true
+                }
+            }
+            
+            return false
+        }
+        
+        // CancelAll, tüm zamanlayıcı olaylarını iptal eder.
+        func (timer *AsyncTimer) CancelAll() {
+            timer.mutex.Lock()
+            defer timer.mutex.Unlock()
+            
+            // Tüm olayları iptal et
+            for i := 0; i < len(timer.timerHeap.events); i++ {
+                timer.timerHeap.events[i].Cancelled = true
+            }
+            
+            timer.wakeup()
+        }
+        
+        // scheduleInternal, bir zamanlayıcı olayı planlar.
+        private func (timer *AsyncTimer) scheduleInternal(when time.Time, callback func(), periodic bool, period time.Duration) int {
+            timer.mutex.Lock()
+            defer timer.mutex.Unlock()
+            
+            // Yeni olay oluştur
+            event := new TimerEvent()
+            event.ID = timer.nextID
+            event.When = when
+            event.Callback = callback
+            event.Periodic = periodic
+            event.Period = period
+            event.Cancelled = false
+            
+            // ID'yi artır
+            timer.nextID++
+            
+            // Olayı kuyruğa ekle
+            heap.Push(&timer.timerHeap, event)
+            
+            // Zamanlayıcıyı uyandır
+            timer.wakeup()
+            
+            return event.ID
+        }
+        
+        // run, zamanlayıcı döngüsünü çalıştırır.
+        private func (timer *AsyncTimer) run() {
+            for {
+                var sleepDuration time.Duration
+                var nextEvent *TimerEvent
+                
+                // Bir sonraki olayı al
+                timer.mutex.Lock()
+                if timer.timerHeap.Len() > 0 {
+                    nextEvent = timer.timerHeap.Peek()
+                    now := time.Now()
+                    
+                    if nextEvent.When.After(now) {
+                        // Bir sonraki olaya kadar bekle
+                        sleepDuration = nextEvent.When.Sub(now)
+                    } else {
+                        // Olay zamanı gelmiş, hemen çalıştır
+                        sleepDuration = 0
+                    }
+                } else {
+                    // Kuyrukta olay yok, varsayılan bekleme süresi
+                    sleepDuration = 24 * time.Hour
+                }
+                timer.mutex.Unlock()
+                
+                // Zamanlayıcı durduruldu mu kontrol et
+                select {
+                case <-timer.stopChan:
+                    return
+                default:
+                    // Devam et
+                }
+                
+                // Bir sonraki olaya kadar bekle veya uyandırılana kadar
+                select {
+                case <-time.After(sleepDuration):
+                    // Zaman doldu, olayları işle
+                case <-timer.wakeupChan:
+                    // Zamanlayıcı uyandırıldı, olayları tekrar kontrol et
+                    continue
+                case <-timer.stopChan:
+                    // Zamanlayıcı durduruldu
+                    return
+                }
+                
+                // Zamanı gelmiş olayları işle
+                timer.processEvents()
+            }
+        }
+        
+        // processEvents, zamanı gelmiş olayları işler.
+        private func (timer *AsyncTimer) processEvents() {
+            now := time.Now()
+            
+            for {
+                timer.mutex.Lock()
+                
+                // Kuyrukta olay var mı kontrol et
+                if timer.timerHeap.Len() == 0 {
+                    timer.mutex.Unlock()
+                    break
+                }
+                
+                // Bir sonraki olayı kontrol et
+                nextEvent := timer.timerHeap.Peek()
+                
+                // Olay zamanı gelmiş mi kontrol et
+                if nextEvent.When.After(now) {
+                    timer.mutex.Unlock()
+                    break
+                }
+                
+                // Olayı kuyruktan çıkar
+                event := heap.Pop(&timer.timerHeap).(*TimerEvent)
+                
+                // Olay iptal edilmiş mi kontrol et
+                if event.Cancelled {
+                    timer.mutex.Unlock()
+                    continue
+                }
+                
+                // Periyodik olay ise, tekrar planla
+                if event.Periodic {
+                    newEvent := new TimerEvent()
+                    newEvent.ID = event.ID
+                    newEvent.When = now.Add(event.Period)
+                    newEvent.Callback = event.Callback
+                    newEvent.Periodic = true
+                    newEvent.Period = event.Period
+                    newEvent.Cancelled = false
+                    
+                    heap.Push(&timer.timerHeap, newEvent)
+                }
+                
+                // Callback'i çağır (mutex'i serbest bırakarak)
+                callback := event.Callback
+                timer.mutex.Unlock()
+                
+                // Callback'i asenkron olarak çalıştır
+                go callback()
+            }
+        }
+        
+        // wakeup, zamanlayıcıyı uyandırır.
+        private func (timer *AsyncTimer) wakeup() {
+            select {
+            case timer.wakeupChan <- struct{}{}:
+            default:
+                // Kanal zaten dolu, uyandırma sinyali gönderilmiş
+            }
+        }
+}
+
+// Sleep, belirtilen süre kadar bekler ve bir Future döndürür.
+func Sleep(eventLoop *EventLoop, duration time.Duration) *AsyncFuture<bool> {
+    promise, future := AsyncPromise.New<bool>(eventLoop)
+    
+    // Zamanlayıcı oluştur
+    timer := AsyncTimer.New(eventLoop)
+    timer.Start()
+    
+    // Belirtilen süre sonra çalışacak bir olay planla
+    timer.Schedule(duration, func() {
+        promise.Complete(true)
+        timer.Stop()
+    })
+    
+    return future
+}
+
+// Delay, belirtilen süre sonra bir işlevi çalıştırır ve bir Future döndürür.
+func Delay(eventLoop *EventLoop, duration time.Duration, action func()) *AsyncFuture<bool> {
+    promise, future := AsyncPromise.New<bool>(eventLoop)
+    
+    // Zamanlayıcı oluştur
+    timer := AsyncTimer.New(eventLoop)
+    timer.Start()
+    
+    // Belirtilen süre sonra çalışacak bir olay planla
+    timer.Schedule(duration, func() {
+        try {
+            action()
+            promise.Complete(true)
+        } catch (err) {
+            promise.CompleteWithError(err)
+        } finally {
+            timer.Stop()
+        }
+    })
+    
+    return future
+}
+
+// Interval, belirtilen süre aralıklarıyla bir işlevi çalıştırır ve bir iptal fonksiyonu döndürür.
+func Interval(eventLoop *EventLoop, period time.Duration, action func()) func() {
+    // Zamanlayıcı oluştur
+    timer := AsyncTimer.New(eventLoop)
+    timer.Start()
+    
+    // Periyodik olay planla
+    id := timer.SchedulePeriodic(period, action)
+    
+    // İptal fonksiyonu döndür
+    return func() {
+        timer.Cancel(id)
+        timer.Stop()
+    }
+}
+
+// Timeout, belirtilen süre içinde bir Future tamamlanmazsa, zaman aşımı hatası döndürür.
+template<T> func Timeout(eventLoop *EventLoop, future *AsyncFuture<T>, timeout time.Duration) *AsyncFuture<T> {
+    promise, timeoutFuture := AsyncPromise.New<T>(eventLoop)
+    
+    // Zamanlayıcı oluştur
+    timer := AsyncTimer.New(eventLoop)
+    timer.Start()
+    
+    // Zaman aşımı olayı planla
+    timeoutID := timer.Schedule(timeout, func() {
+        promise.CompleteWithError(ErrTimeout)
+        timer.Stop()
+    })
+    
+    // Future tamamlandığında
+    future.AddCallback(func(result T, err interface{}) {
+        // Zaman aşımı olayını iptal et
+        timer.Cancel(timeoutID)
+        timer.Stop()
+        
+        // Sonucu veya hatayı ilet
+        if err != nil {
+            promise.CompleteWithError(err)
+        } else {
+            promise.Complete(result)
+        }
+    })
+    
+    return timeoutFuture
+}

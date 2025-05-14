@@ -1,0 +1,102 @@
+// GO-Minus Standart Kütüphane - Async Paketi
+package async
+
+import (
+    "io"
+    "time"
+    "errors"
+    "sync"
+    "sync/atomic"
+)
+
+// Hata sabitleri
+var (
+    ErrClosed = errors.New("async: nesne kapatıldı")
+    ErrTimeout = errors.New("async: zaman aşımı")
+    ErrCanceled = errors.New("async: işlem iptal edildi")
+    ErrUnsupported = errors.New("async: desteklenmeyen işlem")
+    ErrEOF = errors.New("async: EOF")
+    ErrUnexpectedEOF = errors.New("async: beklenmeyen EOF")
+    ErrShortWrite = errors.New("async: kısa yazma")
+    ErrIO = errors.New("async: I/O hatası")
+)
+
+// AsyncCloser, asenkron kapatma işlemleri için bir arayüzdür.
+interface AsyncCloser {
+    func Close() Future<error>
+}
+
+// AsyncReader, asenkron okuma işlemleri için bir arayüzdür.
+interface AsyncReader {
+    func Read(p []byte) Future<int>
+}
+
+// AsyncWriter, asenkron yazma işlemleri için bir arayüzdür.
+interface AsyncWriter {
+    func Write(p []byte) Future<int>
+}
+
+// AsyncReadWriter, hem asenkron okuma hem de yazma işlemleri için bir arayüzdür.
+interface AsyncReadWriter {
+    AsyncReader
+    AsyncWriter
+}
+
+// AsyncReadCloser, asenkron okuma ve kapatma işlemleri için bir arayüzdür.
+interface AsyncReadCloser {
+    AsyncReader
+    AsyncCloser
+}
+
+// AsyncWriteCloser, asenkron yazma ve kapatma işlemleri için bir arayüzdür.
+interface AsyncWriteCloser {
+    AsyncWriter
+    AsyncCloser
+}
+
+// AsyncReadWriteCloser, asenkron okuma, yazma ve kapatma işlemleri için bir arayüzdür.
+interface AsyncReadWriteCloser {
+    AsyncReader
+    AsyncWriter
+    AsyncCloser
+}
+
+// AsyncSeeker, asenkron konumlandırma işlemleri için bir arayüzdür.
+interface AsyncSeeker {
+    func Seek(offset int64, whence int) Future<int64>
+}
+
+// AsyncReadWriteSeeker, asenkron okuma, yazma ve konumlandırma işlemleri için bir arayüzdür.
+interface AsyncReadWriteSeeker {
+    AsyncReader
+    AsyncWriter
+    AsyncSeeker
+}
+
+// AsyncHandler, asenkron olay işleyicisi için bir arayüzdür.
+interface AsyncHandler {
+    func OnEvent(event Event)
+}
+
+// Event, bir asenkron olayı temsil eder.
+class Event {
+    var Type int
+    var Data interface{}
+    var Error error
+}
+
+// EventType sabitleri
+const (
+    EventRead = 1
+    EventWrite = 2
+    EventError = 3
+    EventClose = 4
+    EventConnect = 5
+    EventAccept = 6
+    EventTimeout = 7
+)
+
+// Version, Async paketinin sürümünü döndürür.
+func Version() string {
+    return "0.1.0"
+}

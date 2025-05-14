@@ -1,0 +1,228 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Future
+package async
+
+import (
+    "concurrent"
+    "time"
+)
+
+// AsyncFuture, asenkron bir işlemin sonucunu temsil eder.
+// concurrent.Future'ı temel alır ve asenkron IO işlemleri için genişletir.
+class AsyncFuture<T> {
+    private:
+        var future *concurrent.Future<T>
+        var eventLoop *EventLoop
+
+    public:
+        // New, yeni bir AsyncFuture oluşturur.
+        static func New<T>(eventLoop *EventLoop) *AsyncFuture<T> {
+            af := new AsyncFuture<T>()
+            af.future = concurrent.Future.New<T>()
+            af.eventLoop = eventLoop
+            
+            return af
+        }
+
+        // Get, Future'ın sonucunu döndürür.
+        // Eğer sonuç henüz hazır değilse, hazır olana kadar bloke olur.
+        func (af *AsyncFuture<T>) Get() (T, error) {
+            try {
+                result := af.future.Get()
+                return result, nil
+            } catch (err) {
+                var zero T
+                return zero, err
+            }
+        }
+
+        // GetWithTimeout, belirtilen süre içinde Future'ın sonucunu döndürür.
+        func (af *AsyncFuture<T>) GetWithTimeout(timeout time.Duration) (T, error, bool) {
+            try {
+                result, ok := af.future.GetWithTimeout(timeout)
+                if !ok {
+                    var zero T
+                    return zero, ErrTimeout, false
+                }
+                return result, nil, true
+            } catch (err) {
+                var zero T
+                return zero, err, false
+            }
+        }
+
+        // IsDone, Future'ın tamamlanıp tamamlanmadığını kontrol eder.
+        func (af *AsyncFuture<T>) IsDone() bool {
+            return af.future.IsDone()
+        }
+
+        // IsCancelled, Future'ın iptal edilip edilmediğini kontrol eder.
+        func (af *AsyncFuture<T>) IsCancelled() bool {
+            return af.future.IsCancelled()
+        }
+
+        // Cancel, Future'ı iptal eder.
+        func (af *AsyncFuture<T>) Cancel() bool {
+            return af.future.Cancel()
+        }
+
+        // Then, Future tamamlandığında çağrılacak bir callback ekler.
+        // Callback, sonuç parametresiyle çağrılır.
+        func (af *AsyncFuture<T>) Then(callback func(T)) *AsyncFuture<T> {
+            af.future.AddCallback(func(result T, err interface{}) {
+                if err == nil {
+                    callback(result)
+                }
+            })
+            
+            return af
+        }
+
+        // Catch, Future bir hata ile tamamlandığında çağrılacak bir callback ekler.
+        // Callback, hata parametresiyle çağrılır.
+        func (af *AsyncFuture<T>) Catch(callback func(error)) *AsyncFuture<T> {
+            af.future.AddCallback(func(result T, err interface{}) {
+                if err != nil {
+                    callback(err.(error))
+                }
+            })
+            
+            return af
+        }
+
+        // Finally, Future tamamlandığında veya iptal edildiğinde çağrılacak bir callback ekler.
+        // Callback, parametresiz çağrılır.
+        func (af *AsyncFuture<T>) Finally(callback func()) *AsyncFuture<T> {
+            af.future.AddCallback(func(result T, err interface{}) {
+                callback()
+            })
+            
+            return af
+        }
+
+        // Map, Future'ın sonucunu dönüştürür.
+        // Dönüştürme fonksiyonu, sonuç parametresiyle çağrılır ve yeni bir değer döndürür.
+        template<U> func (af *AsyncFuture<T>) Map(mapper func(T) U) *AsyncFuture<U> {
+            newFuture := AsyncFuture.New<U>(af.eventLoop)
+            
+            af.future.AddCallback(func(result T, err interface{}) {
+                if err != nil {
+                    newFuture.completeWithError(err)
+                } else {
+                    try {
+                        mappedResult := mapper(result)
+                        newFuture.complete(mappedResult)
+                    } catch (mapErr) {
+                        newFuture.completeWithError(mapErr)
+                    }
+                }
+            })
+            
+            return newFuture
+        }
+
+        // FlatMap, Future'ın sonucunu başka bir Future'a dönüştürür.
+        // Dönüştürme fonksiyonu, sonuç parametresiyle çağrılır ve yeni bir Future döndürür.
+        template<U> func (af *AsyncFuture<T>) FlatMap(mapper func(T) *AsyncFuture<U>) *AsyncFuture<U> {
+            newFuture := AsyncFuture.New<U>(af.eventLoop)
+            
+            af.future.AddCallback(func(result T, err interface{}) {
+                if err != nil {
+                    newFuture.completeWithError(err)
+                } else {
+                    try {
+                        mappedFuture := mapper(result)
+                        
+                        mappedFuture.future.AddCallback(func(mappedResult U, mappedErr interface{}) {
+                            if mappedErr != nil {
+                                newFuture.completeWithError(mappedErr)
+                            } else {
+                                newFuture.complete(mappedResult)
+                            }
+                        })
+                    } catch (mapErr) {
+                        newFuture.completeWithError(mapErr)
+                    }
+                }
+            })
+            
+            return newFuture
+        }
+
+        // complete, Future'ı tamamlar ve sonucu ayarlar.
+        // Bu, AsyncPromise tarafından çağrılır.
+        func (af *AsyncFuture<T>) complete(result T) {
+            af.future.complete(result)
+        }
+
+        // completeWithError, Future'ı bir hata ile tamamlar.
+        // Bu, AsyncPromise tarafından çağrılır.
+        func (af *AsyncFuture<T>) completeWithError(err interface{}) {
+            af.future.completeWithError(err)
+        }
+}
+
+// AsyncPromise, bir AsyncFuture'ın sonucunu ayarlamak için kullanılır.
+class AsyncPromise<T> {
+    private:
+        var future *AsyncFuture<T>
+
+    public:
+        // New, yeni bir AsyncPromise ve ilişkili AsyncFuture oluşturur.
+        static func New<T>(eventLoop *EventLoop) (*AsyncPromise<T>, *AsyncFuture<T>) {
+            p := new AsyncPromise<T>()
+            p.future = AsyncFuture.New<T>(eventLoop)
+            
+            return p, p.future
+        }
+
+        // Complete, Promise'i tamamlar ve sonucu ayarlar.
+        func (p *AsyncPromise<T>) Complete(result T) {
+            p.future.complete(result)
+        }
+
+        // CompleteWithError, Promise'i bir hata ile tamamlar.
+        func (p *AsyncPromise<T>) CompleteWithError(err interface{}) {
+            p.future.completeWithError(err)
+        }
+
+        // GetFuture, Promise ile ilişkili Future'ı döndürür.
+        func (p *AsyncPromise<T>) GetFuture() *AsyncFuture<T> {
+            return p.future
+        }
+}
+
+// SupplyAsync, verilen fonksiyonu asenkron olarak çalıştırır ve sonucu içeren bir AsyncFuture döndürür.
+template<T> func SupplyAsync(eventLoop *EventLoop, supplier func() T) *AsyncFuture<T> {
+    promise, future := AsyncPromise.New<T>(eventLoop)
+    
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                promise.CompleteWithError(r)
+            }
+        }()
+        
+        result := supplier()
+        promise.Complete(result)
+    }()
+    
+    return future
+}
+
+// RunAsync, verilen fonksiyonu asenkron olarak çalıştırır ve bir AsyncFuture döndürür.
+func RunAsync(eventLoop *EventLoop, runnable func()) *AsyncFuture<bool> {
+    promise, future := AsyncPromise.New<bool>(eventLoop)
+    
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                promise.CompleteWithError(r)
+            }
+        }()
+        
+        runnable()
+        promise.Complete(true)
+    }()
+    
+    return future
+}

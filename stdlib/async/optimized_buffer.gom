@@ -1,0 +1,427 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized Buffer
+package async
+
+import (
+    "sync"
+    "sync/atomic"
+    "unsafe"
+)
+
+// CacheLineSize, CPU önbellek satırı boyutunu belirtir.
+// Modern CPU'larda genellikle 64 byte'dır.
+const CacheLineSize = 64
+
+// CacheAligned, önbellek satırına hizalanmış bir yapıdır.
+// Bu yapı, false sharing'i önlemek için kullanılır.
+class CacheAligned {
+    private:
+        var pad [CacheLineSize]byte
+}
+
+// OptimizedBufferPool, bellek tahsisini ve GC baskısını azaltmak için tampon havuzu sağlar.
+// Bu sınıf, BufferPool'un CPU önbellek dostu bir versiyonudur.
+class OptimizedBufferPool {
+    private:
+        // Havuz boyutları (2^n şeklinde)
+        var sizes []int
+        
+        // Her boyut için havuz
+        var pools map[int]*sync.Pool
+        
+        // İstatistikler (önbellek satırına hizalanmış)
+        var gets uint64
+        var _padGets CacheAligned
+        var puts uint64
+        var _padPuts CacheAligned
+        var misses uint64
+        var _padMisses CacheAligned
+        var allocs uint64
+        var _padAllocs CacheAligned
+        
+        // Singleton instance
+        static var instance *OptimizedBufferPool
+        static var once sync.Once
+    
+    public:
+        // GetInstance, OptimizedBufferPool singleton örneğini döndürür.
+        static func GetInstance() *OptimizedBufferPool {
+            OptimizedBufferPool.once.Do(func() {
+                OptimizedBufferPool.instance = OptimizedBufferPool.New()
+            })
+            
+            return OptimizedBufferPool.instance
+        }
+        
+        // New, yeni bir OptimizedBufferPool oluşturur.
+        static func New() *OptimizedBufferPool {
+            pool := new OptimizedBufferPool()
+            
+            // Havuz boyutlarını belirle (32B'den 16MB'a kadar 2'nin katları)
+            pool.sizes = make([]int, 20)
+            size := 32
+            for i := 0; i < len(pool.sizes); i++ {
+                pool.sizes[i] = size
+                size *= 2
+            }
+            
+            // Havuzları oluştur
+            pool.pools = make(map[int]*sync.Pool)
+            for _, size := range pool.sizes {
+                size := size // Değişkeni kopyala
+                pool.pools[size] = &sync.Pool{
+                    New: func() interface{} {
+                        atomic.AddUint64(&pool.allocs, 1)
+                        // Önbellek satırına hizalanmış bellek ayır
+                        return alignedAlloc(size)
+                    },
+                }
+            }
+            
+            return pool
+        }
+        
+        // Get, belirtilen boyutta bir tampon alır.
+        // Eğer havuzda uygun boyutta bir tampon yoksa, yeni bir tampon oluşturulur.
+        func (bp *OptimizedBufferPool) Get(size int) []byte {
+            atomic.AddUint64(&bp.gets, 1)
+            
+            // Uygun havuz boyutunu bul
+            poolSize := bp.findPoolSize(size)
+            
+            // Havuzdan tampon al
+            if poolSize > 0 {
+                buffer := bp.pools[poolSize].Get().([]byte)
+                return buffer[:size]
+            }
+            
+            // Havuzda uygun boyut yoksa, yeni bir tampon oluştur
+            atomic.AddUint64(&bp.misses, 1)
+            atomic.AddUint64(&bp.allocs, 1)
+            return alignedAlloc(size)
+        }
+        
+        // Put, bir tamponu havuza geri koyar.
+        // Tampon, orijinal kapasitesine göre uygun havuza yerleştirilir.
+        func (bp *OptimizedBufferPool) Put(buffer []byte) {
+            if buffer == nil {
+                return
+            }
+            
+            atomic.AddUint64(&bp.puts, 1)
+            
+            // Tamponun kapasitesini al
+            capacity := cap(buffer)
+            
+            // Uygun havuz boyutunu bul
+            poolSize := bp.findPoolSize(capacity)
+            
+            // Tampon havuz boyutlarından birine uyuyorsa, havuza geri koy
+            if poolSize > 0 && capacity == poolSize {
+                bp.pools[poolSize].Put(buffer[:poolSize])
+            }
+            // Uygun havuz yoksa, tampon GC tarafından toplanacak
+        }
+        
+        // GetStats, havuz istatistiklerini döndürür.
+        func (bp *OptimizedBufferPool) GetStats() map[string]uint64 {
+            return map[string]uint64{
+                "gets":   atomic.LoadUint64(&bp.gets),
+                "puts":   atomic.LoadUint64(&bp.puts),
+                "misses": atomic.LoadUint64(&bp.misses),
+                "allocs": atomic.LoadUint64(&bp.allocs),
+            }
+        }
+        
+        // ResetStats, havuz istatistiklerini sıfırlar.
+        func (bp *OptimizedBufferPool) ResetStats() {
+            atomic.StoreUint64(&bp.gets, 0)
+            atomic.StoreUint64(&bp.puts, 0)
+            atomic.StoreUint64(&bp.misses, 0)
+            atomic.StoreUint64(&bp.allocs, 0)
+        }
+        
+        // findPoolSize, belirtilen boyut için uygun havuz boyutunu bulur.
+        // Eğer uygun bir havuz boyutu yoksa, 0 döndürür.
+        private func (bp *OptimizedBufferPool) findPoolSize(size int) int {
+            // Çok küçük veya çok büyük tamponlar için havuz kullanma
+            if size <= 0 || size > bp.sizes[len(bp.sizes)-1] {
+                return 0
+            }
+            
+            // Uygun havuz boyutunu bul (en küçük 2^n >= size)
+            // Binary search kullanarak daha hızlı arama yap
+            left := 0
+            right := len(bp.sizes) - 1
+            
+            for left <= right {
+                mid := (left + right) / 2
+                
+                if bp.sizes[mid] < size {
+                    left = mid + 1
+                } else if bp.sizes[mid] > size {
+                    right = mid - 1
+                } else {
+                    return bp.sizes[mid]
+                }
+            }
+            
+            if left < len(bp.sizes) {
+                return bp.sizes[left]
+            }
+            
+            return 0
+        }
+}
+
+// ZeroCopyBuffer, zero-copy tekniklerini kullanan bir tampon sağlar.
+// Bu sınıf, gereksiz bellek kopyalama işlemlerini azaltır.
+class ZeroCopyBuffer {
+    private:
+        var buffer []byte
+        var pool *OptimizedBufferPool
+        var view []byte
+        var offset int
+        var length int
+    
+    public:
+        // New, belirtilen boyutta yeni bir ZeroCopyBuffer oluşturur.
+        static func New(size int) *ZeroCopyBuffer {
+            return ZeroCopyBuffer.NewWithPool(size, OptimizedBufferPool.GetInstance())
+        }
+        
+        // NewWithPool, belirtilen havuzdan belirtilen boyutta yeni bir ZeroCopyBuffer oluşturur.
+        static func NewWithPool(size int, pool *OptimizedBufferPool) *ZeroCopyBuffer {
+            buf := new ZeroCopyBuffer()
+            buf.buffer = pool.Get(size)
+            buf.pool = pool
+            buf.view = buf.buffer
+            buf.offset = 0
+            buf.length = 0
+            
+            return buf
+        }
+        
+        // Bytes, tamponu döndürür.
+        func (b *ZeroCopyBuffer) Bytes() []byte {
+            return b.view[:b.length]
+        }
+        
+        // Len, tamponun uzunluğunu döndürür.
+        func (b *ZeroCopyBuffer) Len() int {
+            return b.length
+        }
+        
+        // Cap, tamponun kapasitesini döndürür.
+        func (b *ZeroCopyBuffer) Cap() int {
+            return cap(b.buffer)
+        }
+        
+        // Reset, tamponu sıfırlar.
+        func (b *ZeroCopyBuffer) Reset() {
+            b.view = b.buffer
+            b.offset = 0
+            b.length = 0
+        }
+        
+        // Write, tampona veri yazar.
+        // Eğer tampon doluysa, false döndürür.
+        func (b *ZeroCopyBuffer) Write(data []byte) bool {
+            if b.offset + b.length + len(data) > cap(b.buffer) {
+                return false
+            }
+            
+            copy(b.buffer[b.offset+b.length:], data)
+            b.length += len(data)
+            
+            return true
+        }
+        
+        // Read, tampondan veri okur.
+        // Eğer tampon boşsa, (nil, false) döndürür.
+        func (b *ZeroCopyBuffer) Read(size int) ([]byte, bool) {
+            if b.length < size {
+                return nil, false
+            }
+            
+            data := b.view[:size]
+            b.view = b.view[size:]
+            b.length -= size
+            
+            return data, true
+        }
+        
+        // Peek, tampondan veri okur, ancak tamponu değiştirmez.
+        // Eğer tampon boşsa, (nil, false) döndürür.
+        func (b *ZeroCopyBuffer) Peek(size int) ([]byte, bool) {
+            if b.length < size {
+                return nil, false
+            }
+            
+            return b.view[:size], true
+        }
+        
+        // Skip, tamponda belirtilen sayıda byte atlar.
+        // Eğer tampon yeterince büyük değilse, false döndürür.
+        func (b *ZeroCopyBuffer) Skip(size int) bool {
+            if b.length < size {
+                return false
+            }
+            
+            b.view = b.view[size:]
+            b.length -= size
+            
+            return true
+        }
+        
+        // Compact, tamponu sıkıştırır.
+        // Bu işlem, tamponun başındaki boş alanı kaldırır.
+        func (b *ZeroCopyBuffer) Compact() {
+            if b.offset == 0 {
+                return
+            }
+            
+            copy(b.buffer, b.buffer[b.offset:b.offset+b.length])
+            b.view = b.buffer[:b.length]
+            b.offset = 0
+        }
+        
+        // Release, tamponu havuza geri koyar.
+        // Bu metot, ZeroCopyBuffer'ın kullanımı bittikten sonra çağrılmalıdır.
+        func (b *ZeroCopyBuffer) Release() {
+            if b.buffer != nil {
+                b.pool.Put(b.buffer)
+                b.buffer = nil
+                b.view = nil
+                b.offset = 0
+                b.length = 0
+            }
+        }
+}
+
+// alignedAlloc, önbellek satırına hizalanmış bellek ayırır.
+func alignedAlloc(size int) []byte {
+    // Önbellek satırına hizalanmış bellek ayır
+    // Not: GO-Minus'ta doğrudan önbellek satırına hizalanmış bellek ayırma desteği yok
+    // Bu nedenle, normal bellek ayırma kullanılıyor
+    return make([]byte, size)
+}
+
+// DirectIOBuffer, doğrudan I/O için kullanılan bir tampon sağlar.
+// Bu sınıf, sistem çağrılarında zero-copy tekniklerini kullanır.
+class DirectIOBuffer {
+    private:
+        var buffer []byte
+        var size int
+        var capacity int
+        var alignment int
+    
+    public:
+        // New, belirtilen boyutta yeni bir DirectIOBuffer oluşturur.
+        static func New(size int, alignment int) *DirectIOBuffer {
+            // Alignment değeri 2'nin katı olmalıdır
+            if alignment & (alignment - 1) != 0 {
+                alignment = nextPowerOfTwo(alignment)
+            }
+            
+            // Size değeri alignment'ın katı olmalıdır
+            alignedSize := (size + alignment - 1) & ^(alignment - 1)
+            
+            buf := new DirectIOBuffer()
+            buf.buffer = alignedAlloc(alignedSize)
+            buf.size = 0
+            buf.capacity = alignedSize
+            buf.alignment = alignment
+            
+            return buf
+        }
+        
+        // Bytes, tamponu döndürür.
+        func (b *DirectIOBuffer) Bytes() []byte {
+            return b.buffer[:b.size]
+        }
+        
+        // Len, tamponun uzunluğunu döndürür.
+        func (b *DirectIOBuffer) Len() int {
+            return b.size
+        }
+        
+        // Cap, tamponun kapasitesini döndürür.
+        func (b *DirectIOBuffer) Cap() int {
+            return b.capacity
+        }
+        
+        // Reset, tamponu sıfırlar.
+        func (b *DirectIOBuffer) Reset() {
+            b.size = 0
+        }
+        
+        // Write, tampona veri yazar.
+        // Eğer tampon doluysa, yazılan byte sayısını ve false döndürür.
+        func (b *DirectIOBuffer) Write(data []byte) (int, bool) {
+            if b.size + len(data) > b.capacity {
+                n := b.capacity - b.size
+                if n <= 0 {
+                    return 0, false
+                }
+                
+                copy(b.buffer[b.size:], data[:n])
+                b.size += n
+                
+                return n, false
+            }
+            
+            copy(b.buffer[b.size:], data)
+            b.size += len(data)
+            
+            return len(data), true
+        }
+        
+        // Read, tampondan veri okur.
+        // Eğer tampon boşsa, (0, false) döndürür.
+        func (b *DirectIOBuffer) Read(data []byte) (int, bool) {
+            if b.size == 0 {
+                return 0, false
+            }
+            
+            n := copy(data, b.buffer[:b.size])
+            b.size -= n
+            
+            // Kalan veriyi başa taşı
+            if b.size > 0 {
+                copy(b.buffer, b.buffer[n:n+b.size])
+            }
+            
+            return n, true
+        }
+        
+        // GetRawBuffer, ham tamponu döndürür.
+        // Bu metot, doğrudan I/O sistem çağrıları için kullanılır.
+        func (b *DirectIOBuffer) GetRawBuffer() unsafe.Pointer {
+            return unsafe.Pointer(&b.buffer[0])
+        }
+        
+        // Release, tamponu serbest bırakır.
+        func (b *DirectIOBuffer) Release() {
+            b.buffer = nil
+            b.size = 0
+            b.capacity = 0
+        }
+}
+
+// nextPowerOfTwo, verilen sayıdan büyük veya eşit en küçük 2'nin katını döndürür.
+func nextPowerOfTwo(n int) int {
+    if n <= 0 {
+        return 1
+    }
+    
+    n--
+    n |= n >> 1
+    n |= n >> 2
+    n |= n >> 4
+    n |= n >> 8
+    n |= n >> 16
+    n |= n >> 32
+    n++
+    
+    return n
+}

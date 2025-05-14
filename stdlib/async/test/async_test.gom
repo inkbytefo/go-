@@ -1,0 +1,149 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+)
+
+// TestAsyncVersion, Async paketinin sürüm bilgisini test eder.
+func TestAsyncVersion(t *testing.T) {
+    version := async.Version()
+    if version == "" {
+        t.Error("Sürüm bilgisi boş olmamalı")
+    }
+    
+    // Sürüm formatını kontrol et (x.y.z)
+    // Bu test, sürüm formatının değişmesi durumunda başarısız olabilir
+    if len(version) < 5 { // En az "0.0.0" formatında olmalı
+        t.Errorf("Geçersiz sürüm formatı: %s", version)
+    }
+}
+
+// TestAsyncErrors, Async paketinin hata sabitlerini test eder.
+func TestAsyncErrors(t *testing.T) {
+    // Hata sabitleri tanımlanmış olmalı
+    if async.ErrClosed == nil {
+        t.Error("ErrClosed tanımlanmamış")
+    }
+    
+    if async.ErrTimeout == nil {
+        t.Error("ErrTimeout tanımlanmamış")
+    }
+    
+    if async.ErrCanceled == nil {
+        t.Error("ErrCanceled tanımlanmamış")
+    }
+    
+    if async.ErrUnsupported == nil {
+        t.Error("ErrUnsupported tanımlanmamış")
+    }
+    
+    // Hata mesajları doğru olmalı
+    if async.ErrClosed.Error() != "async: nesne kapatıldı" {
+        t.Errorf("Beklenmeyen ErrClosed mesajı: %s", async.ErrClosed.Error())
+    }
+    
+    if async.ErrTimeout.Error() != "async: zaman aşımı" {
+        t.Errorf("Beklenmeyen ErrTimeout mesajı: %s", async.ErrTimeout.Error())
+    }
+    
+    if async.ErrCanceled.Error() != "async: işlem iptal edildi" {
+        t.Errorf("Beklenmeyen ErrCanceled mesajı: %s", async.ErrCanceled.Error())
+    }
+    
+    if async.ErrUnsupported.Error() != "async: desteklenmeyen işlem" {
+        t.Errorf("Beklenmeyen ErrUnsupported mesajı: %s", async.ErrUnsupported.Error())
+    }
+}
+
+// TestEventTypes, Event türü sabitlerini test eder.
+func TestEventTypes(t *testing.T) {
+    // Event türü sabitleri tanımlanmış olmalı
+    if async.EventRead <= 0 {
+        t.Error("EventRead tanımlanmamış veya geçersiz")
+    }
+    
+    if async.EventWrite <= 0 {
+        t.Error("EventWrite tanımlanmamış veya geçersiz")
+    }
+    
+    if async.EventError <= 0 {
+        t.Error("EventError tanımlanmamış veya geçersiz")
+    }
+    
+    if async.EventClose <= 0 {
+        t.Error("EventClose tanımlanmamış veya geçersiz")
+    }
+    
+    if async.EventConnect <= 0 {
+        t.Error("EventConnect tanımlanmamış veya geçersiz")
+    }
+    
+    if async.EventAccept <= 0 {
+        t.Error("EventAccept tanımlanmamış veya geçersiz")
+    }
+    
+    if async.EventTimeout <= 0 {
+        t.Error("EventTimeout tanımlanmamış veya geçersiz")
+    }
+    
+    // Event türleri benzersiz olmalı
+    eventTypes := map[int]bool{
+        async.EventRead:    true,
+        async.EventWrite:   true,
+        async.EventError:   true,
+        async.EventClose:   true,
+        async.EventConnect: true,
+        async.EventAccept:  true,
+        async.EventTimeout: true,
+    }
+    
+    if len(eventTypes) != 7 {
+        t.Error("Event türleri benzersiz değil")
+    }
+}
+
+// TestEvent, Event sınıfını test eder.
+func TestEvent(t *testing.T) {
+    // Event oluştur
+    event := async.Event{
+        Type:  async.EventRead,
+        Data:  42,
+        Error: nil,
+    }
+    
+    // Event özelliklerini kontrol et
+    if event.Type != async.EventRead {
+        t.Errorf("Beklenmeyen Event.Type: %d", event.Type)
+    }
+    
+    if event.Data.(int) != 42 {
+        t.Errorf("Beklenmeyen Event.Data: %v", event.Data)
+    }
+    
+    if event.Error != nil {
+        t.Errorf("Beklenmeyen Event.Error: %v", event.Error)
+    }
+    
+    // Hata ile Event oluştur
+    errorEvent := async.Event{
+        Type:  async.EventError,
+        Data:  nil,
+        Error: async.ErrClosed,
+    }
+    
+    // Event özelliklerini kontrol et
+    if errorEvent.Type != async.EventError {
+        t.Errorf("Beklenmeyen Event.Type: %d", errorEvent.Type)
+    }
+    
+    if errorEvent.Data != nil {
+        t.Errorf("Beklenmeyen Event.Data: %v", errorEvent.Data)
+    }
+    
+    if errorEvent.Error != async.ErrClosed {
+        t.Errorf("Beklenmeyen Event.Error: %v", errorEvent.Error)
+    }
+}

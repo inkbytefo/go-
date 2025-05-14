@@ -1,0 +1,503 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Syscall Batch
+package async
+
+import (
+    "os"
+    "syscall"
+    "unsafe"
+    "sync"
+    "sync/atomic"
+    "time"
+    "errors"
+)
+
+// BatchSize, toplu işlem boyutunu belirtir.
+// Bu değer, sistem çağrılarının gruplandırılması için kullanılır.
+const (
+    // MinBatchSize, minimum toplu işlem boyutunu belirtir.
+    MinBatchSize = 4 * 1024 // 4KB
+    
+    // DefaultBatchSize, varsayılan toplu işlem boyutunu belirtir.
+    DefaultBatchSize = 64 * 1024 // 64KB
+    
+    // MaxBatchSize, maksimum toplu işlem boyutunu belirtir.
+    MaxBatchSize = 1024 * 1024 // 1MB
+    
+    // MaxIOVecs, maksimum I/O vektör sayısını belirtir.
+    // Linux'ta bu değer genellikle 1024'tür.
+    MaxIOVecs = 1024
+)
+
+// IOOperation, bir I/O işlemini temsil eder.
+type IOOperation int
+
+const (
+    // ReadOperation, okuma işlemini belirtir.
+    ReadOperation IOOperation = iota
+    
+    // WriteOperation, yazma işlemini belirtir.
+    WriteOperation
+    
+    // SendFileOperation, sendfile işlemini belirtir.
+    SendFileOperation
+    
+    // SpliceOperation, splice işlemini belirtir.
+    SpliceOperation
+)
+
+// IORequest, bir I/O isteğini temsil eder.
+class IORequest {
+    var Operation IOOperation
+    var FD int
+    var Buffer []byte
+    var Offset int64
+    var Count int
+    var Promise *AsyncPromise<int>
+    var Next *IORequest
+}
+
+// IOBatcher, I/O işlemlerini gruplandıran bir sınıftır.
+// Bu sınıf, çoklu I/O işlemlerini tek bir sistem çağrısında gruplandırır.
+class IOBatcher {
+    private:
+        var batchSize int
+        var maxIOVecs int
+        var readQueue *IORequest
+        var writeQueue *IORequest
+        var readQueueTail *IORequest
+        var writeQueueTail *IORequest
+        var readQueueSize int
+        var writeQueueSize int
+        var readBatchSize int
+        var writeBatchSize int
+        var mutex sync.Mutex
+        var stats BatcherStats
+        var eventLoop *EventLoop
+        var flushTimer *time.Timer
+        var flushInterval time.Duration
+        var closed bool
+    
+    public:
+        // New, yeni bir IOBatcher oluşturur.
+        static func New(eventLoop *EventLoop) *IOBatcher {
+            batcher := new IOBatcher()
+            batcher.batchSize = DefaultBatchSize
+            batcher.maxIOVecs = MaxIOVecs
+            batcher.readQueue = nil
+            batcher.writeQueue = nil
+            batcher.readQueueTail = nil
+            batcher.writeQueueTail = nil
+            batcher.readQueueSize = 0
+            batcher.writeQueueSize = 0
+            batcher.readBatchSize = 0
+            batcher.writeBatchSize = 0
+            batcher.eventLoop = eventLoop
+            batcher.flushInterval = 10 * time.Millisecond
+            batcher.closed = false
+            
+            // Otomatik flush için zamanlayıcı başlat
+            batcher.flushTimer = time.AfterFunc(batcher.flushInterval, func() {
+                batcher.Flush()
+                
+                // Zamanlayıcıyı yeniden başlat
+                if !batcher.closed {
+                    batcher.flushTimer.Reset(batcher.flushInterval)
+                }
+            })
+            
+            return batcher
+        }
+        
+        // SetBatchSize, toplu işlem boyutunu ayarlar.
+        func (b *IOBatcher) SetBatchSize(size int) {
+            if size < MinBatchSize {
+                size = MinBatchSize
+            } else if size > MaxBatchSize {
+                size = MaxBatchSize
+            }
+            
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            b.batchSize = size
+        }
+        
+        // SetFlushInterval, otomatik flush aralığını ayarlar.
+        func (b *IOBatcher) SetFlushInterval(interval time.Duration) {
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            b.flushInterval = interval
+            
+            // Zamanlayıcıyı yeniden başlat
+            if !b.closed {
+                b.flushTimer.Reset(b.flushInterval)
+            }
+        }
+        
+        // QueueRead, bir okuma işlemini kuyruğa ekler.
+        func (b *IOBatcher) QueueRead(fd int, buffer []byte) *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(b.eventLoop)
+            
+            // Yeni istek oluştur
+            request := new IORequest()
+            request.Operation = ReadOperation
+            request.FD = fd
+            request.Buffer = buffer
+            request.Promise = promise
+            request.Next = nil
+            
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            // İsteği kuyruğa ekle
+            if b.readQueue == nil {
+                b.readQueue = request
+                b.readQueueTail = request
+            } else {
+                b.readQueueTail.Next = request
+                b.readQueueTail = request
+            }
+            
+            b.readQueueSize++
+            b.readBatchSize += len(buffer)
+            
+            // İstatistikleri güncelle
+            b.stats.TotalReads++
+            
+            // Toplu işlem boyutunu kontrol et
+            if b.readBatchSize >= b.batchSize || b.readQueueSize >= b.maxIOVecs {
+                // Asenkron olarak flush işlemini gerçekleştir
+                go b.flushReads()
+            }
+            
+            return future
+        }
+        
+        // QueueWrite, bir yazma işlemini kuyruğa ekler.
+        func (b *IOBatcher) QueueWrite(fd int, buffer []byte) *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(b.eventLoop)
+            
+            // Yeni istek oluştur
+            request := new IORequest()
+            request.Operation = WriteOperation
+            request.FD = fd
+            request.Buffer = buffer
+            request.Promise = promise
+            request.Next = nil
+            
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            // İsteği kuyruğa ekle
+            if b.writeQueue == nil {
+                b.writeQueue = request
+                b.writeQueueTail = request
+            } else {
+                b.writeQueueTail.Next = request
+                b.writeQueueTail = request
+            }
+            
+            b.writeQueueSize++
+            b.writeBatchSize += len(buffer)
+            
+            // İstatistikleri güncelle
+            b.stats.TotalWrites++
+            
+            // Toplu işlem boyutunu kontrol et
+            if b.writeBatchSize >= b.batchSize || b.writeQueueSize >= b.maxIOVecs {
+                // Asenkron olarak flush işlemini gerçekleştir
+                go b.flushWrites()
+            }
+            
+            return future
+        }
+        
+        // QueueSendFile, bir sendfile işlemini kuyruğa ekler.
+        func (b *IOBatcher) QueueSendFile(outFd int, inFd int, offset *int64, count int) *AsyncFuture<int> {
+            promise, future := AsyncPromise.New<int>(b.eventLoop)
+            
+            // Yeni istek oluştur
+            request := new IORequest()
+            request.Operation = SendFileOperation
+            request.FD = outFd
+            request.Offset = *offset
+            request.Count = count
+            request.Promise = promise
+            request.Next = nil
+            
+            // SendFile işlemi için özel bir alan kullan
+            // Buffer alanını inFd değerini saklamak için kullan
+            // Not: Bu, güvenli olmayan bir dönüşüm, sadece örnek amaçlı
+            inFdBytes := make([]byte, 8)
+            *(*int)(unsafe.Pointer(&inFdBytes[0])) = inFd
+            request.Buffer = inFdBytes
+            
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            // SendFile işlemleri için ayrı bir kuyruk yok, doğrudan işle
+            go func() {
+                n, err := syscall.Sendfile(outFd, inFd, offset, count)
+                
+                if err != nil {
+                    promise.CompleteWithError(err)
+                } else {
+                    promise.Complete(int(n))
+                    
+                    // İstatistikleri güncelle
+                    b.mutex.Lock()
+                    b.stats.TotalSendFiles++
+                    b.stats.BytesSent += uint64(n)
+                    b.mutex.Unlock()
+                }
+            }()
+            
+            return future
+        }
+        
+        // Flush, tüm kuyruktaki işlemleri hemen gerçekleştirir.
+        func (b *IOBatcher) Flush() {
+            // Okuma ve yazma işlemlerini flush et
+            b.flushReads()
+            b.flushWrites()
+        }
+        
+        // flushReads, okuma kuyruğundaki işlemleri gerçekleştirir.
+        private func (b *IOBatcher) flushReads() {
+            b.mutex.Lock()
+            
+            // Kuyruk boşsa, çık
+            if b.readQueue == nil {
+                b.mutex.Unlock()
+                return
+            }
+            
+            // Kuyruğu yerel değişkenlere kopyala ve sıfırla
+            queue := b.readQueue
+            queueSize := b.readQueueSize
+            batchSize := b.readBatchSize
+            
+            // Kuyruğu sıfırla
+            b.readQueue = nil
+            b.readQueueTail = nil
+            b.readQueueSize = 0
+            b.readBatchSize = 0
+            
+            b.mutex.Unlock()
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&b.stats.BatchedReads, 1)
+            atomic.AddUint64(&b.stats.BatchedReadOperations, uint64(queueSize))
+            
+            // I/O vektörleri oluştur
+            iovecs := make([]syscall.Iovec, queueSize)
+            requests := make([]*IORequest, queueSize)
+            
+            // I/O vektörlerini doldur
+            i := 0
+            current := queue
+            
+            for current != nil && i < queueSize {
+                // I/O vektörünü oluştur
+                iovecs[i].Base = &current.Buffer[0]
+                iovecs[i].Len = uint64(len(current.Buffer))
+                
+                // İsteği kaydet
+                requests[i] = current
+                
+                // Sonraki isteğe geç
+                current = current.Next
+                i++
+            }
+            
+            // Readv sistem çağrısını gerçekleştir
+            // Not: Tüm istekler aynı dosya tanımlayıcısına sahip olmalıdır
+            // Bu örnekte, ilk isteğin dosya tanımlayıcısını kullanıyoruz
+            fd := queue.FD
+            
+            n, err := syscall.Readv(fd, iovecs[:i])
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&b.stats.BytesRead, uint64(n))
+            
+            // Hata kontrolü
+            if err != nil {
+                // Tüm istekleri hata ile tamamla
+                for j := 0; j < i; j++ {
+                    requests[j].Promise.CompleteWithError(err)
+                }
+                
+                return
+            }
+            
+            // Okunan verileri isteklere dağıt
+            bytesRead := int(n)
+            for j := 0; j < i; j++ {
+                request := requests[j]
+                bufferLen := len(request.Buffer)
+                
+                if bytesRead >= bufferLen {
+                    // Tampon tamamen okundu
+                    request.Promise.Complete(bufferLen)
+                    bytesRead -= bufferLen
+                } else if bytesRead > 0 {
+                    // Tampon kısmen okundu
+                    request.Promise.Complete(bytesRead)
+                    bytesRead = 0
+                } else {
+                    // Tampon okunamadı
+                    request.Promise.Complete(0)
+                }
+            }
+        }
+        
+        // flushWrites, yazma kuyruğundaki işlemleri gerçekleştirir.
+        private func (b *IOBatcher) flushWrites() {
+            b.mutex.Lock()
+            
+            // Kuyruk boşsa, çık
+            if b.writeQueue == nil {
+                b.mutex.Unlock()
+                return
+            }
+            
+            // Kuyruğu yerel değişkenlere kopyala ve sıfırla
+            queue := b.writeQueue
+            queueSize := b.writeQueueSize
+            batchSize := b.writeBatchSize
+            
+            // Kuyruğu sıfırla
+            b.writeQueue = nil
+            b.writeQueueTail = nil
+            b.writeQueueSize = 0
+            b.writeBatchSize = 0
+            
+            b.mutex.Unlock()
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&b.stats.BatchedWrites, 1)
+            atomic.AddUint64(&b.stats.BatchedWriteOperations, uint64(queueSize))
+            
+            // I/O vektörleri oluştur
+            iovecs := make([]syscall.Iovec, queueSize)
+            requests := make([]*IORequest, queueSize)
+            
+            // I/O vektörlerini doldur
+            i := 0
+            current := queue
+            
+            for current != nil && i < queueSize {
+                // I/O vektörünü oluştur
+                iovecs[i].Base = &current.Buffer[0]
+                iovecs[i].Len = uint64(len(current.Buffer))
+                
+                // İsteği kaydet
+                requests[i] = current
+                
+                // Sonraki isteğe geç
+                current = current.Next
+                i++
+            }
+            
+            // Writev sistem çağrısını gerçekleştir
+            // Not: Tüm istekler aynı dosya tanımlayıcısına sahip olmalıdır
+            // Bu örnekte, ilk isteğin dosya tanımlayıcısını kullanıyoruz
+            fd := queue.FD
+            
+            n, err := syscall.Writev(fd, iovecs[:i])
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&b.stats.BytesWritten, uint64(n))
+            
+            // Hata kontrolü
+            if err != nil {
+                // Tüm istekleri hata ile tamamla
+                for j := 0; j < i; j++ {
+                    requests[j].Promise.CompleteWithError(err)
+                }
+                
+                return
+            }
+            
+            // Yazılan verileri isteklere dağıt
+            bytesWritten := int(n)
+            for j := 0; j < i; j++ {
+                request := requests[j]
+                bufferLen := len(request.Buffer)
+                
+                if bytesWritten >= bufferLen {
+                    // Tampon tamamen yazıldı
+                    request.Promise.Complete(bufferLen)
+                    bytesWritten -= bufferLen
+                } else if bytesWritten > 0 {
+                    // Tampon kısmen yazıldı
+                    request.Promise.Complete(bytesWritten)
+                    bytesWritten = 0
+                } else {
+                    // Tampon yazılamadı
+                    request.Promise.Complete(0)
+                }
+            }
+        }
+        
+        // GetStats, batcher istatistiklerini döndürür.
+        func (b *IOBatcher) GetStats() BatcherStats {
+            return BatcherStats{
+                TotalReads:             atomic.LoadUint64(&b.stats.TotalReads),
+                TotalWrites:            atomic.LoadUint64(&b.stats.TotalWrites),
+                TotalSendFiles:         atomic.LoadUint64(&b.stats.TotalSendFiles),
+                BatchedReads:           atomic.LoadUint64(&b.stats.BatchedReads),
+                BatchedWrites:          atomic.LoadUint64(&b.stats.BatchedWrites),
+                BatchedReadOperations:  atomic.LoadUint64(&b.stats.BatchedReadOperations),
+                BatchedWriteOperations: atomic.LoadUint64(&b.stats.BatchedWriteOperations),
+                BytesRead:              atomic.LoadUint64(&b.stats.BytesRead),
+                BytesWritten:           atomic.LoadUint64(&b.stats.BytesWritten),
+                BytesSent:              atomic.LoadUint64(&b.stats.BytesSent),
+            }
+        }
+        
+        // Close, batcher'ı kapatır.
+        func (b *IOBatcher) Close() {
+            b.mutex.Lock()
+            defer b.mutex.Unlock()
+            
+            if b.closed {
+                return
+            }
+            
+            b.closed = true
+            
+            // Zamanlayıcıyı durdur
+            if b.flushTimer != nil {
+                b.flushTimer.Stop()
+            }
+            
+            // Kuyruktaki işlemleri flush et
+            b.mutex.Unlock()
+            b.Flush()
+            b.mutex.Lock()
+        }
+}
+
+// BatcherStats, batcher istatistiklerini içerir.
+class BatcherStats {
+    var TotalReads uint64
+    var TotalWrites uint64
+    var TotalSendFiles uint64
+    var BatchedReads uint64
+    var BatchedWrites uint64
+    var BatchedReadOperations uint64
+    var BatchedWriteOperations uint64
+    var BytesRead uint64
+    var BytesWritten uint64
+    var BytesSent uint64
+}
+
+// GlobalIOBatcher, global bir IOBatcher örneğidir.
+var GlobalIOBatcher *IOBatcher
+
+// InitGlobalIOBatcher, global IOBatcher örneğini başlatır.
+func InitGlobalIOBatcher(eventLoop *EventLoop) {
+    GlobalIOBatcher = IOBatcher.New(eventLoop)
+}

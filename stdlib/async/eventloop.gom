@@ -1,0 +1,247 @@
+// GO-Minus Standart Kütüphane - Async Paketi - EventLoop
+package async
+
+import (
+    "sync"
+    "time"
+    "errors"
+)
+
+// EventTask, olay döngüsü tarafından işlenecek bir görevi temsil eder.
+class EventTask {
+    var Event Event
+    var Handler AsyncHandler
+}
+
+// EventLoop, asenkron işlemleri yöneten bir olay döngüsüdür.
+class EventLoop {
+    private:
+        var poller Poller
+        var running bool
+        var mutex sync.Mutex
+        var wakeupChan chan struct{}
+        var handlers map[int]AsyncHandler
+        var nextID int
+        var stopChan chan struct{}
+        var taskQueue *LockFreeQueue<EventTask>
+        var pendingTasks *AtomicCounter
+
+    public:
+        // New, yeni bir EventLoop oluşturur.
+        static func New() (*EventLoop, error) {
+            // Platform bağımsız poller oluştur
+            poller, err := newPoller()
+            if err != nil {
+                return nil, err
+            }
+            
+            loop := new EventLoop()
+            loop.poller = poller
+            loop.running = false
+            loop.wakeupChan = make(chan struct{}, 1)
+            loop.handlers = make(map[int]AsyncHandler)
+            loop.nextID = 1
+            loop.stopChan = make(chan struct{})
+            loop.taskQueue = LockFreeQueue.New<EventTask>()
+            loop.pendingTasks = AtomicCounter.New(0)
+            
+            return loop, nil
+        }
+
+        // Start, olay döngüsünü başlatır.
+        func (loop *EventLoop) Start() error {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            if loop.running {
+                return errors.New("async: olay döngüsü zaten çalışıyor")
+            }
+            
+            loop.running = true
+            
+            // Olay döngüsünü başlat
+            go loop.run()
+            
+            return nil
+        }
+
+        // Stop, olay döngüsünü durdurur.
+        func (loop *EventLoop) Stop() error {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            if !loop.running {
+                return errors.New("async: olay döngüsü çalışmıyor")
+            }
+            
+            loop.running = false
+            
+            // Olay döngüsünü durdur
+            close(loop.stopChan)
+            
+            return nil
+        }
+
+        // Register, bir dosya tanımlayıcısını olay döngüsüne kaydeder.
+        func (loop *EventLoop) Register(fd int, events int, handler AsyncHandler) (int, error) {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            // Poller'a kaydet
+            err := loop.poller.Add(fd, events)
+            if err != nil {
+                return 0, err
+            }
+            
+            // Handler'ı kaydet
+            id := loop.nextID
+            loop.handlers[id] = handler
+            loop.nextID++
+            
+            return id, nil
+        }
+
+        // Unregister, bir dosya tanımlayıcısını olay döngüsünden kaldırır.
+        func (loop *EventLoop) Unregister(id int) error {
+            loop.mutex.Lock()
+            defer loop.mutex.Unlock()
+            
+            handler, ok := loop.handlers[id]
+            if !ok {
+                return errors.New("async: geçersiz tanımlayıcı")
+            }
+            
+            // TODO: Poller'dan kaldır
+            
+            // Handler'ı kaldır
+            delete(loop.handlers, id)
+            
+            return nil
+        }
+
+        // Wakeup, olay döngüsünü uyandırır.
+        func (loop *EventLoop) Wakeup() {
+            select {
+            case loop.wakeupChan <- struct{}{}:
+            default:
+            }
+        }
+
+        // Post, bir olayı olay döngüsüne gönderir.
+        // Bu metot, olay döngüsünün çalıştığı thread'den farklı bir thread'den çağrılabilir.
+        func (loop *EventLoop) Post(event Event, handler AsyncHandler) {
+            // Yeni bir görev oluştur
+            task := EventTask{
+                Event: event,
+                Handler: handler,
+            }
+            
+            // Görevi kuyruğa ekle
+            loop.taskQueue.Enqueue(task)
+            
+            // Bekleyen görev sayısını artır
+            loop.pendingTasks.Increment(Relaxed)
+            
+            // Olay döngüsünü uyandır
+            loop.Wakeup()
+        }
+
+        // run, olay döngüsünün ana döngüsüdür.
+        private func (loop *EventLoop) run() {
+            for {
+                // Olayları bekle
+                events, err := loop.poller.Wait(100) // 100ms timeout
+                
+                // Durdurma sinyali kontrol et
+                select {
+                case <-loop.stopChan:
+                    return
+                default:
+                }
+                
+                // Uyanma sinyali kontrol et
+                select {
+                case <-loop.wakeupChan:
+                    // Uyanma sinyali alındı
+                default:
+                }
+                
+                // Bekleyen görevleri işle
+                loop.processPendingTasks()
+                
+                if err != nil {
+                    // Hata işleme
+                    continue
+                }
+                
+                // Olayları işle
+                for _, event := range events {
+                    // Handler'ı bul
+                    loop.mutex.Lock()
+                    handler, ok := loop.handlers[event.ID]
+                    loop.mutex.Unlock()
+                    
+                    if ok {
+                        // Olayı kuyruğa ekle
+                        loop.Post(event, handler)
+                    }
+                }
+            }
+        }
+        
+        // processPendingTasks, bekleyen görevleri işler.
+        private func (loop *EventLoop) processPendingTasks() {
+            // Bekleyen görev sayısını kontrol et
+            pendingCount := loop.pendingTasks.Load(Relaxed)
+            
+            // Bekleyen görev yoksa, çık
+            if pendingCount == 0 {
+                return
+            }
+            
+            // Bekleyen görevleri işle (en fazla 100 görev)
+            maxTasks := uint64(100)
+            if pendingCount < maxTasks {
+                maxTasks = pendingCount
+            }
+            
+            for i := uint64(0); i < maxTasks; i++ {
+                // Kuyruktan bir görev al
+                task, ok := loop.taskQueue.Dequeue()
+                
+                if !ok {
+                    // Kuyruk boş, çık
+                    break
+                }
+                
+                // Bekleyen görev sayısını azalt
+                loop.pendingTasks.Decrement(Relaxed)
+                
+                // Görevi işle
+                task.Handler.OnEvent(task.Event)
+            }
+        }
+}
+
+// Poller, platform bağımsız bir olay bekleyicisidir.
+interface Poller {
+    func Add(fd int, events int) error
+    func Remove(fd int) error
+    func Modify(fd int, events int) error
+    func Wait(timeout int) ([]Event, error)
+    func Close() error
+}
+
+// newPoller, platform bağımsız bir poller oluşturur.
+func newPoller() (Poller, error) {
+    // Platform bağımlı poller oluştur
+    #ifdef _WIN32
+    return newIOCPPoller()
+    #elif defined(__linux__)
+    return newEpollPoller()
+    #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    return newKqueuePoller()
+    #else
+    return nil, errors.New("async: desteklenmeyen platform")
+    #endif
+}

@@ -1,0 +1,417 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized System Calls
+package async
+
+import (
+    "os"
+    "syscall"
+    "unsafe"
+    "sync"
+    "sync/atomic"
+    "time"
+)
+
+// IOVec, bir I/O vektörünü temsil eder.
+// Bu yapı, readv/writev sistem çağrıları için kullanılır.
+class IOVec {
+    var Base unsafe.Pointer
+    var Len int
+}
+
+// BatchedIO, toplu I/O işlemleri için kullanılan bir sınıftır.
+// Bu sınıf, readv/writev sistem çağrılarını kullanarak
+// çoklu okuma/yazma işlemlerini tek bir sistem çağrısında gruplandırır.
+class BatchedIO {
+    private:
+        var fd int
+        var iovecs []IOVec
+        var buffers [][]byte
+        var maxIovecs int
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir BatchedIO oluşturur.
+        static func New(fd int) *BatchedIO {
+            bio := new BatchedIO()
+            bio.fd = fd
+            bio.maxIovecs = 1024 // Sistem sınırı (platform bağımlı)
+            bio.iovecs = make([]IOVec, 0, bio.maxIovecs)
+            bio.buffers = make([][]byte, 0, bio.maxIovecs)
+            
+            return bio
+        }
+        
+        // AddBuffer, bir tamponu toplu işleme ekler.
+        func (bio *BatchedIO) AddBuffer(buffer []byte) bool {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+            
+            if len(bio.iovecs) >= bio.maxIovecs {
+                return false
+            }
+            
+            // IOVec oluştur
+            iov := IOVec{
+                Base: unsafe.Pointer(&buffer[0]),
+                Len: len(buffer),
+            }
+            
+            // IOVec ve tamponu ekle
+            bio.iovecs = append(bio.iovecs, iov)
+            bio.buffers = append(bio.buffers, buffer)
+            
+            return true
+        }
+        
+        // ReadBatched, toplu okuma işlemi gerçekleştirir.
+        func (bio *BatchedIO) ReadBatched() (int, error) {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+            
+            if len(bio.iovecs) == 0 {
+                return 0, nil
+            }
+            
+            // readv sistem çağrısı
+            n, err := syscall.Readv(bio.fd, bio.iovecs)
+            
+            // Tamponları ve IOVec'leri temizle
+            bio.iovecs = bio.iovecs[:0]
+            bio.buffers = bio.buffers[:0]
+            
+            return n, err
+        }
+        
+        // WriteBatched, toplu yazma işlemi gerçekleştirir.
+        func (bio *BatchedIO) WriteBatched() (int, error) {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+            
+            if len(bio.iovecs) == 0 {
+                return 0, nil
+            }
+            
+            // writev sistem çağrısı
+            n, err := syscall.Writev(bio.fd, bio.iovecs)
+            
+            // Tamponları ve IOVec'leri temizle
+            bio.iovecs = bio.iovecs[:0]
+            bio.buffers = bio.buffers[:0]
+            
+            return n, err
+        }
+        
+        // Reset, toplu işlemi sıfırlar.
+        func (bio *BatchedIO) Reset() {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+            
+            bio.iovecs = bio.iovecs[:0]
+            bio.buffers = bio.buffers[:0]
+        }
+}
+
+// FileDescriptorCache, dosya tanımlayıcılarını önbelleğe alan bir sınıftır.
+// Bu sınıf, dosya tanımlayıcılarının yeniden kullanımını sağlar.
+class FileDescriptorCache {
+    private:
+        var cache map[string]*CachedFD
+        var mutex sync.Mutex
+        var maxSize int
+        var size int
+        var hits uint64
+        var misses uint64
+    
+    public:
+        // New, yeni bir FileDescriptorCache oluşturur.
+        static func New(maxSize int) *FileDescriptorCache {
+            if maxSize <= 0 {
+                maxSize = 100
+            }
+            
+            fdc := new FileDescriptorCache()
+            fdc.cache = make(map[string]*CachedFD)
+            fdc.maxSize = maxSize
+            fdc.size = 0
+            
+            return fdc
+        }
+        
+        // Get, belirtilen yol için bir dosya tanımlayıcısı alır.
+        func (fdc *FileDescriptorCache) Get(path string, flag int, perm os.FileMode) (*os.File, error) {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+            
+            // Önbellekte ara
+            if cached, ok := fdc.cache[path]; ok {
+                // Önbellek isabet
+                atomic.AddUint64(&fdc.hits, 1)
+                
+                // Son kullanım zamanını güncelle
+                cached.lastUsed = time.Now()
+                
+                // Dosya tanımlayıcısını döndür
+                return os.NewFile(uintptr(cached.fd), path), nil
+            }
+            
+            // Önbellek ıskalama
+            atomic.AddUint64(&fdc.misses, 1)
+            
+            // Dosyayı aç
+            file, err := os.OpenFile(path, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+            
+            // Önbellek dolu mu kontrol et
+            if fdc.size >= fdc.maxSize {
+                // En eski dosya tanımlayıcısını bul ve kaldır
+                fdc.evictOldest()
+            }
+            
+            // Dosya tanımlayıcısını önbelleğe ekle
+            fd := int(file.Fd())
+            fdc.cache[path] = &CachedFD{
+                fd: fd,
+                lastUsed: time.Now(),
+            }
+            fdc.size++
+            
+            return file, nil
+        }
+        
+        // Put, bir dosya tanımlayıcısını önbelleğe ekler.
+        func (fdc *FileDescriptorCache) Put(path string, file *os.File) {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+            
+            // Dosya tanımlayıcısını al
+            fd := int(file.Fd())
+            
+            // Önbellek dolu mu kontrol et
+            if fdc.size >= fdc.maxSize {
+                // En eski dosya tanımlayıcısını bul ve kaldır
+                fdc.evictOldest()
+            }
+            
+            // Dosya tanımlayıcısını önbelleğe ekle
+            fdc.cache[path] = &CachedFD{
+                fd: fd,
+                lastUsed: time.Now(),
+            }
+            fdc.size++
+        }
+        
+        // Remove, bir dosya tanımlayıcısını önbellekten kaldırır.
+        func (fdc *FileDescriptorCache) Remove(path string) {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+            
+            // Önbellekte ara
+            if _, ok := fdc.cache[path]; ok {
+                // Önbellekten kaldır
+                delete(fdc.cache, path)
+                fdc.size--
+            }
+        }
+        
+        // Clear, önbelleği temizler.
+        func (fdc *FileDescriptorCache) Clear() {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+            
+            // Önbelleği temizle
+            fdc.cache = make(map[string]*CachedFD)
+            fdc.size = 0
+        }
+        
+        // GetStats, önbellek istatistiklerini döndürür.
+        func (fdc *FileDescriptorCache) GetStats() map[string]interface{} {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+            
+            return map[string]interface{}{
+                "size":   fdc.size,
+                "maxSize": fdc.maxSize,
+                "hits":   atomic.LoadUint64(&fdc.hits),
+                "misses": atomic.LoadUint64(&fdc.misses),
+            }
+        }
+        
+        // evictOldest, en eski dosya tanımlayıcısını önbellekten kaldırır.
+        private func (fdc *FileDescriptorCache) evictOldest() {
+            var oldestPath string
+            var oldestTime time.Time
+            
+            // İlk elemanı en eski olarak ayarla
+            for path, cached := range fdc.cache {
+                oldestPath = path
+                oldestTime = cached.lastUsed
+                break
+            }
+            
+            // En eski elemanı bul
+            for path, cached := range fdc.cache {
+                if cached.lastUsed.Before(oldestTime) {
+                    oldestPath = path
+                    oldestTime = cached.lastUsed
+                }
+            }
+            
+            // En eski elemanı kaldır
+            if oldestPath != "" {
+                delete(fdc.cache, oldestPath)
+                fdc.size--
+            }
+        }
+}
+
+// CachedFD, önbelleğe alınmış bir dosya tanımlayıcısını temsil eder.
+class CachedFD {
+    var fd int
+    var lastUsed time.Time
+}
+
+// ZeroCopyFile, zero-copy dosya işlemleri için kullanılan bir sınıftır.
+// Bu sınıf, sendfile sistem çağrısını kullanarak
+// dosya içeriğini doğrudan ağ soketine gönderir.
+class ZeroCopyFile {
+    private:
+        var file *os.File
+        var fd int
+    
+    public:
+        // New, yeni bir ZeroCopyFile oluşturur.
+        static func New(file *os.File) *ZeroCopyFile {
+            zcf := new ZeroCopyFile()
+            zcf.file = file
+            zcf.fd = int(file.Fd())
+            
+            return zcf
+        }
+        
+        // Open, belirtilen yolu açar ve bir ZeroCopyFile döndürür.
+        static func Open(path string, flag int, perm os.FileMode) (*ZeroCopyFile, error) {
+            file, err := os.OpenFile(path, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+            
+            return ZeroCopyFile.New(file), nil
+        }
+        
+        // SendFile, dosya içeriğini doğrudan ağ soketine gönderir.
+        func (zcf *ZeroCopyFile) SendFile(socket *os.File, offset int64, count int) (int64, error) {
+            // sendfile sistem çağrısı
+            return syscall.Sendfile(int(socket.Fd()), zcf.fd, &offset, count)
+        }
+        
+        // Close, dosyayı kapatır.
+        func (zcf *ZeroCopyFile) Close() error {
+            return zcf.file.Close()
+        }
+}
+
+// SyscallBatcher, sistem çağrılarını gruplandıran bir sınıftır.
+// Bu sınıf, çoklu sistem çağrılarını tek bir çağrıda gruplandırır.
+class SyscallBatcher {
+    private:
+        var fdCache *FileDescriptorCache
+        var batchedIOs map[int]*BatchedIO
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir SyscallBatcher oluşturur.
+        static func New() *SyscallBatcher {
+            sb := new SyscallBatcher()
+            sb.fdCache = FileDescriptorCache.New(100)
+            sb.batchedIOs = make(map[int]*BatchedIO)
+            
+            return sb
+        }
+        
+        // GetBatchedIO, belirtilen dosya tanımlayıcısı için bir BatchedIO döndürür.
+        func (sb *SyscallBatcher) GetBatchedIO(fd int) *BatchedIO {
+            sb.mutex.Lock()
+            defer sb.mutex.Unlock()
+            
+            // BatchedIO ara
+            if bio, ok := sb.batchedIOs[fd]; ok {
+                return bio
+            }
+            
+            // Yeni BatchedIO oluştur
+            bio := BatchedIO.New(fd)
+            sb.batchedIOs[fd] = bio
+            
+            return bio
+        }
+        
+        // GetFileDescriptorCache, dosya tanımlayıcısı önbelleğini döndürür.
+        func (sb *SyscallBatcher) GetFileDescriptorCache() *FileDescriptorCache {
+            return sb.fdCache
+        }
+        
+        // OpenFile, bir dosyayı açar ve dosya tanımlayıcısını önbelleğe alır.
+        func (sb *SyscallBatcher) OpenFile(path string, flag int, perm os.FileMode) (*os.File, error) {
+            return sb.fdCache.Get(path, flag, perm)
+        }
+        
+        // CloseFile, bir dosyayı kapatır ve dosya tanımlayıcısını önbellekten kaldırır.
+        func (sb *SyscallBatcher) CloseFile(path string, file *os.File) error {
+            sb.fdCache.Remove(path)
+            return file.Close()
+        }
+        
+        // ReadBatched, toplu okuma işlemi gerçekleştirir.
+        func (sb *SyscallBatcher) ReadBatched(fd int, buffers [][]byte) (int, error) {
+            bio := sb.GetBatchedIO(fd)
+            
+            // Tamponları ekle
+            for _, buffer := range buffers {
+                if !bio.AddBuffer(buffer) {
+                    // Tampon eklenemedi, mevcut tamponları oku
+                    n, err := bio.ReadBatched()
+                    if err != nil {
+                        return n, err
+                    }
+                    
+                    // Yeni tamponu ekle
+                    bio.AddBuffer(buffer)
+                }
+            }
+            
+            // Toplu okuma işlemi gerçekleştir
+            return bio.ReadBatched()
+        }
+        
+        // WriteBatched, toplu yazma işlemi gerçekleştirir.
+        func (sb *SyscallBatcher) WriteBatched(fd int, buffers [][]byte) (int, error) {
+            bio := sb.GetBatchedIO(fd)
+            
+            // Tamponları ekle
+            for _, buffer := range buffers {
+                if !bio.AddBuffer(buffer) {
+                    // Tampon eklenemedi, mevcut tamponları yaz
+                    n, err := bio.WriteBatched()
+                    if err != nil {
+                        return n, err
+                    }
+                    
+                    // Yeni tamponu ekle
+                    bio.AddBuffer(buffer)
+                }
+            }
+            
+            // Toplu yazma işlemi gerçekleştir
+            return bio.WriteBatched()
+        }
+        
+        // SendFile, dosya içeriğini doğrudan ağ soketine gönderir.
+        func (sb *SyscallBatcher) SendFile(socket *os.File, file *os.File, offset int64, count int) (int64, error) {
+            zcf := ZeroCopyFile.New(file)
+            return zcf.SendFile(socket, offset, count)
+        }
+}
+
+// GlobalSyscallBatcher, global bir SyscallBatcher örneğidir.
+var GlobalSyscallBatcher = SyscallBatcher.New()

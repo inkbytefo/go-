@@ -1,0 +1,193 @@
+// GO-Minus Standart Kütüphane - Memory Paketi - Region
+// Bu dosya, GO-Minus programlama dili için bölgesel bellek yönetimi (Region-Based Memory Management) implementasyonunu içerir.
+package memory
+
+import (
+    "sync"
+    "unsafe"
+)
+
+// RegionBlock, bölgesel bellek yönetiminde kullanılan bellek bloğunu temsil eder.
+struct RegionBlock {
+    // Ptr, bellek bloğunun başlangıç adresi.
+    Ptr unsafe.Pointer
+    
+    // Size, bellek bloğunun boyutu (bayt cinsinden).
+    Size uint64
+    
+    // Used, kullanılan bellek miktarı (bayt cinsinden).
+    Used uint64
+    
+    // Next, sonraki bellek bloğu.
+    Next *RegionBlock
+}
+
+// RegionStats, bölgesel bellek yöneticisinin istatistiklerini içerir.
+struct RegionStats {
+    // TotalSize, toplam bellek boyutu (bayt cinsinden).
+    TotalSize uint64
+    
+    // UsedSize, kullanılan bellek boyutu (bayt cinsinden).
+    UsedSize uint64
+    
+    // BlockCount, bellek bloğu sayısı.
+    BlockCount uint64
+    
+    // AllocationCount, bellek ayırma işlemi sayısı.
+    AllocationCount uint64
+}
+
+// Region, bölgesel bellek yönetimi için kullanılan bir sınıftır.
+// Bu sınıf, bellek bloklarını yönetir ve bölge sonunda tüm belleği serbest bırakır.
+class Region {
+    private:
+        var head *RegionBlock
+        var current *RegionBlock
+        var blockSize uint64
+        var stats RegionStats
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir Region örneği oluşturur.
+        static func New() *Region {
+            return NewWithBlockSize(1024 * 1024) // Varsayılan blok boyutu: 1 MB
+        }
+        
+        // NewWithBlockSize, belirtilen blok boyutuyla yeni bir Region örneği oluşturur.
+        static func NewWithBlockSize(blockSize uint64) *Region {
+            if blockSize < 1024 {
+                blockSize = 1024 // Minimum blok boyutu: 1 KB
+            }
+            
+            region := &Region{
+                blockSize: blockSize,
+                stats: RegionStats{},
+            }
+            
+            // İlk bellek bloğunu oluştur
+            region.addBlock()
+            
+            return region
+        }
+        
+        // Allocate, belirtilen boyutta bellek ayırır ve başlangıç adresini döndürür.
+        func Allocate(size uint64) unsafe.Pointer {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Bellek boyutu 0 ise null döndür
+            if size == 0 {
+                return null
+            }
+            
+            // Hizalama için boyutu ayarla (8 bayt hizalama)
+            alignedSize := (size + 7) & ^uint64(7)
+            
+            // Mevcut blokta yeterli alan yoksa yeni blok oluştur
+            if this.current.Used + alignedSize > this.current.Size {
+                // Eğer istenen boyut blok boyutundan büyükse, özel bir blok oluştur
+                if alignedSize > this.blockSize {
+                    block := this.createBlock(alignedSize)
+                    block.Next = this.head
+                    this.head = block
+                    
+                    ptr := unsafe.Pointer(uintptr(block.Ptr))
+                    block.Used = alignedSize
+                    
+                    this.stats.UsedSize += alignedSize
+                    this.stats.AllocationCount++
+                    
+                    return ptr
+                } else {
+                    this.addBlock()
+                }
+            }
+            
+            // Mevcut bloktan bellek ayır
+            ptr := unsafe.Pointer(uintptr(this.current.Ptr) + uintptr(this.current.Used))
+            this.current.Used += alignedSize
+            
+            this.stats.UsedSize += alignedSize
+            this.stats.AllocationCount++
+            
+            return ptr
+        }
+        
+        // Allocate<T>, belirtilen tipte bir nesne için bellek ayırır ve başlangıç adresini döndürür.
+        func Allocate<T>(count uint64) *T {
+            size := uint64(unsafe.Sizeof(T{})) * count
+            ptr := this.Allocate(size)
+            return (*T)(ptr)
+        }
+        
+        // Free, bölgedeki tüm belleği serbest bırakır.
+        func Free() {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            // Tüm bellek bloklarını serbest bırak
+            block := this.head
+            for block != null {
+                nextBlock := block.Next
+                unsafe.Free(block.Ptr)
+                block = nextBlock
+            }
+            
+            // Bölgeyi sıfırla
+            this.head = null
+            this.current = null
+            this.stats = RegionStats{}
+            
+            // Yeni bir blok oluştur
+            this.addBlock()
+        }
+        
+        // GetStats, bölgesel bellek yöneticisinin istatistiklerini döndürür.
+        func GetStats() RegionStats {
+            this.mutex.Lock()
+            defer this.mutex.Unlock()
+            
+            return this.stats
+        }
+        
+        // addBlock, yeni bir bellek bloğu ekler.
+        private func addBlock() {
+            block := this.createBlock(this.blockSize)
+            
+            if this.head == null {
+                this.head = block
+            } else {
+                block.Next = this.head
+                this.head = block
+            }
+            
+            this.current = block
+        }
+        
+        // createBlock, belirtilen boyutta yeni bir bellek bloğu oluşturur.
+        private func createBlock(size uint64) *RegionBlock {
+            ptr := unsafe.Pointer(new(byte[size]))
+            
+            block := &RegionBlock{
+                Ptr: ptr,
+                Size: size,
+                Used: 0,
+                Next: null,
+            }
+            
+            this.stats.TotalSize += size
+            this.stats.BlockCount++
+            
+            return block
+        }
+}
+
+// NewRegion, yeni bir Region örneği oluşturur.
+func NewRegion() *Region {
+    return Region.New()
+}
+
+// NewRegionWithBlockSize, belirtilen blok boyutuyla yeni bir Region örneği oluşturur.
+func NewRegionWithBlockSize(blockSize uint64) *Region {
+    return Region.NewWithBlockSize(blockSize)
+}

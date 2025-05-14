@@ -1,0 +1,232 @@
+// GO-Minus Standart Kütüphane - Memory Paketi - Test
+// Bu dosya, GO-Minus programlama dili için bellek yönetimi paketinin test senaryolarını içerir.
+package memory_test
+
+import (
+    "memory"
+    "testing"
+    "time"
+    "unsafe"
+)
+
+// TestDefaultMemoryManager, varsayılan bellek yöneticisini test eder.
+func TestDefaultMemoryManager(t *testing.T) {
+    // Varsayılan bellek yöneticisini oluştur
+    options := memory.MemoryManagerOptions{
+        EnableProfiling: false,
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: false,
+        EnablePooling: false,
+    }
+    
+    manager := memory.DefaultMemoryManager.New(options)
+    
+    // Bellek ayır
+    size := uint64(1024)
+    ptr := manager.Allocate(size)
+    
+    // Bellek adresinin null olmadığını kontrol et
+    if ptr == null {
+        t.Error("Bellek ayırma başarısız")
+    }
+    
+    // İstatistikleri kontrol et
+    stats := manager.GetStats()
+    
+    if stats.TotalAllocated != size {
+        t.Errorf("Toplam ayrılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", size, stats.TotalAllocated)
+    }
+    
+    if stats.AllocationCount != 1 {
+        t.Errorf("Bellek ayırma işlemi sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.AllocationCount)
+    }
+    
+    if stats.CurrentUsage != size {
+        t.Errorf("Şu anda kullanılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", size, stats.CurrentUsage)
+    }
+    
+    if stats.PeakUsage != size {
+        t.Errorf("En yüksek bellek kullanımı yanlış. Beklenen: %d, Alınan: %d", size, stats.PeakUsage)
+    }
+    
+    // Belleği serbest bırak
+    manager.Free(ptr)
+    
+    // İstatistikleri kontrol et (profilleme etkin olmadığı için değişmemeli)
+    stats = manager.GetStats()
+    
+    if stats.TotalAllocated != size {
+        t.Errorf("Toplam ayrılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", size, stats.TotalAllocated)
+    }
+    
+    if stats.AllocationCount != 1 {
+        t.Errorf("Bellek ayırma işlemi sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.AllocationCount)
+    }
+}
+
+// TestMemoryProfiler, bellek profillemeyi test eder.
+func TestMemoryProfiler(t *testing.T) {
+    // Profilleme etkin olan bir bellek yöneticisi oluştur
+    options := memory.MemoryManagerOptions{
+        EnableProfiling: true,
+        ProfileSaveInterval: time.Second,
+        ProfileFilePath: "memory_profile_test.json",
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: false,
+        EnablePooling: false,
+    }
+    
+    manager := memory.DefaultMemoryManager.New(options)
+    
+    // Bellek ayır
+    size := uint64(1024)
+    ptr := manager.Allocate(size)
+    
+    // Bellek adresinin null olmadığını kontrol et
+    if ptr == null {
+        t.Error("Bellek ayırma başarısız")
+    }
+    
+    // İstatistikleri kontrol et
+    stats := manager.GetStats()
+    
+    if stats.TotalAllocated != size {
+        t.Errorf("Toplam ayrılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", size, stats.TotalAllocated)
+    }
+    
+    if stats.AllocationCount != 1 {
+        t.Errorf("Bellek ayırma işlemi sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.AllocationCount)
+    }
+    
+    if stats.CurrentUsage != size {
+        t.Errorf("Şu anda kullanılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", size, stats.CurrentUsage)
+    }
+    
+    if stats.PeakUsage != size {
+        t.Errorf("En yüksek bellek kullanımı yanlış. Beklenen: %d, Alınan: %d", size, stats.PeakUsage)
+    }
+    
+    // Belleği serbest bırak
+    manager.Free(ptr)
+    
+    // İstatistikleri kontrol et (profilleme etkin olduğu için değişmeli)
+    stats = manager.GetStats()
+    
+    if stats.TotalFreed != size {
+        t.Errorf("Toplam serbest bırakılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", size, stats.TotalFreed)
+    }
+    
+    if stats.FreeCount != 1 {
+        t.Errorf("Bellek serbest bırakma işlemi sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.FreeCount)
+    }
+    
+    if stats.CurrentUsage != 0 {
+        t.Errorf("Şu anda kullanılan bellek miktarı yanlış. Beklenen: %d, Alınan: %d", 0, stats.CurrentUsage)
+    }
+}
+
+// TestRegion, bölgesel bellek yönetimini test eder.
+func TestRegion(t *testing.T) {
+    // Bölge oluştur
+    region := memory.NewRegion()
+    
+    // Bellek ayır
+    size := uint64(1024)
+    ptr := region.Allocate(size)
+    
+    // Bellek adresinin null olmadığını kontrol et
+    if ptr == null {
+        t.Error("Bellek ayırma başarısız")
+    }
+    
+    // İstatistikleri kontrol et
+    stats := region.GetStats()
+    
+    if stats.TotalSize < size {
+        t.Errorf("Toplam bellek boyutu yanlış. Beklenen: >= %d, Alınan: %d", size, stats.TotalSize)
+    }
+    
+    if stats.UsedSize < size {
+        t.Errorf("Kullanılan bellek boyutu yanlış. Beklenen: >= %d, Alınan: %d", size, stats.UsedSize)
+    }
+    
+    if stats.BlockCount != 1 {
+        t.Errorf("Bellek bloğu sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.BlockCount)
+    }
+    
+    if stats.AllocationCount != 1 {
+        t.Errorf("Bellek ayırma işlemi sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.AllocationCount)
+    }
+    
+    // Bölgeyi serbest bırak
+    region.Free()
+    
+    // İstatistikleri kontrol et
+    stats = region.GetStats()
+    
+    if stats.UsedSize != 0 {
+        t.Errorf("Kullanılan bellek boyutu yanlış. Beklenen: %d, Alınan: %d", 0, stats.UsedSize)
+    }
+    
+    if stats.AllocationCount != 0 {
+        t.Errorf("Bellek ayırma işlemi sayısı yanlış. Beklenen: %d, Alınan: %d", 0, stats.AllocationCount)
+    }
+}
+
+// TestPool, bellek havuzunu test eder.
+func TestPool(t *testing.T) {
+    // Bellek havuzu oluştur
+    capacity := uint64(10)
+    pool := memory.NewPool<int>(capacity)
+    
+    // Havuzdan bir öğe al
+    ptr := pool.Get()
+    
+    // Bellek adresinin null olmadığını kontrol et
+    if ptr == null {
+        t.Error("Havuzdan öğe alma başarısız")
+    }
+    
+    // İstatistikleri kontrol et
+    stats := pool.GetStats()
+    
+    if stats.Capacity != capacity {
+        t.Errorf("Havuz kapasitesi yanlış. Beklenen: %d, Alınan: %d", capacity, stats.Capacity)
+    }
+    
+    if stats.GetCount != 1 {
+        t.Errorf("Havuzdan alınan öğe sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.GetCount)
+    }
+    
+    // Öğeyi havuza geri döndür
+    pool.Return(ptr)
+    
+    // İstatistikleri kontrol et
+    stats = pool.GetStats()
+    
+    if stats.ReturnCount != 1 {
+        t.Errorf("Havuza geri döndürülen öğe sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.ReturnCount)
+    }
+    
+    if stats.Available != 1 {
+        t.Errorf("Kullanılabilir öğe sayısı yanlış. Beklenen: %d, Alınan: %d", 1, stats.Available)
+    }
+    
+    // Havuzu temizle
+    pool.Clear()
+    
+    // İstatistikleri kontrol et
+    stats = pool.GetStats()
+    
+    if stats.Available != 0 {
+        t.Errorf("Kullanılabilir öğe sayısı yanlış. Beklenen: %d, Alınan: %d", 0, stats.Available)
+    }
+    
+    if stats.GetCount != 0 {
+        t.Errorf("Havuzdan alınan öğe sayısı yanlış. Beklenen: %d, Alınan: %d", 0, stats.GetCount)
+    }
+    
+    if stats.ReturnCount != 0 {
+        t.Errorf("Havuza geri döndürülen öğe sayısı yanlış. Beklenen: %d, Alınan: %d", 0, stats.ReturnCount)
+    }
+}

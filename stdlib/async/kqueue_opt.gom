@@ -1,0 +1,293 @@
+// GO-Minus Standart Kütüphane - Async Paketi - Optimized Kqueue
+package async
+
+import (
+    "syscall"
+    "unsafe"
+    "sync/atomic"
+    "time"
+    "errors"
+)
+
+// BSD için kqueue sabitleri
+const (
+    EVFILT_READ  = -1
+    EVFILT_WRITE = -2
+    EV_ADD      = 0x0001
+    EV_DELETE   = 0x0002
+    EV_ENABLE   = 0x0004
+    EV_DISABLE  = 0x0008
+    EV_ONESHOT  = 0x0010
+    EV_CLEAR    = 0x0020
+    EV_EOF      = 0x8000
+    EV_ERROR    = 0x4000
+)
+
+// kevent, kevent yapısını temsil eder.
+class kevent {
+    var ident  uint64
+    var filter int16
+    var flags  uint16
+    var fflags uint32
+    var data   int64
+    var udata  uint64
+}
+
+// timespec, timespec yapısını temsil eder.
+class timespec {
+    var tv_sec  int64
+    var tv_nsec int64
+}
+
+// OptimizedKqueuePoller, optimize edilmiş bir kqueue poller sağlar.
+class OptimizedKqueuePoller {
+    private:
+        var kq int
+        var events []kevent
+        var maxEvents int
+        var mode MultiplexerMode
+        var oneShot bool
+        var stats MultiplexerStats
+        var closed bool
+    
+    public:
+        // New, yeni bir OptimizedKqueuePoller oluşturur.
+        static func New(options MultiplexerOptions) (*OptimizedKqueuePoller, error) {
+            // Kqueue dosya tanımlayıcısı oluştur
+            kq, err := syscall.Kqueue()
+            if err != nil {
+                return nil, err
+            }
+            
+            poller := new OptimizedKqueuePoller()
+            poller.kq = kq
+            poller.maxEvents = options.MaxEvents
+            poller.events = make([]kevent, options.MaxEvents)
+            poller.mode = options.Mode
+            poller.oneShot = options.OneShot
+            
+            return poller, nil
+        }
+        
+        // Add, bir dosya tanımlayıcısını kqueue'ya ekler.
+        func (p *OptimizedKqueuePoller) Add(fd int, events int) error {
+            if p.closed {
+                return errors.New("kqueue: kapalı")
+            }
+            
+            // Okuma ve yazma için ayrı kevent'ler oluştur
+            var changes [2]kevent
+            var numChanges int
+            
+            // Okuma olayı
+            if events&EventRead != 0 {
+                changes[numChanges].ident = uint64(fd)
+                changes[numChanges].filter = EVFILT_READ
+                changes[numChanges].flags = EV_ADD | EV_ENABLE
+                
+                // Edge-triggered mod için EV_CLEAR ekle
+                if p.mode == EdgeTriggered {
+                    changes[numChanges].flags |= EV_CLEAR
+                }
+                
+                // One-shot mod için EV_ONESHOT ekle
+                if p.oneShot {
+                    changes[numChanges].flags |= EV_ONESHOT
+                }
+                
+                changes[numChanges].udata = uint64(fd)
+                numChanges++
+            }
+            
+            // Yazma olayı
+            if events&EventWrite != 0 {
+                changes[numChanges].ident = uint64(fd)
+                changes[numChanges].filter = EVFILT_WRITE
+                changes[numChanges].flags = EV_ADD | EV_ENABLE
+                
+                // Edge-triggered mod için EV_CLEAR ekle
+                if p.mode == EdgeTriggered {
+                    changes[numChanges].flags |= EV_CLEAR
+                }
+                
+                // One-shot mod için EV_ONESHOT ekle
+                if p.oneShot {
+                    changes[numChanges].flags |= EV_ONESHOT
+                }
+                
+                changes[numChanges].udata = uint64(fd)
+                numChanges++
+            }
+            
+            // Değişiklikleri uygula
+            _, err := syscall.Kevent(p.kq, changes[:numChanges], nil, nil)
+            return err
+        }
+        
+        // Remove, bir dosya tanımlayıcısını kqueue'dan kaldırır.
+        func (p *OptimizedKqueuePoller) Remove(fd int) error {
+            if p.closed {
+                return errors.New("kqueue: kapalı")
+            }
+            
+            // Okuma ve yazma için ayrı kevent'ler oluştur
+            var changes [2]kevent
+            
+            // Okuma olayını kaldır
+            changes[0].ident = uint64(fd)
+            changes[0].filter = EVFILT_READ
+            changes[0].flags = EV_DELETE
+            
+            // Yazma olayını kaldır
+            changes[1].ident = uint64(fd)
+            changes[1].filter = EVFILT_WRITE
+            changes[1].flags = EV_DELETE
+            
+            // Değişiklikleri uygula
+            _, err := syscall.Kevent(p.kq, changes[:], nil, nil)
+            return err
+        }
+        
+        // Modify, bir dosya tanımlayıcısının olaylarını değiştirir.
+        func (p *OptimizedKqueuePoller) Modify(fd int, events int) error {
+            if p.closed {
+                return errors.New("kqueue: kapalı")
+            }
+            
+            // Önce kaldır, sonra ekle
+            err := p.Remove(fd)
+            if err != nil {
+                return err
+            }
+            
+            return p.Add(fd, events)
+        }
+        
+        // Wait, olayları bekler.
+        func (p *OptimizedKqueuePoller) Wait(timeout int) ([]Event, error) {
+            if p.closed {
+                return nil, errors.New("kqueue: kapalı")
+            }
+            
+            startTime := time.Now()
+            
+            // Timeout için timespec oluştur
+            var ts *timespec
+            var timeoutSpec timespec
+            
+            if timeout >= 0 {
+                timeoutSpec.tv_sec = int64(timeout / 1000)
+                timeoutSpec.tv_nsec = int64((timeout % 1000) * 1000000)
+                ts = &timeoutSpec
+            }
+            
+            // Kevent çağrısı
+            n, err := syscall.Kevent(p.kq, nil, p.events, ts)
+            
+            waitTime := time.Since(startTime)
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&p.stats.TotalWakeups, 1)
+            atomic.AddInt64((*int64)(&p.stats.TotalWaitTime), int64(waitTime))
+            
+            // Ortalama bekleme süresini güncelle
+            totalWakeups := atomic.LoadUint64(&p.stats.TotalWakeups)
+            if totalWakeups > 0 {
+                p.stats.AverageWaitTime = time.Duration(int64(p.stats.TotalWaitTime) / int64(totalWakeups))
+            }
+            
+            if err != nil {
+                return nil, err
+            }
+            
+            // Zaman aşımı kontrolü
+            if n == 0 {
+                atomic.AddUint64(&p.stats.TotalTimeouts, 1)
+                return nil, nil
+            }
+            
+            // Olayları dönüştür
+            events := make([]Event, n)
+            
+            for i := 0; i < n; i++ {
+                fd := int(p.events[i].ident)
+                filter := p.events[i].filter
+                flags := p.events[i].flags
+                
+                events[i] = Event{
+                    FD:    fd,
+                    ID:    fd,
+                    Type:  p.convertKqueueEvents(filter, flags),
+                    Data:  nil,
+                    Error: nil,
+                }
+            }
+            
+            // İstatistikleri güncelle
+            atomic.AddUint64(&p.stats.TotalEvents, uint64(n))
+            
+            // Ortalama olay sayısını güncelle
+            if totalWakeups > 0 {
+                p.stats.AverageEventsPerWakeup = float64(atomic.LoadUint64(&p.stats.TotalEvents)) / float64(totalWakeups)
+            }
+            
+            // Maksimum olay sayısını güncelle
+            if uint64(n) > atomic.LoadUint64(&p.stats.MaxEventsPerWakeup) {
+                atomic.StoreUint64(&p.stats.MaxEventsPerWakeup, uint64(n))
+            }
+            
+            return events, nil
+        }
+        
+        // Close, kqueue'yu kapatır.
+        func (p *OptimizedKqueuePoller) Close() error {
+            if p.closed {
+                return errors.New("kqueue: zaten kapalı")
+            }
+            
+            p.closed = true
+            
+            return syscall.Close(p.kq)
+        }
+        
+        // GetStats, poller istatistiklerini döndürür.
+        func (p *OptimizedKqueuePoller) GetStats() MultiplexerStats {
+            return MultiplexerStats{
+                TotalEvents:          atomic.LoadUint64(&p.stats.TotalEvents),
+                TotalWakeups:         atomic.LoadUint64(&p.stats.TotalWakeups),
+                TotalTimeouts:        atomic.LoadUint64(&p.stats.TotalTimeouts),
+                AverageEventsPerWakeup: p.stats.AverageEventsPerWakeup,
+                MaxEventsPerWakeup:   atomic.LoadUint64(&p.stats.MaxEventsPerWakeup),
+                TotalWaitTime:        p.stats.TotalWaitTime,
+                AverageWaitTime:      p.stats.AverageWaitTime,
+            }
+        }
+        
+        // convertKqueueEvents, kqueue olaylarını olay tiplerine dönüştürür.
+        private func (p *OptimizedKqueuePoller) convertKqueueEvents(filter int16, flags uint16) int {
+            var events int
+            
+            if filter == EVFILT_READ {
+                events |= EventRead
+            }
+            
+            if filter == EVFILT_WRITE {
+                events |= EventWrite
+            }
+            
+            if flags&EV_EOF != 0 {
+                events |= EventHangup
+            }
+            
+            if flags&EV_ERROR != 0 {
+                events |= EventError
+            }
+            
+            return events
+        }
+}
+
+// newOptimizedKqueuePoller, yeni bir OptimizedKqueuePoller oluşturur.
+func newOptimizedKqueuePoller(options MultiplexerOptions) (IOMultiplexer, error) {
+    return OptimizedKqueuePoller.New(options)
+}

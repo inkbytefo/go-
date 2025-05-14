@@ -1,0 +1,320 @@
+// GO-Minus Standart Kütüphane - Async Paketi - File Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "os"
+    "path/filepath"
+)
+
+// TestAsyncFileOpenClose, asenkron dosya açma ve kapatma işlemlerini test eder.
+func TestAsyncFileOpenClose(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Geçici bir dosya oluştur
+    tempFile := filepath.Join(os.TempDir(), "async_file_test.txt")
+    
+    // Dosyayı oluştur
+    file, err := async.AsyncFile.Create(loop, tempFile)
+    if err != nil {
+        t.Fatalf("AsyncFile.Create hatası: %v", err)
+    }
+    
+    // Dosya adını kontrol et
+    if file.Name() != tempFile {
+        t.Errorf("Beklenen dosya adı '%s', alınan: '%s'", tempFile, file.Name())
+    }
+    
+    // Dosya tanımlayıcısını kontrol et
+    if file.Fd() <= 0 {
+        t.Errorf("Geçersiz dosya tanımlayıcısı: %d", file.Fd())
+    }
+    
+    // Dosyayı kapat
+    closeErr, err := file.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Close hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Dosya kapatma hatası: %v", closeErr)
+    }
+    
+    // Dosyayı tekrar kapat (hata vermemeli)
+    closeErr, err = file.Close().Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Close (tekrar) hatası: %v", err)
+    }
+    
+    if closeErr != nil {
+        t.Errorf("Dosya tekrar kapatma hatası: %v", closeErr)
+    }
+    
+    // Geçici dosyayı temizle
+    os.Remove(tempFile)
+}
+
+// TestAsyncFileReadWrite, asenkron dosya okuma ve yazma işlemlerini test eder.
+func TestAsyncFileReadWrite(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Geçici bir dosya oluştur
+    tempFile := filepath.Join(os.TempDir(), "async_file_test.txt")
+    
+    // Dosyayı oluştur
+    file, err := async.AsyncFile.Create(loop, tempFile)
+    if err != nil {
+        t.Fatalf("AsyncFile.Create hatası: %v", err)
+    }
+    defer file.Close().Get()
+    defer os.Remove(tempFile)
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, Async IO!")
+    
+    // Dosyaya yaz
+    n, err := file.Write(data).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Write hatası: %v", err)
+    }
+    
+    if n != len(data) {
+        t.Errorf("Beklenen yazılan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    // Dosya konumunu başa al
+    pos, err := file.Seek(0, os.SEEK_SET).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Seek hatası: %v", err)
+    }
+    
+    if pos != 0 {
+        t.Errorf("Beklenen dosya konumu 0, alınan: %d", pos)
+    }
+    
+    // Dosyadan oku
+    buffer := make([]byte, len(data))
+    n, err = file.Read(buffer).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Read hatası: %v", err)
+    }
+    
+    if n != len(data) {
+        t.Errorf("Beklenen okunan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    if string(buffer) != string(data) {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", string(data), string(buffer))
+    }
+}
+
+// TestAsyncFileReadAt, asenkron dosya belirli konumdan okuma işlemini test eder.
+func TestAsyncFileReadAt(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Geçici bir dosya oluştur
+    tempFile := filepath.Join(os.TempDir(), "async_file_test.txt")
+    
+    // Dosyayı oluştur
+    file, err := async.AsyncFile.Create(loop, tempFile)
+    if err != nil {
+        t.Fatalf("AsyncFile.Create hatası: %v", err)
+    }
+    defer file.Close().Get()
+    defer os.Remove(tempFile)
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, Async IO!")
+    
+    // Dosyaya yaz
+    n, err := file.Write(data).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Write hatası: %v", err)
+    }
+    
+    // Belirli konumdan oku
+    offset := int64(8) // "Async IO!" kısmını oku
+    buffer := make([]byte, len(data)-int(offset))
+    n, err = file.ReadAt(buffer, offset).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.ReadAt hatası: %v", err)
+    }
+    
+    expectedData := "Async IO!"
+    if string(buffer) != expectedData {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", expectedData, string(buffer))
+    }
+}
+
+// TestAsyncFileWriteAt, asenkron dosya belirli konuma yazma işlemini test eder.
+func TestAsyncFileWriteAt(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Geçici bir dosya oluştur
+    tempFile := filepath.Join(os.TempDir(), "async_file_test.txt")
+    
+    // Dosyayı oluştur
+    file, err := async.AsyncFile.Create(loop, tempFile)
+    if err != nil {
+        t.Fatalf("AsyncFile.Create hatası: %v", err)
+    }
+    defer file.Close().Get()
+    defer os.Remove(tempFile)
+    
+    // İlk veri
+    data1 := []byte("Merhaba, Dünya!")
+    
+    // Dosyaya yaz
+    n, err := file.Write(data1).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Write hatası: %v", err)
+    }
+    
+    // İkinci veri
+    data2 := []byte("Async")
+    
+    // Belirli konuma yaz
+    offset := int64(9) // "Dünya" yerine "Async" yaz
+    n, err = file.WriteAt(data2, offset).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.WriteAt hatası: %v", err)
+    }
+    
+    // Dosya konumunu başa al
+    pos, err := file.Seek(0, os.SEEK_SET).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Seek hatası: %v", err)
+    }
+    
+    // Dosyadan oku
+    buffer := make([]byte, len(data1))
+    n, err = file.Read(buffer).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Read hatası: %v", err)
+    }
+    
+    expectedData := "Merhaba, Async!"
+    if string(buffer) != expectedData {
+        t.Errorf("Beklenen okunan veri '%s', alınan: '%s'", expectedData, string(buffer))
+    }
+}
+
+// TestAsyncFileSync, asenkron dosya senkronizasyon işlemini test eder.
+func TestAsyncFileSync(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Geçici bir dosya oluştur
+    tempFile := filepath.Join(os.TempDir(), "async_file_test.txt")
+    
+    // Dosyayı oluştur
+    file, err := async.AsyncFile.Create(loop, tempFile)
+    if err != nil {
+        t.Fatalf("AsyncFile.Create hatası: %v", err)
+    }
+    defer file.Close().Get()
+    defer os.Remove(tempFile)
+    
+    // Yazılacak veri
+    data := []byte("Merhaba, Async IO!")
+    
+    // Dosyaya yaz
+    n, err := file.Write(data).Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Write hatası: %v", err)
+    }
+    
+    // Dosyayı senkronize et
+    syncErr, err := file.Sync().Get()
+    if err != nil {
+        t.Errorf("AsyncFile.Sync hatası: %v", err)
+    }
+    
+    if syncErr != nil {
+        t.Errorf("Dosya senkronizasyon hatası: %v", syncErr)
+    }
+}
+
+// TestAsyncFileOpenNonExistent, var olmayan bir dosyayı açma işlemini test eder.
+func TestAsyncFileOpenNonExistent(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop oluşturma hatası: %v", err)
+    }
+    
+    // EventLoop başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop başlatma hatası: %v", err)
+    }
+    defer loop.Stop()
+    
+    // Var olmayan bir dosya adı
+    nonExistentFile := filepath.Join(os.TempDir(), "non_existent_file.txt")
+    
+    // Var olmayan dosyayı aç
+    file, err := async.AsyncFile.Open(loop, nonExistentFile)
+    
+    // Hata bekleniyor
+    if err == nil {
+        t.Error("Var olmayan dosya açma hatası bekleniyor")
+        file.Close().Get()
+    }
+}

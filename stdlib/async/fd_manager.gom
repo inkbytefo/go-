@@ -1,0 +1,488 @@
+// GO-Minus Standart Kütüphane - Async Paketi - File Descriptor Manager
+package async
+
+import (
+    "os"
+    "sync"
+    "sync/atomic"
+    "time"
+    "errors"
+    "container/list"
+)
+
+// FDCacheMode, dosya tanımlayıcı önbellek modunu belirtir.
+type FDCacheMode int
+
+const (
+    // LRUCache, en az kullanılan önbellek modunu belirtir.
+    LRUCache FDCacheMode = iota
+    
+    // MRUCache, en çok kullanılan önbellek modunu belirtir.
+    MRUCache
+    
+    // FIFOCache, ilk giren ilk çıkar önbellek modunu belirtir.
+    FIFOCache
+    
+    // LIFOCache, son giren ilk çıkar önbellek modunu belirtir.
+    LIFOCache
+)
+
+// FDCacheOptions, dosya tanımlayıcı önbellek seçeneklerini belirtir.
+class FDCacheOptions {
+    var Mode FDCacheMode
+    var MaxSize int
+    var TTL time.Duration
+    var CleanupInterval time.Duration
+}
+
+// FDCacheStats, dosya tanımlayıcı önbellek istatistiklerini içerir.
+class FDCacheStats {
+    var Size int
+    var MaxSize int
+    var Hits uint64
+    var Misses uint64
+    var Evictions uint64
+    var Expirations uint64
+}
+
+// FDCacheEntry, dosya tanımlayıcı önbellek girdisini temsil eder.
+class FDCacheEntry {
+    var FD int
+    var File *os.File
+    var Path string
+    var LastUsed time.Time
+    var CreatedAt time.Time
+    var RefCount int32
+    var Element *list.Element
+}
+
+// OptimizedFDCache, optimize edilmiş bir dosya tanımlayıcı önbelleği sağlar.
+class OptimizedFDCache {
+    private:
+        var cache map[string]*FDCacheEntry
+        var lruList *list.List
+        var mode FDCacheMode
+        var maxSize int
+        var ttl time.Duration
+        var cleanupInterval time.Duration
+        var cleanupTimer *time.Timer
+        var mutex sync.Mutex
+        var stats FDCacheStats
+        var closed bool
+    
+    public:
+        // New, yeni bir OptimizedFDCache oluşturur.
+        static func New(options FDCacheOptions) *OptimizedFDCache {
+            if options.MaxSize <= 0 {
+                options.MaxSize = 100
+            }
+            
+            if options.TTL <= 0 {
+                options.TTL = 5 * time.Minute
+            }
+            
+            if options.CleanupInterval <= 0 {
+                options.CleanupInterval = 1 * time.Minute
+            }
+            
+            cache := new OptimizedFDCache()
+            cache.cache = make(map[string]*FDCacheEntry)
+            cache.lruList = list.New()
+            cache.mode = options.Mode
+            cache.maxSize = options.MaxSize
+            cache.ttl = options.TTL
+            cache.cleanupInterval = options.CleanupInterval
+            cache.stats.MaxSize = options.MaxSize
+            
+            // Temizleme zamanlayıcısını başlat
+            cache.cleanupTimer = time.AfterFunc(options.CleanupInterval, func() {
+                cache.cleanup()
+                
+                // Zamanlayıcıyı yeniden başlat
+                if !cache.closed {
+                    cache.cleanupTimer.Reset(cache.cleanupInterval)
+                }
+            })
+            
+            return cache
+        }
+        
+        // Get, belirtilen yol için bir dosya tanımlayıcısı alır.
+        func (c *OptimizedFDCache) Get(path string, flag int, perm os.FileMode) (*os.File, error) {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            if c.closed {
+                return nil, errors.New("fd cache: kapalı")
+            }
+            
+            // Önbellekte ara
+            entry, ok := c.cache[path]
+            
+            if ok {
+                // Önbellek isabet
+                atomic.AddUint64(&c.stats.Hits, 1)
+                
+                // Son kullanım zamanını güncelle
+                entry.LastUsed = time.Now()
+                
+                // Referans sayısını artır
+                atomic.AddInt32(&entry.RefCount, 1)
+                
+                // LRU listesini güncelle
+                c.updateLRUList(entry)
+                
+                // Dosya tanımlayıcısını döndür
+                return entry.File, nil
+            }
+            
+            // Önbellek ıskalama
+            atomic.AddUint64(&c.stats.Misses, 1)
+            
+            // Dosyayı aç
+            file, err := os.OpenFile(path, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+            
+            // Önbellek dolu mu kontrol et
+            if c.stats.Size >= c.maxSize {
+                // Yer aç
+                c.evict()
+            }
+            
+            // Yeni girdi oluştur
+            entry = new FDCacheEntry()
+            entry.FD = int(file.Fd())
+            entry.File = file
+            entry.Path = path
+            entry.LastUsed = time.Now()
+            entry.CreatedAt = time.Now()
+            entry.RefCount = 1
+            
+            // LRU listesine ekle
+            entry.Element = c.lruList.PushFront(path)
+            
+            // Önbelleğe ekle
+            c.cache[path] = entry
+            c.stats.Size++
+            
+            return file, nil
+        }
+        
+        // Put, bir dosya tanımlayıcısını önbelleğe ekler.
+        func (c *OptimizedFDCache) Put(path string, file *os.File) {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            if c.closed {
+                return
+            }
+            
+            // Dosya tanımlayıcısını al
+            fd := int(file.Fd())
+            
+            // Önbellekte ara
+            entry, ok := c.cache[path]
+            
+            if ok {
+                // Referans sayısını azalt
+                if atomic.AddInt32(&entry.RefCount, -1) <= 0 {
+                    // Referans sayısı 0 veya daha az, girdiden çık
+                    c.removeEntry(path)
+                }
+                
+                return
+            }
+            
+            // Önbellek dolu mu kontrol et
+            if c.stats.Size >= c.maxSize {
+                // Yer aç
+                c.evict()
+            }
+            
+            // Yeni girdi oluştur
+            entry = new FDCacheEntry()
+            entry.FD = fd
+            entry.File = file
+            entry.Path = path
+            entry.LastUsed = time.Now()
+            entry.CreatedAt = time.Now()
+            entry.RefCount = 0
+            
+            // LRU listesine ekle
+            entry.Element = c.lruList.PushFront(path)
+            
+            // Önbelleğe ekle
+            c.cache[path] = entry
+            c.stats.Size++
+        }
+        
+        // Remove, bir dosya tanımlayıcısını önbellekten kaldırır.
+        func (c *OptimizedFDCache) Remove(path string) {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            if c.closed {
+                return
+            }
+            
+            // Girdiden çık
+            c.removeEntry(path)
+        }
+        
+        // Clear, önbelleği temizler.
+        func (c *OptimizedFDCache) Clear() {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            if c.closed {
+                return
+            }
+            
+            // Tüm girdileri kapat
+            for path, entry := range c.cache {
+                entry.File.Close()
+                delete(c.cache, path)
+            }
+            
+            // LRU listesini temizle
+            c.lruList.Init()
+            
+            // İstatistikleri sıfırla
+            c.stats.Size = 0
+        }
+        
+        // GetStats, önbellek istatistiklerini döndürür.
+        func (c *OptimizedFDCache) GetStats() FDCacheStats {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            return FDCacheStats{
+                Size:        c.stats.Size,
+                MaxSize:     c.stats.MaxSize,
+                Hits:        atomic.LoadUint64(&c.stats.Hits),
+                Misses:      atomic.LoadUint64(&c.stats.Misses),
+                Evictions:   atomic.LoadUint64(&c.stats.Evictions),
+                Expirations: atomic.LoadUint64(&c.stats.Expirations),
+            }
+        }
+        
+        // Close, önbelleği kapatır.
+        func (c *OptimizedFDCache) Close() {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            if c.closed {
+                return
+            }
+            
+            c.closed = true
+            
+            // Temizleme zamanlayıcısını durdur
+            if c.cleanupTimer != nil {
+                c.cleanupTimer.Stop()
+            }
+            
+            // Tüm girdileri kapat
+            for path, entry := range c.cache {
+                entry.File.Close()
+                delete(c.cache, path)
+            }
+            
+            // LRU listesini temizle
+            c.lruList.Init()
+            
+            // İstatistikleri sıfırla
+            c.stats.Size = 0
+        }
+        
+        // cleanup, süresi dolmuş girdileri temizler.
+        private func (c *OptimizedFDCache) cleanup() {
+            c.mutex.Lock()
+            defer c.mutex.Unlock()
+            
+            if c.closed {
+                return
+            }
+            
+            now := time.Now()
+            
+            // Süresi dolmuş girdileri bul
+            for path, entry := range c.cache {
+                // TTL kontrolü
+                if now.Sub(entry.LastUsed) > c.ttl {
+                    // Referans sayısı kontrolü
+                    if atomic.LoadInt32(&entry.RefCount) <= 0 {
+                        // Girdiden çık
+                        c.removeEntry(path)
+                        
+                        // İstatistikleri güncelle
+                        atomic.AddUint64(&c.stats.Expirations, 1)
+                    }
+                }
+            }
+        }
+        
+        // evict, önbellekten bir girdi çıkarır.
+        private func (c *OptimizedFDCache) evict() {
+            if c.lruList.Len() == 0 {
+                return
+            }
+            
+            var element *list.Element
+            
+            // Önbellek moduna göre girdi seç
+            switch c.mode {
+            case LRUCache:
+                // En az kullanılan girdiyi seç
+                element = c.lruList.Back()
+            case MRUCache:
+                // En çok kullanılan girdiyi seç
+                element = c.lruList.Front()
+            case FIFOCache:
+                // İlk giren girdiyi seç
+                element = c.lruList.Back()
+            case LIFOCache:
+                // Son giren girdiyi seç
+                element = c.lruList.Front()
+            }
+            
+            if element != nil {
+                path := element.Value.(string)
+                
+                // Girdiden çık
+                c.removeEntry(path)
+                
+                // İstatistikleri güncelle
+                atomic.AddUint64(&c.stats.Evictions, 1)
+            }
+        }
+        
+        // removeEntry, bir girdiyi önbellekten kaldırır.
+        private func (c *OptimizedFDCache) removeEntry(path string) {
+            // Önbellekte ara
+            entry, ok := c.cache[path]
+            
+            if !ok {
+                return
+            }
+            
+            // Dosyayı kapat
+            entry.File.Close()
+            
+            // LRU listesinden kaldır
+            if entry.Element != nil {
+                c.lruList.Remove(entry.Element)
+            }
+            
+            // Önbellekten kaldır
+            delete(c.cache, path)
+            
+            // İstatistikleri güncelle
+            c.stats.Size--
+        }
+        
+        // updateLRUList, LRU listesini günceller.
+        private func (c *OptimizedFDCache) updateLRUList(entry *FDCacheEntry) {
+            // Önbellek moduna göre LRU listesini güncelle
+            switch c.mode {
+            case LRUCache, MRUCache:
+                // Girdiyi listenin başına taşı
+                if entry.Element != nil {
+                    c.lruList.MoveToFront(entry.Element)
+                }
+            case FIFOCache:
+                // FIFO modunda liste güncellenmez
+            case LIFOCache:
+                // LIFO modunda liste güncellenmez
+            }
+        }
+}
+
+// FDManager, dosya tanımlayıcı yönetimi için kullanılan bir sınıftır.
+class FDManager {
+    private:
+        var fdCache *OptimizedFDCache
+        var fdRefCount map[int]int32
+        var mutex sync.Mutex
+    
+    public:
+        // New, yeni bir FDManager oluşturur.
+        static func New(options FDCacheOptions) *FDManager {
+            manager := new FDManager()
+            manager.fdCache = OptimizedFDCache.New(options)
+            manager.fdRefCount = make(map[int]int32)
+            
+            return manager
+        }
+        
+        // Open, bir dosyayı açar ve dosya tanımlayıcısını yönetir.
+        func (m *FDManager) Open(path string, flag int, perm os.FileMode) (*os.File, error) {
+            // Dosyayı önbellekten al
+            file, err := m.fdCache.Get(path, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+            
+            // Dosya tanımlayıcısını al
+            fd := int(file.Fd())
+            
+            // Referans sayısını artır
+            m.mutex.Lock()
+            m.fdRefCount[fd]++
+            m.mutex.Unlock()
+            
+            return file, nil
+        }
+        
+        // Close, bir dosyayı kapatır ve dosya tanımlayıcısını yönetir.
+        func (m *FDManager) Close(file *os.File) error {
+            // Dosya tanımlayıcısını al
+            fd := int(file.Fd())
+            
+            // Referans sayısını azalt
+            m.mutex.Lock()
+            refCount := m.fdRefCount[fd]
+            if refCount > 1 {
+                // Hala başka referanslar var, sadece referans sayısını azalt
+                m.fdRefCount[fd]--
+                m.mutex.Unlock()
+                return nil
+            }
+            
+            // Son referans, dosyayı önbelleğe koy
+            delete(m.fdRefCount, fd)
+            m.mutex.Unlock()
+            
+            // Dosyayı önbelleğe koy
+            m.fdCache.Put(file.Name(), file)
+            
+            return nil
+        }
+        
+        // GetStats, yönetici istatistiklerini döndürür.
+        func (m *FDManager) GetStats() FDCacheStats {
+            return m.fdCache.GetStats()
+        }
+        
+        // Close, yöneticiyi kapatır.
+        func (m *FDManager) Close() {
+            m.fdCache.Close()
+        }
+}
+
+// GlobalFDManager, global bir FDManager örneğidir.
+var GlobalFDManager *FDManager
+
+// InitGlobalFDManager, global FDManager örneğini başlatır.
+func InitGlobalFDManager() {
+    options := FDCacheOptions{
+        Mode:            LRUCache,
+        MaxSize:         1000,
+        TTL:             5 * time.Minute,
+        CleanupInterval: 1 * time.Minute,
+    }
+    
+    GlobalFDManager = FDManager.New(options)
+}
