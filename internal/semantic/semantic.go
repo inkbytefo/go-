@@ -1,8 +1,9 @@
 package semantic
 
 import (
-	"gominus/internal/ast"
-	"gominus/internal/token"
+	"github.com/inkbytefo/go-minus/internal/ast"
+
+	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // Analyzer, semantik analiz işlemlerini gerçekleştirir.
@@ -330,13 +331,7 @@ func (a *Analyzer) analyzeConstStatement(stmt *ast.ConstStatement) Type {
 	return constType
 }
 
-// symbolTypeFromType, bir Type'dan SymbolType elde eder.
-func symbolTypeFromType(t Type) SymbolType {
-	if basicType, ok := t.(*BasicType); ok {
-		return basicType.Kind
-	}
-	return UNKNOWN_TYPE
-}
+// Artık inference_extra.go dosyasında tanımlandı
 
 // Diğer analiz fonksiyonları buraya eklenecek
 func (a *Analyzer) analyzeReturnStatement(stmt *ast.ReturnStatement) Type {

@@ -2,7 +2,8 @@ package semantic
 
 import (
 	"fmt"
-	"gominus/internal/token"
+
+	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // SymbolType, bir sembolün tipini temsil eder.

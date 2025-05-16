@@ -1,77 +1,77 @@
-# GO-Minus Öğreticileri
+# GO-Minus Tutorials
 
-Bu dizin, GO-Minus programlama dilini öğrenmek için çeşitli öğreticileri içermektedir. Bu öğreticiler, GO-Minus'un temel kavramlarından ileri düzey özelliklerine kadar geniş bir yelpazede konuları kapsamaktadır.
+This directory contains various tutorials for learning the GO-Minus programming language. These tutorials cover a wide range of topics from basic concepts to advanced features of GO-Minus.
 
-## Başlangıç
+## Getting Started
 
-- [Başlangıç Rehberi](getting-started.md) - GO-Minus'u kurma, ilk programınızı yazma ve temel dil özelliklerini öğrenme
+- [Getting Started Guide](getting-started.md) - Installing GO-Minus, writing your first program, and learning basic language features
 
-## Temel Konular
+## Basic Topics
 
-- Değişkenler ve Veri Tipleri (Yakında)
-- Kontrol Yapıları (Yakında)
-- Fonksiyonlar (Yakında)
-- Paketler ve Modüller (Yakında)
-- Hata İşleme (Yakında)
+- Variables and Data Types (Coming Soon)
+- Control Structures (Coming Soon)
+- Functions (Coming Soon)
+- Packages and Modules (Coming Soon)
+- Error Handling (Coming Soon)
 
-## Nesne Yönelimli Programlama
+## Object-Oriented Programming
 
-- Sınıflar ve Nesneler (Yakında)
-- Kalıtım ve Polimorfizm (Yakında)
-- Arayüzler (Yakında)
-- Erişim Belirleyicileri (Yakında)
-- Soyut Sınıflar ve Metotlar (Yakında)
+- Classes and Objects (Coming Soon)
+- Inheritance and Polymorphism (Coming Soon)
+- Interfaces (Coming Soon)
+- Access Modifiers (Coming Soon)
+- Abstract Classes and Methods (Coming Soon)
 
-## Jenerik Programlama
+## Generic Programming
 
-- Şablonlar (Yakında)
-- Şablon Sınıflar (Yakında)
-- Şablon Fonksiyonlar (Yakında)
-- Şablon Metaprogramlama (Yakında)
+- Templates (Coming Soon)
+- Template Classes (Coming Soon)
+- Template Functions (Coming Soon)
+- Template Metaprogramming (Coming Soon)
 
-## İstisna İşleme
+## Exception Handling
 
-- Try-Catch-Finally (Yakında)
-- Özel İstisna Sınıfları (Yakında)
-- İstisna Hiyerarşisi (Yakında)
+- Try-Catch-Finally (Coming Soon)
+- Custom Exception Classes (Coming Soon)
+- Exception Hierarchy (Coming Soon)
 
-## Eşzamanlılık
+## Concurrency
 
-- Goroutine'ler (Yakında)
-- Kanallar (Yakında)
-- Mutex ve Senkronizasyon (Yakında)
-- WaitGroup (Yakında)
-- Select (Yakında)
+- Goroutines (Coming Soon)
+- Channels (Coming Soon)
+- Mutex and Synchronization (Coming Soon)
+- WaitGroup (Coming Soon)
+- Select (Coming Soon)
 
-## Bellek Yönetimi
+## Memory Management
 
-- Otomatik Bellek Yönetimi (Yakında)
-- Manuel Bellek Yönetimi (Yakında)
-- Bellek Optimizasyonları (Yakında)
+- Automatic Memory Management (Coming Soon)
+- Manual Memory Management (Coming Soon)
+- Memory Optimizations (Coming Soon)
 
-## Standart Kütüphane
+## Standard Library
 
-- fmt Paketi (Yakında)
-- io Paketi (Yakında)
-- container Paketi (Yakında)
-- concurrent Paketi (Yakında)
-- math Paketi (Yakında)
+- fmt Package (Coming Soon)
+- io Package (Coming Soon)
+- container Package (Coming Soon)
+- concurrent Package (Coming Soon)
+- math Package (Coming Soon)
 
-## İleri Düzey Konular
+## Advanced Topics
 
-- Reflection (Yakında)
-- Unsafe Operasyonlar (Yakında)
-- CGO Entegrasyonu (Yakında)
-- LLVM IR Manipülasyonu (Yakında)
+- Reflection (Coming Soon)
+- Unsafe Operations (Coming Soon)
+- CGO Integration (Coming Soon)
+- LLVM IR Manipulation (Coming Soon)
 
-## Pratik Örnekler
+## Practical Examples
 
-- Web Sunucusu (Yakında)
-- Veritabanı Uygulaması (Yakında)
-- GUI Uygulaması (Yakında)
-- Oyun Geliştirme (Yakında)
-- Sistem Programlama (Yakında)
+- Web Server (Coming Soon)
+- Database Application (Coming Soon)
+- GUI Application (Coming Soon)
+- Game Development (Coming Soon)
+- System Programming (Coming Soon)
 
-## Katkıda Bulunma
+## Contributing
 
-GO-Minus öğreticilerine katkıda bulunmak için, lütfen [Katkı Sağlama Rehberi](../../CONTRIBUTING.md) belgesini okuyun. Öğreticilerde hata bulursanız veya yeni öğretici önerileriniz varsa, lütfen [GitHub Issues](https://github.com/gominus/gominus/issues) üzerinden bildirimde bulunun.
+To contribute to GO-Minus tutorials, please read the [Contribution Guide](../../CONTRIBUTING.md). If you find errors in the tutorials or have suggestions for new tutorials, please report them via [GitHub Issues](https://github.com/gominus/gominus/issues).

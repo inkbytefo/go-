@@ -5,12 +5,13 @@ type TokenType string
 
 // Token, kaynak koddaki bir token'ı temsil eder.
 type Token struct {
-	Type    TokenType // Token türü (örn: IDENT, INT, LPAREN)
-	Literal string    // Token'ın değişmez değeri (örn: "x", "123", "(")
-	Line    int       // Token'ın bulunduğu satır numarası
-	Column  int       // Token'ın bulunduğu sütun numarası
-	Pos     int       // Token'ın dosyadaki başlangıç pozisyonu (byte offset)
-	End     int       // Token'ın dosyadaki bitiş pozisyonu (byte offset)
+	Type     TokenType // Token türü (örn: IDENT, INT, LPAREN)
+	Literal  string    // Token'ın değişmez değeri (örn: "x", "123", "(")
+	Line     int       // Token'ın bulunduğu satır numarası
+	Column   int       // Token'ın bulunduğu sütun numarası
+	Pos      int       // Token'ın dosyadaki başlangıç pozisyonu (byte offset)
+	End      int       // Token'ın dosyadaki bitiş pozisyonu (byte offset)
+	Position Position  // Token'ın konumu
 }
 
 // Anahtar kelimeler ve token türleri

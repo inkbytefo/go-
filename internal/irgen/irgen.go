@@ -2,8 +2,9 @@ package irgen
 
 import (
 	"fmt"
-	"goplus/internal/ast"
-	"goplus/internal/semantic"
+
+	"github.com/inkbytefo/go-minus/internal/ast"
+	"github.com/inkbytefo/go-minus/internal/semantic"
 
 	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/constant"

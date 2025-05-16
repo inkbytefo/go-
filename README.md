@@ -1,43 +1,105 @@
-# GO-Minus Programlama Dili
+# GO-Minus Programming Language
 
-GO-Minus, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle (sınıflar, şablonlar, istisna işleme vb.) genişletilmiş bir programlama dilidir. GO-Minus dosyaları `.gom` uzantısını kullanır.
+GO-Minus is a programming language that includes all features of the Go programming language and extends it with C++-like features (classes, templates, exception handling, etc.). GO-Minus files use the `.gom` extension.
 
-## 🎯 Amaç
+## 🎯 Purpose
 
-GO-Minus dilinin temel amacı, Go'nun sadeliği, hızlı derleme süreleri ve güçlü eşzamanlılık modelini, C++'ın düşük seviyeli sistem kontrolü, performans optimizasyonları, şablon metaprogramlama (basitleştirilmiş) ve zengin OOP yetenekleriyle birleştirmektir. Hem yüksek performanslı sistem programlama hem de hızlı uygulama geliştirme için "tatlı noktayı" bulmayı hedefler.
+The main purpose of the GO-Minus language is to combine Go's simplicity, fast compilation times, and powerful concurrency model with C++'s low-level system control, performance optimizations, template metaprogramming (simplified), and rich OOP capabilities. It aims to find the "sweet spot" for both high-performance system programming and rapid application development.
 
-## ✨ Özellikler
+## ✨ Features
 
-- **Go Uyumluluğu**: Go'nun tüm özelliklerini destekler
-- **Sınıflar ve Kalıtım**: C++ benzeri sınıf ve kalıtım desteği
-- **Şablonlar**: Jenerik programlama için şablon desteği
-- **İstisna İşleme**: Try-catch-finally yapıları
-- **Erişim Belirleyicileri**: Public, private, protected erişim kontrolü
-- **LLVM Tabanlı**: Güçlü optimizasyon ve çoklu platform desteği
-- **Zengin Standart Kütüphane**: Temel veri yapıları, I/O işlemleri, eşzamanlılık desteği
-- **Geliştirme Araçları**: Paket yöneticisi, test aracı, belgelendirme aracı, kod biçimlendirme aracı
-- **IDE Entegrasyonu**: VS Code, JetBrains IDE'leri, Vim/Neovim, Emacs için eklentiler
+- **Go Compatibility**: Supports all features of Go
+- **Classes and Inheritance**: C++-like class and inheritance support
+- **Templates**: Template support for generic programming
+- **Exception Handling**: Try-catch-finally structures
+- **Access Modifiers**: Public, private, protected access control
+- **LLVM Based**: Strong optimization and multi-platform support
+- **Rich Standard Library**: Basic data structures, I/O operations, concurrency support
+- **Development Tools**: Package manager, testing tool, documentation tool, code formatting tool
+- **IDE Integration**: Plugins for VS Code, JetBrains IDEs, Vim/Neovim, Emacs
 
-## 🚀 Başlangıç
+## 📂 Project Structure
 
-### Kurulum
+```
+go-minus/
+├── cmd/                      # Command-line applications
+│   ├── gominus/              # GO-Minus compiler
+│   ├── gompm/                # GO-Minus package manager
+│   ├── gomfmt/               # GO-Minus code formatting tool
+│   ├── gomdoc/               # GO-Minus documentation tool
+│   ├── gomtest/              # GO-Minus testing tool
+│   └── gomlsp/               # GO-Minus language server
+├── docs/                     # Documentation
+│   ├── tutorial/             # Tutorials
+│   ├── reference/            # Reference documents
+│   ├── images/               # Documentation images
+│   └── ...                   # Other documentation files
+├── examples/                 # Example code
+│   ├── basic/                # Basic examples
+│   ├── advanced/             # Advanced examples
+│   ├── vulkan/               # Vulkan examples
+│   └── memory/               # Memory management examples
+├── internal/                 # Internal packages
+│   ├── ast/                  # Abstract syntax tree
+│   ├── codegen/              # Code generation
+│   ├── irgen/                # IR generation
+│   ├── lexer/                # Lexical analysis
+│   ├── optimizer/            # Optimization
+│   ├── parser/               # Syntax analysis
+│   ├── semantic/             # Semantic analysis
+│   └── token/                # Token definitions
+├── pkg/                      # Public packages
+│   ├── compiler/             # Compiler API
+│   └── runtime/              # Runtime API
+├── stdlib/                   # Standard library
+│   ├── async/                # Asynchronous operations
+│   ├── concurrent/           # Concurrency
+│   ├── container/            # Data structures
+│   ├── core/                 # Core functions
+│   ├── fmt/                  # Formatting
+│   ├── io/                   # Input/output operations
+│   ├── math/                 # Mathematical operations
+│   ├── memory/               # Memory management
+│   ├── net/                  # Network operations
+│   ├── regex/                # Regular expressions
+│   ├── strings/              # String operations
+│   ├── time/                 # Time operations
+│   └── vulkan/               # Vulkan bindings
+├── tests/                    # Tests
+│   ├── compiler/             # Compiler tests
+│   ├── basic/                # Basic language feature tests
+│   └── ...                   # Other test files
+├── website/                  # Website
+│   ├── content/              # Content
+│   ├── static/               # Static files
+│   └── templates/            # Templates
+├── .gitignore                # Git ignore list
+├── go.mod                    # Go module definition
+├── go.sum                    # Go dependency checksum
+├── LICENSE                   # License file
+└── README.md                 # This file
+```
+
+## 🚀 Getting Started
+
+### Installation
 
 ```bash
-# GO-Minus derleyicisini klonlayın
-git clone https://github.com/gominus/gominus.git
-cd gominus
+# Clone the GO-Minus compiler
+git clone https://github.com/inkbytefo/go-minus.git
+cd go-minus
 
-# GO-Minus derleyicisini derleyin
+# Build the GO-Minus compiler
 go build -o gominus ./cmd/gominus
 
-# Derleyiciyi PATH'e ekleyin
-# Windows için:
+# Add the compiler to PATH
+# For Windows:
 # copy gominus.exe C:\Windows\System32\
-# Linux/macOS için:
+# For Linux/macOS:
 # sudo cp gominus /usr/local/bin/
 ```
 
-### Merhaba Dünya
+### Hello World
 
 ```go
 // main.gom
@@ -46,16 +108,16 @@ package main
 import "fmt"
 
 func main() {
-    fmt.Println("Merhaba, GO-Minus!")
+    fmt.Println("Hello, GO-Minus!")
 }
 ```
 
 ```bash
-# Programı derleyin ve çalıştırın
+# Compile and run the program
 gominus run main.gom
 ```
 
-### Sınıf Örneği
+### Class Example
 
 ```go
 // person.gom
@@ -88,64 +150,63 @@ class Person {
 }
 
 func main() {
-    person := Person("Ahmet", 30)
-    fmt.Println("İsim:", person.getName())
-    fmt.Println("Yaş:", person.getAge())
+    person := Person("John", 30)
+    fmt.Println("Name:", person.getName())
+    fmt.Println("Age:", person.getAge())
 
     person.birthday()
-    fmt.Println("Yeni yaş:", person.getAge())
+    fmt.Println("New age:", person.getAge())
 }
 ```
 
 ```bash
-# Programı derleyin ve çalıştırın
+# Compile and run the program
 gominus run person.gom
 ```
 
-## 🛠️ Geliştirme Araçları
+## 🛠️ Development Tools
 
-GO-Minus dili, aşağıdaki geliştirme araçlarını sağlar:
+The GO-Minus language provides the following development tools:
 
-- **gompm**: GO-Minus Paket Yöneticisi
-- **gomtest**: GO-Minus Test Aracı
-- **gomdoc**: GO-Minus Belgelendirme Aracı
-- **gomfmt**: GO-Minus Kod Biçimlendirme Aracı
-- **gomlsp**: GO-Minus Dil Sunucusu
-- **gomdebug**: GO-Minus Hata Ayıklama Aracı
+- **gompm**: GO-Minus Package Manager (`cmd/gompm`)
+- **gomtest**: GO-Minus Testing Tool (`cmd/gomtest`)
+- **gomdoc**: GO-Minus Documentation Tool (`cmd/gomdoc`)
+- **gomfmt**: GO-Minus Code Formatting Tool (`cmd/gomfmt`)
+- **gomlsp**: GO-Minus Language Server (`cmd/gomlsp`)
+- **gomdebug**: GO-Minus Debugging Tool (`cmd/gomdebug`)
 
-## 🔌 IDE Entegrasyonu
+## 🔌 IDE Integration
 
-GO-Minus dili, aşağıdaki IDE'ler için eklentiler sağlar:
+The GO-Minus language provides plugins for the following IDEs:
 
-- **VS Code**: [GO-Minus VS Code Eklentisi](ide/vscode/README.md)
-- **JetBrains IDEs**: [GO-Minus JetBrains Eklentisi](ide/jetbrains/README.md)
-- **Vim/Neovim**: [GO-Minus Vim Eklentisi](ide/vim/README.md)
-- **Emacs**: [GO-Minus Emacs Eklentisi](ide/emacs/README.md)
+- **VS Code**: [GO-Minus VS Code Plugin](ide/vscode/README.md)
+- **JetBrains IDEs**: [GO-Minus JetBrains Plugin](ide/jetbrains/README.md)
+- **Vim/Neovim**: [GO-Minus Vim Plugin](ide/vim/README.md)
+- **Emacs**: [GO-Minus Emacs Plugin](ide/emacs/README.md)
 
-## 📚 Belgelendirme
+## 📚 Documentation
 
-- [Başlangıç Rehberi](docs/tutorial/getting-started.md)
-- [Dil Referansı](docs/reference/README.md)
-- [Standart Kütüphane](stdlib/README.md)
-- [Öğreticiler](docs/tutorial/README.md)
-- [En İyi Uygulamalar](docs/best-practices.md)
-- [SSS](docs/faq.md)
+- [Getting Started Guide](docs/tutorial/getting-started.md)
+- [Language Reference](docs/reference/README.md)
+- [Standard Library](stdlib/README.md)
+- [Tutorials](docs/tutorial/README.md)
+- [Best Practices](docs/best-practices.md)
+- [FAQ](docs/faq.md)
+- [Why GO-Minus?](docs/why-gominus.md)
+- [Progress Report](docs/progress.md)
+- [Development Plan](docs/development-plan.md)
 
-## 👥 Topluluk
+## 👥 Community
 
-- [GitHub](https://github.com/gominus/gominus)
-- [Web Sitesi](website/index.html)
+- [GitHub](https://github.com/inkbytefo/go-minus)
+- [Website](website/index.html)
 - [Discord](https://discord.gg/gominus)
 - [Forum](https://forum.gominus.org)
 
-## 🤝 Katkıda Bulunma
+## 🤝 Contributing
 
-GO-Minus projesine katkıda bulunmak için, lütfen [katkı sağlama rehberini](CONTRIBUTING.md) okuyun. Tüm katkıda bulunanlar, [davranış kurallarımıza](CODE_OF_CONDUCT.md) uymayı kabul etmiş sayılır.
+To contribute to the GO-Minus project, please read the [contribution guide](CONTRIBUTING.md). All contributors are considered to have agreed to our [code of conduct](CODE_OF_CONDUCT.md).
 
-## 📋 İlerleme
+## 📄 License
 
-GO-Minus dilinin geliştirme sürecini takip etmek için [ilerleme raporunu](progress.md) inceleyebilirsiniz.
-
-## 📄 Lisans
-
-GO-Minus dili, [MIT Lisansı](LICENSE) altında lisanslanmıştır.
+The GO-Minus language is licensed under the [MIT License](LICENSE).

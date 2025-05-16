@@ -1,8 +1,7 @@
 package semantic
 
 import (
-	"gominus/internal/ast"
-	"gominus/internal/token"
+	"github.com/inkbytefo/go-minus/internal/ast"
 )
 
 // TypeInference, tip çıkarımı işlemlerini gerçekleştirir.
@@ -148,7 +147,7 @@ func (ti *TypeInference) inferInfixExpressionType(expr *ast.InfixExpression) Typ
 
 	// Operatöre göre tip kontrolü yap
 	switch expr.Operator {
-	case "+", "-", "*", "/", "%":
+	case "-", "*", "/", "%":
 		// Aritmetik operatörler sayısal tipte olmalıdır
 		if basicLeftType, ok := leftType.(*BasicType); !ok || (basicLeftType.Kind != INTEGER_TYPE && basicLeftType.Kind != FLOAT_TYPE) {
 			ti.analyzer.reportError(expr.Token, "Aritmetik operatörün sol tarafı sayısal tipte olmalıdır")
@@ -158,8 +157,11 @@ func (ti *TypeInference) inferInfixExpressionType(expr *ast.InfixExpression) Typ
 		}
 
 		// Eğer herhangi bir taraf FLOAT_TYPE ise, sonuç FLOAT_TYPE olur
-		if (basicLeftType, ok1 := leftType.(*BasicType); ok1 && basicLeftType.Kind == FLOAT_TYPE) ||
-			(basicRightType, ok2 := rightType.(*BasicType); ok2 && basicRightType.Kind == FLOAT_TYPE) {
+		var basicLeftType, basicRightType *BasicType
+		var ok1, ok2 bool
+		basicLeftType, ok1 = leftType.(*BasicType)
+		basicRightType, ok2 = rightType.(*BasicType)
+		if (ok1 && basicLeftType.Kind == FLOAT_TYPE) || (ok2 && basicRightType.Kind == FLOAT_TYPE) {
 			return &BasicType{Name: "float", Kind: FLOAT_TYPE}
 		}
 		return &BasicType{Name: "int", Kind: INTEGER_TYPE}
@@ -170,8 +172,26 @@ func (ti *TypeInference) inferInfixExpressionType(expr *ast.InfixExpression) Typ
 				return &BasicType{Name: "string", Kind: STRING_TYPE}
 			}
 		}
-		// Sayısal tip kontrolü yukarıda yapıldı
-		return leftType
+
+		// + operatörü sayısal tipler için de kullanılabilir
+		var basicLeftType2, basicRightType2 *BasicType
+		var ok3, ok4 bool
+
+		basicLeftType2, ok3 = leftType.(*BasicType)
+		if !ok3 || (basicLeftType2.Kind != INTEGER_TYPE && basicLeftType2.Kind != FLOAT_TYPE) {
+			ti.analyzer.reportError(expr.Token, "Aritmetik operatörün sol tarafı sayısal tipte olmalıdır")
+		}
+
+		basicRightType2, ok4 = rightType.(*BasicType)
+		if !ok4 || (basicRightType2.Kind != INTEGER_TYPE && basicRightType2.Kind != FLOAT_TYPE) {
+			ti.analyzer.reportError(expr.Token, "Aritmetik operatörün sağ tarafı sayısal tipte olmalıdır")
+		}
+
+		// Eğer herhangi bir taraf FLOAT_TYPE ise, sonuç FLOAT_TYPE olur
+		if (ok3 && basicLeftType2.Kind == FLOAT_TYPE) || (ok4 && basicRightType2.Kind == FLOAT_TYPE) {
+			return &BasicType{Name: "float", Kind: FLOAT_TYPE}
+		}
+		return &BasicType{Name: "int", Kind: INTEGER_TYPE}
 	case "<", ">", "<=", ">=", "==", "!=":
 		// Karşılaştırma operatörleri aynı tipte olmalıdır
 		if !leftType.Equals(rightType) {

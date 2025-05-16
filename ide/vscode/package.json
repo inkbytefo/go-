@@ -1,9 +1,9 @@
 {
-  "name": "goplus",
-  "displayName": "GO+ Language Support",
-  "description": "GO+ dili için sözdizimi vurgulama, kod tamamlama, hata ayıklama ve diğer özellikler",
+  "name": "gominus",
+  "displayName": "GO-Minus Language Support",
+  "description": "GO-Minus dili için sözdizimi vurgulama, kod tamamlama, hata ayıklama ve diğer özellikler",
   "version": "0.1.0",
-  "publisher": "goplus",
+  "publisher": "gominus",
   "engines": {
     "vscode": "^1.60.0"
   },
@@ -14,121 +14,121 @@
     "Linters"
   ],
   "activationEvents": [
-    "onLanguage:goplus",
-    "onCommand:goplus.startLanguageServer",
-    "onCommand:goplus.stopLanguageServer",
-    "onCommand:goplus.restartLanguageServer",
-    "onCommand:goplus.startDebugging",
-    "onCommand:goplus.formatDocument",
-    "onCommand:goplus.runTests",
-    "onCommand:goplus.runCurrentFile"
+    "onLanguage:gominus",
+    "onCommand:gominus.startLanguageServer",
+    "onCommand:gominus.stopLanguageServer",
+    "onCommand:gominus.restartLanguageServer",
+    "onCommand:gominus.startDebugging",
+    "onCommand:gominus.formatDocument",
+    "onCommand:gominus.runTests",
+    "onCommand:gominus.runCurrentFile"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "goplus",
+        "id": "gominus",
         "aliases": [
-          "GO+",
-          "goplus"
+          "GO-Minus",
+          "gominus"
         ],
         "extensions": [
-          ".gop"
+          ".gom"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "goplus",
-        "scopeName": "source.goplus",
-        "path": "./syntaxes/gop.tmLanguage.json"
+        "language": "gominus",
+        "scopeName": "source.gominus",
+        "path": "./syntaxes/gom.tmLanguage.json"
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "GO+",
+      "title": "GO-Minus",
       "properties": {
-        "goplus.languageServerPath": {
+        "gominus.languageServerPath": {
           "type": "string",
-          "default": "goplsp",
-          "description": "GO+ dil sunucusu yolu"
+          "default": "gomlsp",
+          "description": "GO-Minus dil sunucusu yolu"
         },
-        "goplus.debuggerPath": {
+        "gominus.debuggerPath": {
           "type": "string",
-          "default": "gopdebug",
-          "description": "GO+ hata ayıklama aracı yolu"
+          "default": "gomdebug",
+          "description": "GO-Minus hata ayıklama aracı yolu"
         },
-        "goplus.formatOnSave": {
+        "gominus.formatOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Kaydetme sırasında GO+ dosyalarını biçimlendir"
+          "description": "Kaydetme sırasında GO-Minus dosyalarını biçimlendir"
         },
-        "goplus.lintOnSave": {
+        "gominus.lintOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Kaydetme sırasında GO+ dosyalarını denetle"
+          "description": "Kaydetme sırasında GO-Minus dosyalarını denetle"
         },
-        "goplus.testOnSave": {
+        "gominus.testOnSave": {
           "type": "boolean",
           "default": false,
-          "description": "Kaydetme sırasında GO+ testlerini çalıştır"
+          "description": "Kaydetme sırasında GO-Minus testlerini çalıştır"
         }
       }
     },
     "commands": [
       {
-        "command": "goplus.startLanguageServer",
-        "title": "GO+: Dil Sunucusunu Başlat"
+        "command": "gominus.startLanguageServer",
+        "title": "GO-Minus: Dil Sunucusunu Başlat"
       },
       {
-        "command": "goplus.stopLanguageServer",
-        "title": "GO+: Dil Sunucusunu Durdur"
+        "command": "gominus.stopLanguageServer",
+        "title": "GO-Minus: Dil Sunucusunu Durdur"
       },
       {
-        "command": "goplus.restartLanguageServer",
-        "title": "GO+: Dil Sunucusunu Yeniden Başlat"
+        "command": "gominus.restartLanguageServer",
+        "title": "GO-Minus: Dil Sunucusunu Yeniden Başlat"
       },
       {
-        "command": "goplus.startDebugging",
-        "title": "GO+: Hata Ayıklamayı Başlat"
+        "command": "gominus.startDebugging",
+        "title": "GO-Minus: Hata Ayıklamayı Başlat"
       },
       {
-        "command": "goplus.formatDocument",
-        "title": "GO+: Belgeyi Biçimlendir"
+        "command": "gominus.formatDocument",
+        "title": "GO-Minus: Belgeyi Biçimlendir"
       },
       {
-        "command": "goplus.runTests",
-        "title": "GO+: Testleri Çalıştır"
+        "command": "gominus.runTests",
+        "title": "GO-Minus: Testleri Çalıştır"
       },
       {
-        "command": "goplus.runCurrentFile",
-        "title": "GO+: Mevcut Dosyayı Çalıştır"
+        "command": "gominus.runCurrentFile",
+        "title": "GO-Minus: Mevcut Dosyayı Çalıştır"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "when": "editorLangId == goplus",
-          "command": "goplus.formatDocument",
+          "when": "editorLangId == gominus",
+          "command": "gominus.formatDocument",
           "group": "1_modification"
         },
         {
-          "when": "editorLangId == goplus",
-          "command": "goplus.runCurrentFile",
+          "when": "editorLangId == gominus",
+          "command": "gominus.runCurrentFile",
           "group": "2_execution"
         },
         {
-          "when": "editorLangId == goplus",
-          "command": "goplus.startDebugging",
+          "when": "editorLangId == gominus",
+          "command": "gominus.startDebugging",
           "group": "2_execution"
         }
       ]
     },
     "debuggers": [
       {
-        "type": "goplus",
-        "label": "GO+ Debugger",
+        "type": "gominus",
+        "label": "GO-Minus Debugger",
         "program": "./out/debugAdapter.js",
         "runtime": "node",
         "configurationAttributes": {
@@ -139,7 +139,7 @@
             "properties": {
               "program": {
                 "type": "string",
-                "description": "Çalıştırılacak GO+ programının yolu",
+                "description": "Çalıştırılacak GO-Minus programının yolu",
                 "default": "${file}"
               },
               "args": {
@@ -167,9 +167,9 @@
         },
         "initialConfigurations": [
           {
-            "type": "goplus",
+            "type": "gominus",
             "request": "launch",
-            "name": "GO+ Programını Çalıştır",
+            "name": "GO-Minus Programını Çalıştır",
             "program": "${file}",
             "args": [],
             "cwd": "${workspaceFolder}",
@@ -178,12 +178,12 @@
         ],
         "configurationSnippets": [
           {
-            "label": "GO+: Programı Çalıştır",
-            "description": "GO+ programını hata ayıklama modunda çalıştır",
+            "label": "GO-Minus: Programı Çalıştır",
+            "description": "GO-Minus programını hata ayıklama modunda çalıştır",
             "body": {
-              "type": "goplus",
+              "type": "gominus",
               "request": "launch",
-              "name": "GO+ Programını Çalıştır",
+              "name": "GO-Minus Programını Çalıştır",
               "program": "^\"\\${file}\"",
               "args": [],
               "cwd": "^\"\\${workspaceFolder}\"",

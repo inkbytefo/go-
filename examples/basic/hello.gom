@@ -1,0 +1,99 @@
+// GO-Minus örnek programı
+package main
+
+import "fmt"
+
+// Basit bir fonksiyon
+func add(a int, b int) int {
+    return a + b
+}
+
+// Sınıf tanımı
+class Person {
+    public var name string
+    public var age int
+
+    // Yapıcı metot
+    func() {
+        this.name = "Anonim"
+        this.age = 0
+    }
+
+    // Parametre alan yapıcı metot
+    func(name string, age int) {
+        this.name = name
+        this.age = age
+    }
+
+    // Metot
+    func (p Person) sayHello() {
+        fmt.Println("Merhaba, benim adım", this.name, "ve", this.age, "yaşındayım.")
+    }
+}
+
+// Şablon fonksiyon
+template<T> func max(a T, b T) T {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+
+// Try-catch örneği
+func divide(a int, b int) int {
+    try {
+        if b == 0 {
+            throw "Sıfıra bölme hatası"
+        }
+        return a / b
+    } catch (e string) {
+        fmt.Println("Hata:", e)
+        return 0
+    }
+}
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Sabit tanımlama
+    const pi = 3.14159
+    
+    // Fonksiyon çağrısı
+    result := add(x, y)
+    fmt.Println("Toplam:", result)
+    
+    // Şablon fonksiyon çağrısı
+    maxInt := max<int>(x, y)
+    fmt.Println("Maksimum:", maxInt)
+    
+    // Sınıf örneği oluşturma
+    person := new Person("Ahmet", 30)
+    person.sayHello()
+    
+    // Try-catch kullanımı
+    divResult := divide(10, 2)
+    fmt.Println("Bölme sonucu:", divResult)
+    
+    divResult = divide(10, 0)
+    fmt.Println("Sıfıra bölme sonucu:", divResult)
+    
+    // Döngüler
+    for i := 0; i < 5; i++ {
+        fmt.Println("For döngüsü:", i)
+    }
+    
+    j := 0
+    while j < 5 {
+        fmt.Println("While döngüsü:", j)
+        j++
+    }
+    
+    // Scope kullanımı (RAII)
+    scope {
+        fmt.Println("Scope bloğu içindeyim")
+    }
+}

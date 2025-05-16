@@ -1,4 +1,4 @@
-# GO+ Davranış Kuralları
+# GO-Minus Davranış Kuralları
 
 ## Taahhüdümüz
 
@@ -46,6 +46,6 @@ Bu Davranış Kuralları, [Contributor Covenant](https://www.contributor-covenan
 
 Davranış Kuralları ile ilgili sorularınız veya endişeleriniz için lütfen proje ekibiyle iletişime geçin:
 
-- GitHub Issues: [https://github.com/goplus/goplus/issues](https://github.com/goplus/goplus/issues)
-- Discord: [GO+ Discord Sunucusu](https://discord.gg/goplus)
-- E-posta: conduct@goplus.org
+- GitHub Issues: [https://github.com/gominus/gominus/issues](https://github.com/gominus/gominus/issues)
+- Discord: [GO-Minus Discord Sunucusu](https://discord.gg/gominus)
+- E-posta: conduct@gominus.org

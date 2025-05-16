@@ -1,0 +1,41 @@
+// GO-Minus örnek programı
+package main
+
+import "fmt"
+
+// Sınıf tanımı
+class Person {
+    public var name string
+    public var age int
+
+    // Metot
+    func (p Person) sayHello() {
+        fmt.Println("Merhaba, benim adım", this.name, "ve", this.age, "yaşındayım.")
+    }
+}
+
+// Ana fonksiyon
+func main() {
+    // Değişken tanımlama
+    var x int = 10
+    var y int = 20
+    
+    // Sabit tanımlama
+    const pi = 3.14159
+    
+    // Sınıf örneği oluşturma
+    person := new Person("Ahmet", 30)
+    person.sayHello()
+    
+    // Try-catch kullanımı
+    try {
+        if x > y {
+            throw "x, y'den büyük olamaz"
+        }
+        fmt.Println("x <= y")
+    } catch (e string) {
+        fmt.Println("Hata:", e)
+    } finally {
+        fmt.Println("İşlem tamamlandı")
+    }
+}

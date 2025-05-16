@@ -52,12 +52,12 @@ Sözdizimi vurgulama otomatik olarak etkinleştirilir. Özel renk şeması için
 
 ```vim
 " vimrc veya init.vim dosyanıza ekleyin
-let g:goplus_highlight_types = 1
-let g:goplus_highlight_fields = 1
-let g:goplus_highlight_functions = 1
-let g:goplus_highlight_function_calls = 1
-let g:goplus_highlight_operators = 1
-let g:goplus_highlight_build_constraints = 1
+let g:gominus_highlight_types = 1
+let g:gominus_highlight_fields = 1
+let g:gominus_highlight_functions = 1
+let g:gominus_highlight_function_calls = 1
+let g:gominus_highlight_operators = 1
+let g:gominus_highlight_build_constraints = 1
 ```
 
 ### coc.nvim ile LSP Yapılandırması
@@ -66,10 +66,10 @@ let g:goplus_highlight_build_constraints = 1
 // coc-settings.json dosyanıza ekleyin
 {
   "languageserver": {
-    "goplus": {
-      "command": "goplsp",
-      "filetypes": ["goplus", "gop"],
-      "rootPatterns": ["gop.mod", ".git/"],
+    "gominus": {
+      "command": "gomlsp",
+      "filetypes": ["gominus", "gom"],
+      "rootPatterns": ["gom.mod", ".git/"],
       "initializationOptions": {
         "goplsEnv": {
           "GOPATH": "/path/to/gopath"
@@ -84,11 +84,11 @@ let g:goplus_highlight_build_constraints = 1
 
 ```vim
 " vimrc veya init.vim dosyanıza ekleyin
-if executable('goplsp')
+if executable('gomlsp')
   au User lsp_setup call lsp#register_server({
-    \ 'name': 'goplus',
-    \ 'cmd': {server_info->['goplsp']},
-    \ 'whitelist': ['goplus', 'gop'],
+    \ 'name': 'gominus',
+    \ 'cmd': {server_info->['gomlsp']},
+    \ 'whitelist': ['gominus', 'gom'],
     \ 'workspace_config': {
     \   'gopls': {
     \     'staticcheck': v:true,
@@ -107,7 +107,7 @@ endif
 
 ```vim
 " vimrc veya init.vim dosyanıza ekleyin
-au BufRead,BufNewFile *.gop set filetype=goplus
+au BufRead,BufNewFile *.gom set filetype=gominus
 ```
 
 ### Anahtar Eşlemeleri
@@ -115,22 +115,22 @@ au BufRead,BufNewFile *.gop set filetype=goplus
 ```vim
 " vimrc veya init.vim dosyanıza ekleyin
 " Tanıma gitme
-autocmd FileType goplus nmap <buffer> gd <plug>(lsp-definition)
+autocmd FileType gominus nmap <buffer> gd <plug>(lsp-definition)
 " Referansları bulma
-autocmd FileType goplus nmap <buffer> gr <plug>(lsp-references)
+autocmd FileType gominus nmap <buffer> gr <plug>(lsp-references)
 " Belgeyi biçimlendir
-autocmd FileType goplus nmap <buffer> gf <plug>(lsp-document-format)
+autocmd FileType gominus nmap <buffer> gf <plug>(lsp-document-format)
 " Testleri çalıştır
-autocmd FileType goplus nmap <buffer> <leader>t :GoplusTest<CR>
+autocmd FileType gominus nmap <buffer> <leader>t :GominusTest<CR>
 " Mevcut dosyayı çalıştır
-autocmd FileType goplus nmap <buffer> <leader>r :GoplusRun<CR>
+autocmd FileType gominus nmap <buffer> <leader>r :GominusRun<CR>
 ```
 
 ## Kullanım
 
 ### Sözdizimi Vurgulama
 
-GO+ dosyaları (`.gop` uzantılı) otomatik olarak sözdizimi vurgulaması ile açılır.
+GO-Minus dosyaları (`.gom` uzantılı) otomatik olarak sözdizimi vurgulaması ile açılır.
 
 ### Kod Tamamlama
 
@@ -154,12 +154,12 @@ Mevcut dosyayı çalıştırmak için, `<leader>r` tuşlarına basın.
 
 ## Komutlar
 
-- `:GoplusRun`: Mevcut dosyayı çalıştırır
-- `:GoplusTest`: Testleri çalıştırır
-- `:GoplusLint`: Kodu denetler
-- `:GoplusFmt`: Kodu biçimlendirir
-- `:GoplusImports`: İçe aktarmaları düzenler
-- `:GoplusInfo`: GO+ ortam bilgilerini gösterir
+- `:GominusRun`: Mevcut dosyayı çalıştırır
+- `:GominusTest`: Testleri çalıştırır
+- `:GominusLint`: Kodu denetler
+- `:GominusFmt`: Kodu biçimlendirir
+- `:GominusImports`: İçe aktarmaları düzenler
+- `:GominusInfo`: GO-Minus ortam bilgilerini gösterir
 
 ## Sorun Giderme
 
@@ -170,14 +170,14 @@ Mevcut dosyayı çalıştırmak için, `<leader>r` tuşlarına basın.
 
 ### LSP Çalışmıyor
 
-1. `goplsp` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
+1. `gomlsp` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
 2. LSP istemcisinin doğru yapılandırıldığını kontrol edin
 3. LSP durumunu kontrol edin (coc.nvim için `:CocInfo`, vim-lsp için `:LspStatus`)
 
 ## Katkıda Bulunma
 
-GO+ Vim/Neovim Eklentisi, açık kaynaklı bir projedir. Katkıda bulunmak için, lütfen [katkı sağlama rehberini](../../CONTRIBUTING.md) okuyun.
+GO-Minus Vim/Neovim Eklentisi, açık kaynaklı bir projedir. Katkıda bulunmak için, lütfen [katkı sağlama rehberini](../../CONTRIBUTING.md) okuyun.
 
 ## Lisans
 
-GO+ Vim/Neovim Eklentisi, GO+ projesi ile aynı lisans altında dağıtılmaktadır.
+GO-Minus Vim/Neovim Eklentisi, GO-Minus projesi ile aynı lisans altında dağıtılmaktadır.

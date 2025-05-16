@@ -1,51 +1,51 @@
-# Neden GO-Minus?
+# Why GO-Minus?
 
-GO-Minus, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle genişletilmiş bir programlama dilidir. Bu belge, GO-Minus'un neden tercih edilebileceğini ve hangi kullanım senaryolarında öne çıktığını açıklamaktadır.
+GO-Minus is a programming language that includes all features of the Go programming language and extends it with C++-like features. This document explains why GO-Minus might be preferred and in which use cases it excels.
 
-## GO-Minus'un Temel Değer Önerisi
+## GO-Minus's Core Value Proposition
 
-GO-Minus, iki güçlü dilin en iyi özelliklerini birleştirerek programlama dünyasında benzersiz bir konum elde etmeyi hedeflemektedir:
+GO-Minus aims to achieve a unique position in the programming world by combining the best features of two powerful languages:
 
-1. **Go'nun Sadeliği ve Verimliliği**: Go'nun temiz sözdizimi, hızlı derleme süreleri ve güçlü eşzamanlılık modeli
-2. **C++'ın Güçlü Özellikleri**: Sınıflar, şablonlar, istisna işleme ve düşük seviyeli sistem kontrolü
+1. **Go's Simplicity and Efficiency**: Go's clean syntax, fast compilation times, and powerful concurrency model
+2. **C++'s Powerful Features**: Classes, templates, exception handling, and low-level system control
 
-Bu kombinasyon, hem hızlı uygulama geliştirme hem de yüksek performanslı sistem programlama için ideal bir ortam sağlar.
+This combination provides an ideal environment for both rapid application development and high-performance system programming.
 
-## GO-Minus'u Tercih Etme Nedenleri
+## Reasons to Choose GO-Minus
 
-### 1. Performans ve Kontrol
+### 1. Performance and Control
 
-GO-Minus, Go'nun garbage collector'ünün sağladığı kolaylığı korurken, performans kritik bölümler için manuel bellek yönetimi seçeneği sunar. Bu, gerçek zamanlı uygulamalar, oyunlar ve düşük gecikme gerektiren sistemler için idealdir.
+GO-Minus maintains the convenience of Go's garbage collector while offering manual memory management options for performance-critical sections. This is ideal for real-time applications, games, and systems requiring low latency.
 
 ```go
-// Manuel bellek yönetimi örneği
+// Manual memory management example
 func processLargeData() {
-    // Manuel bellek yönetimi modu
+    // Manual memory management mode
     unsafe {
         buffer := allocate<byte>(1024 * 1024)
         defer free(buffer)
-        
-        // Performans kritik işlemler
+
+        // Performance critical operations
         // ...
     }
 }
 ```
 
-### 2. Nesne Yönelimli Programlama
+### 2. Object-Oriented Programming
 
-GO-Minus, Go'nun basit yapı ve arayüz sistemini C++ tarzı sınıflar ve kalıtım ile genişletir. Bu, karmaşık nesne hiyerarşileri gerektiren büyük projelerde kod organizasyonunu kolaylaştırır.
+GO-Minus extends Go's simple struct and interface system with C++-style classes and inheritance. This facilitates code organization in large projects requiring complex object hierarchies.
 
 ```go
-// Sınıf ve kalıtım örneği
+// Class and inheritance example
 class Animal {
     protected:
         string name
-    
+
     public:
         Animal(string name) {
             this.name = name
         }
-        
+
         virtual string makeSound() {
             return "..."
         }
@@ -54,41 +54,41 @@ class Animal {
 class Dog : Animal {
     public:
         Dog(string name) : Animal(name) {}
-        
+
         override string makeSound() {
             return "Woof!"
         }
 }
 ```
 
-### 3. Jenerik Programlama
+### 3. Generic Programming
 
-GO-Minus, C++ tarzı şablonlar ile güçlü jenerik programlama desteği sağlar. Bu, tip güvenliği korurken kod tekrarını azaltır.
+GO-Minus provides powerful generic programming support with C++-style templates. This reduces code duplication while maintaining type safety.
 
 ```go
-// Şablon örneği
+// Template example
 template<T>
 class Stack {
     private:
         T[] items
         int size
-    
+
     public:
         Stack() {
             this.items = T[]{}
             this.size = 0
         }
-        
+
         void push(T item) {
             this.items = append(this.items, item)
             this.size++
         }
-        
+
         T pop() {
             if this.size == 0 {
                 throw new Exception("Stack is empty")
             }
-            
+
             this.size--
             item := this.items[this.size]
             this.items = this.items[:this.size]
@@ -97,111 +97,111 @@ class Stack {
 }
 ```
 
-### 4. İstisna İşleme
+### 4. Exception Handling
 
-GO-Minus, Go'nun hata döndürme mekanizmasını korurken, C++ tarzı istisna işleme desteği de sağlar. Bu, hata işleme kodunu daha temiz ve okunabilir hale getirir.
+GO-Minus maintains Go's error return mechanism while also providing C++-style exception handling support. This makes error handling code cleaner and more readable.
 
 ```go
-// İstisna işleme örneği
+// Exception handling example
 func processFile(filename string) {
     try {
         file := openFile(filename)
         defer file.close()
-        
-        // Dosya işlemleri
+
+        // File operations
         // ...
     } catch (FileNotFoundException e) {
         log.error("File not found: " + e.message)
     } catch (IOException e) {
         log.error("IO error: " + e.message)
     } finally {
-        // Temizlik işlemleri
+        // Cleanup operations
         // ...
     }
 }
 ```
 
-### 5. Eşzamanlılık Modeli
+### 5. Concurrency Model
 
-GO-Minus, Go'nun goroutine ve channel tabanlı eşzamanlılık modelini korur ve genişletir. Bu, paralel programlamayı basit ve güvenli hale getirir.
+GO-Minus preserves and extends Go's goroutine and channel-based concurrency model. This makes parallel programming simple and safe.
 
 ```go
-// Eşzamanlılık örneği
+// Concurrency example
 func processItems(items []Item) []Result {
     results := make(chan Result, len(items))
-    
+
     for _, item := range items {
         go func(item Item) {
             result := processItem(item)
             results <- result
         }(item)
     }
-    
-    // Sonuçları topla
+
+    // Collect results
     finalResults := []Result{}
     for i := 0; i < len(items); i++ {
         finalResults = append(finalResults, <-results)
     }
-    
+
     return finalResults
 }
 ```
 
-## Hangi Kullanım Senaryoları İçin Uygundur?
+## Which Use Cases Is It Suitable For?
 
-GO-Minus, aşağıdaki kullanım senaryoları için özellikle uygundur:
+GO-Minus is particularly suitable for the following use cases:
 
-### Sistem Programlama
+### System Programming
 
-Düşük seviyeli sistem kontrolü ve yüksek performans gerektiren uygulamalar:
-- İşletim sistemi bileşenleri
-- Sürücüler
-- Gömülü sistemler
-- Performans kritik arka uç hizmetleri
+Applications requiring low-level system control and high performance:
+- Operating system components
+- Drivers
+- Embedded systems
+- Performance-critical backend services
 
-### Oyun Geliştirme
+### Game Development
 
-Yüksek performans ve düşük gecikme gerektiren oyun geliştirme:
-- Oyun motorları
-- Fizik simülasyonları
-- Grafik işleme
-- Gerçek zamanlı sistemler
+Game development requiring high performance and low latency:
+- Game engines
+- Physics simulations
+- Graphics processing
+- Real-time systems
 
-### Büyük Ölçekli Uygulamalar
+### Large-Scale Applications
 
-Karmaşık nesne hiyerarşileri ve güçlü tip sistemi gerektiren büyük projeler:
-- Kurumsal uygulamalar
-- Büyük ölçekli web hizmetleri
-- Veri işleme sistemleri
-- Dağıtık sistemler
+Large projects requiring complex object hierarchies and strong type systems:
+- Enterprise applications
+- Large-scale web services
+- Data processing systems
+- Distributed systems
 
-### Bilimsel Hesaplama
+### Scientific Computing
 
-Yüksek performanslı hesaplama gerektiren bilimsel uygulamalar:
-- Veri analizi
-- Makine öğrenimi
-- Simülasyonlar
-- Görüntü işleme
+Scientific applications requiring high-performance computing:
+- Data analysis
+- Machine learning
+- Simulations
+- Image processing
 
-## GO-Minus vs Diğer Diller
+## GO-Minus vs Other Languages
 
 ### GO-Minus vs Go
 
-- **Avantajlar**: Daha güçlü OOP desteği, şablonlar, istisna işleme, manuel bellek yönetimi seçeneği
-- **Dezavantajlar**: Daha karmaşık dil özellikleri, daha uzun öğrenme eğrisi
+- **Advantages**: Stronger OOP support, templates, exception handling, manual memory management option
+- **Disadvantages**: More complex language features, steeper learning curve
 
 ### GO-Minus vs C++
 
-- **Avantajlar**: Daha temiz sözdizimi, daha hızlı derleme süreleri, daha güçlü eşzamanlılık modeli, daha modern standart kütüphane
-- **Dezavantajlar**: Daha az olgun ekosistem, daha az düşük seviyeli kontrol
+- **Advantages**: Cleaner syntax, faster compilation times, stronger concurrency model, more modern standard library
+- **Disadvantages**: Less mature ecosystem, less low-level control
 
 ### GO-Minus vs Rust
 
-- **Avantajlar**: Daha kolay öğrenme eğrisi, daha hızlı geliştirme, daha güçlü OOP desteği
-- **Dezavantajlar**: Daha az güvenli bellek modeli, daha az güçlü tip sistemi
+- **Advantages**: Easier learning curve, faster development, stronger OOP support
+- **Disadvantages**: Less safe memory model, less powerful type system
 
-## Sonuç
+## Conclusion
 
-GO-Minus, Go'nun sadeliği ve verimliliği ile C++'ın güçlü özelliklerini birleştirerek, hem hızlı uygulama geliştirme hem de yüksek performanslı sistem programlama için ideal bir ortam sağlar. Özellikle sistem programlama, oyun geliştirme, büyük ölçekli uygulamalar ve bilimsel hesaplama alanlarında öne çıkar.
+GO-Minus combines Go's simplicity and efficiency with C++'s powerful features to provide an ideal environment for both rapid application development and high-performance system programming. It particularly excels in system programming, game development, large-scale applications, and scientific computing.
 
-GO-Minus'u denemek ve topluluğa katılmak için [GO-Minus web sitesini](https://gominus.org) ziyaret edebilir ve [GitHub deposunu](https://github.com/gominus/gominus) inceleyebilirsiniz.
+To try GO-Minus and join the community, you can visit the [GO-Minus website](https://gominus.org) and explore the [GitHub repository](https://github.com/gominus/gominus).

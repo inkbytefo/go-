@@ -2,14 +2,17 @@ package ast
 
 import (
 	"bytes"
-	"gominus/internal/token"
 	"strings"
+
+	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // Node, AST'deki her düğümün sahip olması gereken temel arayüzdür.
 type Node interface {
 	TokenLiteral() string // Düğümle ilişkili token'ın değişmez değerini döndürür
 	String() string       // Hata ayıklama ve test için AST düğümünün okunabilir bir temsilini döndürür
+	Pos() token.Position  // Düğümün konumunu döndürür
+	End() token.Position  // Düğümün bitiş konumunu döndürür
 }
 
 // Statement, bir ifadeyi temsil eden bir AST düğümüdür.
@@ -47,6 +50,22 @@ func (p *Program) String() string {
 	return out.String()
 }
 
+// Pos, programın konumunu döndürür.
+func (p *Program) Pos() token.Position {
+	if len(p.Statements) > 0 {
+		return p.Statements[0].Pos()
+	}
+	return token.Position{}
+}
+
+// End, programın bitiş konumunu döndürür.
+func (p *Program) End() token.Position {
+	if len(p.Statements) > 0 {
+		return p.Statements[len(p.Statements)-1].End()
+	}
+	return token.Position{}
+}
+
 // Identifier, bir tanımlayıcıyı (değişken adı, fonksiyon adı vb.) temsil eder.
 type Identifier struct {
 	Token token.Token // token.IDENT token'ı
@@ -56,6 +75,8 @@ type Identifier struct {
 func (i *Identifier) expressionNode()      {}
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 func (i *Identifier) String() string       { return i.Value }
+func (i *Identifier) Pos() token.Position  { return i.Token.Position }
+func (i *Identifier) End() token.Position  { return i.Token.Position }
 
 // VarStatement, bir değişken tanımlama ifadesini temsil eder.
 // Örnek: var x int = 5
@@ -87,6 +108,16 @@ func (vs *VarStatement) String() string {
 
 	return out.String()
 }
+func (vs *VarStatement) Pos() token.Position { return vs.Token.Position }
+func (vs *VarStatement) End() token.Position {
+	if vs.Value != nil {
+		return vs.Value.End()
+	}
+	if vs.Type != nil {
+		return vs.Type.End()
+	}
+	return vs.Name.End()
+}
 
 // ConstStatement, bir sabit tanımlama ifadesini temsil eder.
 // Örnek: const x = 5
@@ -115,6 +146,8 @@ func (cs *ConstStatement) String() string {
 
 	return out.String()
 }
+func (cs *ConstStatement) Pos() token.Position { return cs.Token.Position }
+func (cs *ConstStatement) End() token.Position { return cs.Value.End() }
 
 // ReturnStatement, bir dönüş ifadesini temsil eder.
 // Örnek: return 5
@@ -138,6 +171,13 @@ func (rs *ReturnStatement) String() string {
 
 	return out.String()
 }
+func (rs *ReturnStatement) Pos() token.Position { return rs.Token.Position }
+func (rs *ReturnStatement) End() token.Position {
+	if rs.ReturnValue != nil {
+		return rs.ReturnValue.End()
+	}
+	return rs.Token.Position
+}
 
 // ExpressionStatement, bir ifade cümlesini temsil eder.
 // Örnek: x + 5
@@ -153,6 +193,13 @@ func (es *ExpressionStatement) String() string {
 		return es.Expression.String()
 	}
 	return ""
+}
+func (es *ExpressionStatement) Pos() token.Position { return es.Token.Position }
+func (es *ExpressionStatement) End() token.Position {
+	if es.Expression != nil {
+		return es.Expression.End()
+	}
+	return es.Token.Position
 }
 
 // BlockStatement, bir blok ifadesini temsil eder.
@@ -175,6 +222,13 @@ func (bs *BlockStatement) String() string {
 
 	return out.String()
 }
+func (bs *BlockStatement) Pos() token.Position { return bs.Token.Position }
+func (bs *BlockStatement) End() token.Position {
+	if len(bs.Statements) > 0 {
+		return bs.Statements[len(bs.Statements)-1].End()
+	}
+	return bs.Token.Position
+}
 
 // IntegerLiteral, bir tamsayı değişmez değerini temsil eder.
 // Örnek: 5
@@ -186,6 +240,8 @@ type IntegerLiteral struct {
 func (il *IntegerLiteral) expressionNode()      {}
 func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
 func (il *IntegerLiteral) String() string       { return il.Token.Literal }
+func (il *IntegerLiteral) Pos() token.Position  { return il.Token.Position }
+func (il *IntegerLiteral) End() token.Position  { return il.Token.Position }
 
 // FloatLiteral, bir ondalık sayı değişmez değerini temsil eder.
 // Örnek: 3.14
@@ -197,6 +253,8 @@ type FloatLiteral struct {
 func (fl *FloatLiteral) expressionNode()      {}
 func (fl *FloatLiteral) TokenLiteral() string { return fl.Token.Literal }
 func (fl *FloatLiteral) String() string       { return fl.Token.Literal }
+func (fl *FloatLiteral) Pos() token.Position  { return fl.Token.Position }
+func (fl *FloatLiteral) End() token.Position  { return fl.Token.Position }
 
 // StringLiteral, bir string değişmez değerini temsil eder.
 // Örnek: "hello"
@@ -208,6 +266,8 @@ type StringLiteral struct {
 func (sl *StringLiteral) expressionNode()      {}
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) String() string       { return "\"" + sl.Value + "\"" }
+func (sl *StringLiteral) Pos() token.Position  { return sl.Token.Position }
+func (sl *StringLiteral) End() token.Position  { return sl.Token.Position }
 
 // CharLiteral, bir karakter değişmez değerini temsil eder.
 // Örnek: 'a'
@@ -219,6 +279,8 @@ type CharLiteral struct {
 func (cl *CharLiteral) expressionNode()      {}
 func (cl *CharLiteral) TokenLiteral() string { return cl.Token.Literal }
 func (cl *CharLiteral) String() string       { return "'" + string(cl.Value) + "'" }
+func (cl *CharLiteral) Pos() token.Position  { return cl.Token.Position }
+func (cl *CharLiteral) End() token.Position  { return cl.Token.Position }
 
 // BooleanLiteral, bir boolean değişmez değerini temsil eder.
 // Örnek: true, false
@@ -235,6 +297,8 @@ func (bl *BooleanLiteral) String() string {
 	}
 	return "false"
 }
+func (bl *BooleanLiteral) Pos() token.Position { return bl.Token.Position }
+func (bl *BooleanLiteral) End() token.Position { return bl.Token.Position }
 
 // NullLiteral, bir null değişmez değerini temsil eder.
 // Örnek: nil
@@ -245,6 +309,8 @@ type NullLiteral struct {
 func (nl *NullLiteral) expressionNode()      {}
 func (nl *NullLiteral) TokenLiteral() string { return nl.Token.Literal }
 func (nl *NullLiteral) String() string       { return "nil" }
+func (nl *NullLiteral) Pos() token.Position  { return nl.Token.Position }
+func (nl *NullLiteral) End() token.Position  { return nl.Token.Position }
 
 // PrefixExpression, bir önek ifadesini temsil eder.
 // Örnek: !true, -5
@@ -266,6 +332,8 @@ func (pe *PrefixExpression) String() string {
 
 	return out.String()
 }
+func (pe *PrefixExpression) Pos() token.Position { return pe.Token.Position }
+func (pe *PrefixExpression) End() token.Position { return pe.Right.End() }
 
 // InfixExpression, bir araek ifadesini temsil eder.
 // Örnek: 5 + 5
@@ -289,6 +357,8 @@ func (ie *InfixExpression) String() string {
 
 	return out.String()
 }
+func (ie *InfixExpression) Pos() token.Position { return ie.Left.Pos() }
+func (ie *InfixExpression) End() token.Position { return ie.Right.End() }
 
 // IfExpression, bir if ifadesini temsil eder.
 // Örnek: if (x > y) { x } else { y }
@@ -315,6 +385,13 @@ func (ie *IfExpression) String() string {
 	}
 
 	return out.String()
+}
+func (ie *IfExpression) Pos() token.Position { return ie.Token.Position }
+func (ie *IfExpression) End() token.Position {
+	if ie.Alternative != nil {
+		return ie.Alternative.End()
+	}
+	return ie.Consequence.End()
 }
 
 // FunctionLiteral, bir fonksiyon değişmez değerini temsil eder.
@@ -349,6 +426,8 @@ func (fl *FunctionLiteral) String() string {
 
 	return out.String()
 }
+func (fl *FunctionLiteral) Pos() token.Position { return fl.Token.Position }
+func (fl *FunctionLiteral) End() token.Position { return fl.Body.End() }
 
 // CallExpression, bir fonksiyon çağrısını temsil eder.
 // Örnek: add(1, 2)
@@ -375,6 +454,13 @@ func (ce *CallExpression) String() string {
 
 	return out.String()
 }
+func (ce *CallExpression) Pos() token.Position { return ce.Function.Pos() }
+func (ce *CallExpression) End() token.Position {
+	if len(ce.Arguments) > 0 {
+		return ce.Arguments[len(ce.Arguments)-1].End()
+	}
+	return ce.Token.Position
+}
 
 // ArrayLiteral, bir dizi değişmez değerini temsil eder.
 // Örnek: [1, 2, 3]
@@ -399,6 +485,13 @@ func (al *ArrayLiteral) String() string {
 
 	return out.String()
 }
+func (al *ArrayLiteral) Pos() token.Position { return al.Token.Position }
+func (al *ArrayLiteral) End() token.Position {
+	if len(al.Elements) > 0 {
+		return al.Elements[len(al.Elements)-1].End()
+	}
+	return al.Token.Position
+}
 
 // IndexExpression, bir dizin ifadesini temsil eder.
 // Örnek: myArray[1]
@@ -421,6 +514,8 @@ func (ie *IndexExpression) String() string {
 
 	return out.String()
 }
+func (ie *IndexExpression) Pos() token.Position { return ie.Left.Pos() }
+func (ie *IndexExpression) End() token.Position { return ie.Index.End() }
 
 // HashLiteral, bir hash değişmez değerini temsil eder.
 // Örnek: {"one": 1, "two": 2}
@@ -445,6 +540,8 @@ func (hl *HashLiteral) String() string {
 
 	return out.String()
 }
+func (hl *HashLiteral) Pos() token.Position { return hl.Token.Position }
+func (hl *HashLiteral) End() token.Position { return hl.Token.Position }
 
 // ForStatement, bir for döngüsünü temsil eder.
 // Örnek: for i := 0; i < 10; i++ { ... }
@@ -482,6 +579,8 @@ func (fs *ForStatement) String() string {
 
 	return out.String()
 }
+func (fs *ForStatement) Pos() token.Position { return fs.Token.Position }
+func (fs *ForStatement) End() token.Position { return fs.Body.End() }
 
 // WhileStatement, bir while döngüsünü temsil eder.
 // Örnek: while (x < 10) { ... }
@@ -503,6 +602,8 @@ func (ws *WhileStatement) String() string {
 
 	return out.String()
 }
+func (ws *WhileStatement) Pos() token.Position { return ws.Token.Position }
+func (ws *WhileStatement) End() token.Position { return ws.Body.End() }
 
 // ClassStatement, bir sınıf tanımını temsil eder.
 // Örnek: class Person { ... }
@@ -541,6 +642,8 @@ func (cs *ClassStatement) String() string {
 
 	return out.String()
 }
+func (cs *ClassStatement) Pos() token.Position { return cs.Token.Position }
+func (cs *ClassStatement) End() token.Position { return cs.Body.End() }
 
 // MethodStatement, bir metot tanımını temsil eder.
 // Örnek: func (p Person) sayHello() { ... }
@@ -580,6 +683,8 @@ func (ms *MethodStatement) String() string {
 
 	return out.String()
 }
+func (ms *MethodStatement) Pos() token.Position { return ms.Token.Position }
+func (ms *MethodStatement) End() token.Position { return ms.Body.End() }
 
 // TryCatchStatement, bir try-catch ifadesini temsil eder.
 // Örnek: try { ... } catch (e Error) { ... } finally { ... }
@@ -609,6 +714,16 @@ func (tcs *TryCatchStatement) String() string {
 	}
 
 	return out.String()
+}
+func (tcs *TryCatchStatement) Pos() token.Position { return tcs.Token.Position }
+func (tcs *TryCatchStatement) End() token.Position {
+	if tcs.Finally != nil {
+		return tcs.Finally.End()
+	}
+	if len(tcs.Catches) > 0 {
+		return tcs.Catches[len(tcs.Catches)-1].End()
+	}
+	return tcs.Try.End()
 }
 
 // CatchClause, bir catch bloğunu temsil eder.
@@ -644,6 +759,8 @@ func (cc *CatchClause) String() string {
 
 	return out.String()
 }
+func (cc *CatchClause) Pos() token.Position { return cc.Token.Position }
+func (cc *CatchClause) End() token.Position { return cc.Body.End() }
 
 // ThrowStatement, bir throw ifadesini temsil eder.
 // Örnek: throw new Error("message")
@@ -663,6 +780,8 @@ func (ts *ThrowStatement) String() string {
 
 	return out.String()
 }
+func (ts *ThrowStatement) Pos() token.Position { return ts.Token.Position }
+func (ts *ThrowStatement) End() token.Position { return ts.Value.End() }
 
 // ScopeStatement, bir scope ifadesini temsil eder.
 // Örnek: scope { ... }
@@ -681,6 +800,8 @@ func (ss *ScopeStatement) String() string {
 
 	return out.String()
 }
+func (ss *ScopeStatement) Pos() token.Position { return ss.Token.Position }
+func (ss *ScopeStatement) End() token.Position { return ss.Body.End() }
 
 // TemplateExpression, bir şablon ifadesini temsil eder.
 // Örnek: template<T> func add(a T, b T) T { return a + b; }
@@ -707,6 +828,8 @@ func (te *TemplateExpression) String() string {
 
 	return out.String()
 }
+func (te *TemplateExpression) Pos() token.Position { return te.Token.Position }
+func (te *TemplateExpression) End() token.Position { return te.Body.End() }
 
 // NewExpression, bir new ifadesini temsil eder.
 // Örnek: new Person("John", 30)
@@ -734,6 +857,13 @@ func (ne *NewExpression) String() string {
 
 	return out.String()
 }
+func (ne *NewExpression) Pos() token.Position { return ne.Token.Position }
+func (ne *NewExpression) End() token.Position {
+	if len(ne.Arguments) > 0 {
+		return ne.Arguments[len(ne.Arguments)-1].End()
+	}
+	return ne.Class.End()
+}
 
 // MemberExpression, bir üye erişim ifadesini temsil eder.
 // Örnek: person.name, person->name
@@ -760,6 +890,8 @@ func (me *MemberExpression) String() string {
 
 	return out.String()
 }
+func (me *MemberExpression) Pos() token.Position { return me.Object.Pos() }
+func (me *MemberExpression) End() token.Position { return me.Member.End() }
 
 // PackageStatement, bir paket bildirimini temsil eder.
 // Örnek: package main
@@ -776,6 +908,8 @@ func (ps *PackageStatement) String() string {
 	out.WriteString(ps.Name.String())
 	return out.String()
 }
+func (ps *PackageStatement) Pos() token.Position { return ps.Token.Position }
+func (ps *PackageStatement) End() token.Position { return ps.Name.End() }
 
 // ImportStatement, bir import bildirimini temsil eder.
 // Örnek: import "fmt"
@@ -792,3 +926,5 @@ func (is *ImportStatement) String() string {
 	out.WriteString(is.Path.String())
 	return out.String()
 }
+func (is *ImportStatement) Pos() token.Position { return is.Token.Position }
+func (is *ImportStatement) End() token.Position { return is.Path.End() }

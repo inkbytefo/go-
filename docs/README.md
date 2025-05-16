@@ -1,48 +1,48 @@
-# GO-Minus Belgelendirmesi
+# GO-Minus Documentation
 
-Bu dizin, GO-Minus programlama dili için resmi belgelendirmeyi içermektedir. GO-Minus, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle genişletilmiş bir programlama dilidir.
+This directory contains the official documentation for the GO-Minus programming language. GO-Minus is a programming language that includes all features of the Go programming language and extends it with C++-like features.
 
-## İçindekiler
+## Contents
 
-- [Başlangıç Rehberi](tutorial/getting-started.md) - GO-Minus'u kullanmaya başlamak için adım adım rehber
-- [Dil Referansı](reference/README.md) - GO-Minus dilinin kapsamlı referansı
-- [Standart Kütüphane](stdlib-reference.md) - GO-Minus standart kütüphanesinin referansı
-- [Neden GO-Minus?](why-gominus.md) - GO-Minus'un avantajları ve kullanım senaryoları
-- [En İyi Uygulamalar](best-practices.md) - GO-Minus ile geliştirme yaparken izlenmesi gereken en iyi uygulamalar
-- [SSS](faq.md) - Sık sorulan sorular ve cevapları
-- [Örnekler](examples/) - GO-Minus ile yazılmış örnek projeler ve kod parçaları
-- [Dil Grameri](grammar.ebnf) - GO-Minus dilinin EBNF formatında resmi grameri
-- [Geliştirme Araçları](tools.md) - GO-Minus geliştirme araçları hakkında bilgiler
-- [Geliştirme İlerleme Raporu](development-progress.md) - GO-Minus geliştirme sürecinin ilerleme durumu
+- [Getting Started Guide](tutorial/getting-started.md) - Step-by-step guide to start using GO-Minus
+- [Language Reference](reference/README.md) - Comprehensive reference of the GO-Minus language
+- [Standard Library](stdlib-reference.md) - Reference for the GO-Minus standard library
+- [Why GO-Minus?](why-gominus.md) - Advantages and use cases of GO-Minus
+- [Best Practices](best-practices.md) - Best practices to follow when developing with GO-Minus
+- [FAQ](faq.md) - Frequently asked questions and answers
+- [Examples](examples/) - Example projects and code snippets written in GO-Minus
+- [Language Grammar](grammar.ebnf) - Formal grammar of the GO-Minus language in EBNF format
+- [Development Tools](tools.md) - Information about GO-Minus development tools
+- [Development Progress Report](development-progress.md) - Progress status of the GO-Minus development process
 
-## Başlangıç
+## Getting Started
 
-GO-Minus'u öğrenmeye yeni başlayanlar için, [Başlangıç Rehberi](tutorial/getting-started.md) ile başlamanızı öneririz. Bu rehber, GO-Minus'u kurma, ilk programınızı yazma ve temel dil özelliklerini öğrenme konularında size yardımcı olacaktır.
+For those new to learning GO-Minus, we recommend starting with the [Getting Started Guide](tutorial/getting-started.md). This guide will help you install GO-Minus, write your first program, and learn the basic language features.
 
-## Dil Referansı
+## Language Reference
 
-GO-Minus dilinin tüm özelliklerini öğrenmek için [Dil Referansı](reference/README.md) belgesini inceleyebilirsiniz. Bu belge, sözdizimi, veri tipleri, operatörler, kontrol yapıları, fonksiyonlar, sınıflar, şablonlar, istisna işleme ve diğer dil özelliklerini kapsamlı bir şekilde açıklamaktadır.
+To learn all the features of the GO-Minus language, you can explore the [Language Reference](reference/README.md) document. This document comprehensively explains syntax, data types, operators, control structures, functions, classes, templates, exception handling, and other language features.
 
-## Standart Kütüphane
+## Standard Library
 
-GO-Minus standart kütüphanesinin tüm bileşenlerini öğrenmek için [Standart Kütüphane](stdlib-reference.md) belgesini inceleyebilirsiniz. Bu belge, temel I/O işlemleri, veri yapıları, ağ programlama, zaman işlemleri ve diğer standart kütüphane bileşenlerini kapsamlı bir şekilde açıklamaktadır.
+To learn all the components of the GO-Minus standard library, you can explore the [Standard Library](stdlib-reference.md) document. This document comprehensively explains basic I/O operations, data structures, network programming, time operations, and other standard library components.
 
-## Örnekler
+## Examples
 
-GO-Minus'un pratik kullanımını görmek için [Örnekler](examples/) dizinindeki örnek projeleri ve kod parçalarını inceleyebilirsiniz. Bu örnekler, GO-Minus'un çeşitli kullanım senaryolarını ve özelliklerini göstermektedir.
+To see the practical use of GO-Minus, you can explore the example projects and code snippets in the [Examples](examples/) directory. These examples demonstrate various use cases and features of GO-Minus.
 
-## Geliştirme Araçları
+## Development Tools
 
-GO-Minus ile geliştirme yaparken kullanabileceğiniz araçlar hakkında bilgi almak için [Geliştirme Araçları](tools.md) belgesini inceleyebilirsiniz. Bu belge, derleyici, paket yöneticisi, test aracı, belgelendirme aracı ve diğer geliştirme araçlarını açıklamaktadır.
+To get information about the tools you can use when developing with GO-Minus, you can explore the [Development Tools](tools.md) document. This document explains the compiler, package manager, testing tool, documentation tool, and other development tools.
 
-## Geliştirme İlerleme Raporu
+## Development Progress Report
 
-GO-Minus programlama dilinin geliştirme sürecinin ilerleme durumunu görmek için [Geliştirme İlerleme Raporu](development-progress.md) belgesini inceleyebilirsiniz. Bu belge, tamamlanan, devam eden ve planlanan geliştirme görevlerini listelemektedir.
+To see the progress status of the development process of the GO-Minus programming language, you can explore the [Development Progress Report](development-progress.md) document. This document lists completed, ongoing, and planned development tasks.
 
-## Katkıda Bulunma
+## Contributing
 
-GO-Minus belgelendirmesine katkıda bulunmak için, lütfen [Katkı Sağlama Rehberi](../CONTRIBUTING.md) belgesini okuyun. Belgelendirmede hata bulursanız veya iyileştirme önerileriniz varsa, lütfen [GitHub Issues](https://github.com/gominus/gominus/issues) üzerinden bildirimde bulunun.
+To contribute to the GO-Minus documentation, please read the [Contribution Guide](../CONTRIBUTING.md) document. If you find errors in the documentation or have suggestions for improvement, please report them via [GitHub Issues](https://github.com/gominus/gominus/issues).
 
-## Lisans
+## License
 
-GO-Minus belgelendirmesi, [MIT Lisansı](../LICENSE) altında lisanslanmıştır.
+The GO-Minus documentation is licensed under the [MIT License](../LICENSE).

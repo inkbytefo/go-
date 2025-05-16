@@ -1,0 +1,235 @@
+// GO-Minus Standart Kütüphane - Heap Paketi
+package heap
+
+// Heap, bir öncelik kuyruğu implementasyonudur.
+// Bu implementasyon, Go'nun container/heap paketini temel alır ancak
+// GO-Minus'ın şablon özelliklerini kullanarak tip güvenliği sağlar.
+class Heap<T> {
+    private var elements []T
+    private var size int
+    private var less func(T, T) bool // Karşılaştırma fonksiyonu
+
+    // New, belirtilen karşılaştırma fonksiyonunu kullanarak yeni bir Heap oluşturur.
+    // less fonksiyonu, iki eleman arasındaki öncelik ilişkisini belirler.
+    // Eğer less(a, b) true ise, a elemanı b elemanından daha yüksek önceliğe sahiptir.
+    static func New<T>(less func(T, T) bool) *Heap<T> {
+        h := new Heap<T>()
+        h.elements = make([]T, 0)
+        h.size = 0
+        h.less = less
+        return h
+    }
+
+    // Size, heap'teki eleman sayısını döndürür.
+    func (h *Heap<T>) Size() int {
+        return h.size
+    }
+
+    // IsEmpty, heap'in boş olup olmadığını kontrol eder.
+    func (h *Heap<T>) IsEmpty() bool {
+        return h.size == 0
+    }
+
+    // Push, heap'e bir eleman ekler.
+    func (h *Heap<T>) Push(element T) {
+        h.elements = append(h.elements, element)
+        h.size++
+        h.siftUp(h.size - 1)
+    }
+
+    // Pop, heap'ten en yüksek önceliğe sahip elemanı çıkarır ve döndürür.
+    // Eğer heap boşsa, panik oluşturur.
+    func (h *Heap<T>) Pop() T {
+        if h.size == 0 {
+            throw "heap: Pop called on empty heap"
+        }
+        
+        root := h.elements[0]
+        h.elements[0] = h.elements[h.size-1]
+        h.elements = h.elements[:h.size-1]
+        h.size--
+        
+        if h.size > 0 {
+            h.siftDown(0)
+        }
+        
+        return root
+    }
+
+    // Peek, heap'teki en yüksek önceliğe sahip elemanı döndürür ancak çıkarmaz.
+    // Eğer heap boşsa, panik oluşturur.
+    func (h *Heap<T>) Peek() T {
+        if h.size == 0 {
+            throw "heap: Peek called on empty heap"
+        }
+        return h.elements[0]
+    }
+
+    // Clear, heap'teki tüm elemanları kaldırır.
+    func (h *Heap<T>) Clear() {
+        h.elements = h.elements[:0]
+        h.size = 0
+    }
+
+    // Contains, heap'in belirtilen elemanı içerip içermediğini kontrol eder.
+    func (h *Heap<T>) Contains(element T) bool {
+        for i := 0; i < h.size; i++ {
+            if h.elements[i] == element {
+                return true
+            }
+        }
+        return false
+    }
+
+    // ToArray, heap'teki elemanları bir dizi olarak döndürür.
+    // Döndürülen dizi, heap özelliğini korumaz.
+    func (h *Heap<T>) ToArray() []T {
+        result := make([]T, h.size)
+        for i := 0; i < h.size; i++ {
+            result[i] = h.elements[i]
+        }
+        return result
+    }
+
+    // FromArray, verilen diziyi kullanarak heap'i oluşturur.
+    // Bu işlem, O(n) zamanda gerçekleşir.
+    func (h *Heap<T>) FromArray(arr []T) {
+        h.elements = make([]T, len(arr))
+        for i := 0; i < len(arr); i++ {
+            h.elements[i] = arr[i]
+        }
+        h.size = len(arr)
+        
+        // Heap özelliğini sağlamak için, yaprak olmayan tüm düğümleri aşağı doğru eleyerek heap'i oluştur
+        for i := h.size/2 - 1; i >= 0; i-- {
+            h.siftDown(i)
+        }
+    }
+
+    // siftUp, belirtilen indeksteki elemanı, heap özelliğini koruyacak şekilde yukarı doğru taşır.
+    private func (h *Heap<T>) siftUp(index int) {
+        parent := (index - 1) / 2
+        
+        if index > 0 && h.less(h.elements[index], h.elements[parent]) {
+            h.swap(index, parent)
+            h.siftUp(parent)
+        }
+    }
+
+    // siftDown, belirtilen indeksteki elemanı, heap özelliğini koruyacak şekilde aşağı doğru taşır.
+    private func (h *Heap<T>) siftDown(index int) {
+        smallest := index
+        left := 2*index + 1
+        right := 2*index + 2
+        
+        if left < h.size && h.less(h.elements[left], h.elements[smallest]) {
+            smallest = left
+        }
+        
+        if right < h.size && h.less(h.elements[right], h.elements[smallest]) {
+            smallest = right
+        }
+        
+        if smallest != index {
+            h.swap(index, smallest)
+            h.siftDown(smallest)
+        }
+    }
+
+    // swap, belirtilen indekslerdeki elemanları değiştirir.
+    private func (h *Heap<T>) swap(i, j int) {
+        h.elements[i], h.elements[j] = h.elements[j], h.elements[i]
+    }
+}
+
+// MinHeap, minimum öncelik kuyruğu oluşturmak için kullanılır.
+// En küçük eleman, en yüksek önceliğe sahiptir.
+class MinHeap<T> {
+    private var heap *Heap<T>
+
+    // New, yeni bir MinHeap oluşturur.
+    // T tipi, < operatörünü desteklemelidir.
+    static func New<T>() *MinHeap<T> {
+        m := new MinHeap<T>()
+        m.heap = Heap.New<T>(func(a, b T) bool {
+            return a < b
+        })
+        return m
+    }
+
+    // Push, heap'e bir eleman ekler.
+    func (m *MinHeap<T>) Push(element T) {
+        m.heap.Push(element)
+    }
+
+    // Pop, heap'ten en küçük elemanı çıkarır ve döndürür.
+    func (m *MinHeap<T>) Pop() T {
+        return m.heap.Pop()
+    }
+
+    // Peek, heap'teki en küçük elemanı döndürür ancak çıkarmaz.
+    func (m *MinHeap<T>) Peek() T {
+        return m.heap.Peek()
+    }
+
+    // Size, heap'teki eleman sayısını döndürür.
+    func (m *MinHeap<T>) Size() int {
+        return m.heap.Size()
+    }
+
+    // IsEmpty, heap'in boş olup olmadığını kontrol eder.
+    func (m *MinHeap<T>) IsEmpty() bool {
+        return m.heap.IsEmpty()
+    }
+
+    // Clear, heap'teki tüm elemanları kaldırır.
+    func (m *MinHeap<T>) Clear() {
+        m.heap.Clear()
+    }
+}
+
+// MaxHeap, maksimum öncelik kuyruğu oluşturmak için kullanılır.
+// En büyük eleman, en yüksek önceliğe sahiptir.
+class MaxHeap<T> {
+    private var heap *Heap<T>
+
+    // New, yeni bir MaxHeap oluşturur.
+    // T tipi, > operatörünü desteklemelidir.
+    static func New<T>() *MaxHeap<T> {
+        m := new MaxHeap<T>()
+        m.heap = Heap.New<T>(func(a, b T) bool {
+            return a > b
+        })
+        return m
+    }
+
+    // Push, heap'e bir eleman ekler.
+    func (m *MaxHeap<T>) Push(element T) {
+        m.heap.Push(element)
+    }
+
+    // Pop, heap'ten en büyük elemanı çıkarır ve döndürür.
+    func (m *MaxHeap<T>) Pop() T {
+        return m.heap.Pop()
+    }
+
+    // Peek, heap'teki en büyük elemanı döndürür ancak çıkarmaz.
+    func (m *MaxHeap<T>) Peek() T {
+        return m.heap.Peek()
+    }
+
+    // Size, heap'teki eleman sayısını döndürür.
+    func (m *MaxHeap<T>) Size() int {
+        return m.heap.Size()
+    }
+
+    // IsEmpty, heap'in boş olup olmadığını kontrol eder.
+    func (m *MaxHeap<T>) IsEmpty() bool {
+        return m.heap.IsEmpty()
+    }
+
+    // Clear, heap'teki tüm elemanları kaldırır.
+    func (m *MaxHeap<T>) Clear() {
+        m.heap.Clear()
+    }
+}

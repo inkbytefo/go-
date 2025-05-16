@@ -29,8 +29,8 @@ GO-Minus JetBrains Eklentisi, GO-Minus programlama dili için IntelliJ IDEA, GoL
 1. JetBrains IDE'nizi açın
 2. "File" > "Settings" > "Plugins" menüsünü açın
 3. "Marketplace" sekmesine tıklayın
-4. "GO+" araması yapın
-5. "GO+ Language Support" eklentisini bulun ve "Install" düğmesine tıklayın
+4. "GO-Minus" araması yapın
+5. "GO-Minus Language Support" eklentisini bulun ve "Install" düğmesine tıklayın
 6. IDE'yi yeniden başlatın
 
 ### ZIP Dosyasından Kurulum
@@ -46,7 +46,7 @@ GO-Minus JetBrains Eklentisi, GO-Minus programlama dili için IntelliJ IDEA, GoL
 
 ### Sözdizimi Vurgulama
 
-GO+ dosyaları (`.gop` uzantılı) otomatik olarak sözdizimi vurgulaması ile açılır.
+GO-Minus dosyaları (`.gom` uzantılı) otomatik olarak sözdizimi vurgulaması ile açılır.
 
 ### Kod Tamamlama
 
@@ -66,9 +66,9 @@ Bir belgeyi biçimlendirmek için, `Ctrl+Alt+L` (veya `Cmd+Alt+L`) tuşlarına b
 
 ### Hata Ayıklama
 
-1. Hata ayıklamak istediğiniz GO+ dosyasını açın
+1. Hata ayıklamak istediğiniz GO-Minus dosyasını açın
 2. Çalıştırma yapılandırması oluşturun ("Run" > "Edit Configurations...")
-3. "+" düğmesine tıklayın ve "GO+" seçeneğini seçin
+3. "+" düğmesine tıklayın ve "GO-Minus" seçeneğini seçin
 4. Yapılandırmayı adlandırın ve "OK" düğmesine tıklayın
 5. Kesme noktaları ayarlamak için, satır numarasının solundaki boşluğa tıklayın
 6. "Run" > "Debug" menüsünü seçin veya `Shift+F9` tuşlarına basın
@@ -76,19 +76,19 @@ Bir belgeyi biçimlendirmek için, `Ctrl+Alt+L` (veya `Cmd+Alt+L`) tuşlarına b
 
 ### Testleri Çalıştırma
 
-1. Test dosyasını açın (`*_test.gop`)
+1. Test dosyasını açın (`*_test.gom`)
 2. Test fonksiyonunun yanındaki yeşil "Run" düğmesine tıklayın veya sağ tıklayıp "Run" seçeneğini seçin
 
 ## Yapılandırma
 
-Eklentiyi yapılandırmak için, "File" > "Settings" > "Languages & Frameworks" > "GO+" menüsünü açın.
+Eklentiyi yapılandırmak için, "File" > "Settings" > "Languages & Frameworks" > "GO-Minus" menüsünü açın.
 
 ### Dil Sunucusu Yolu
 
 Dil sunucusu yolunu belirtin:
 
 ```
-goplsp
+gomlsp
 ```
 
 ### Hata Ayıklama Aracı Yolu
@@ -96,12 +96,12 @@ goplsp
 Hata ayıklama aracı yolunu belirtin:
 
 ```
-gopdebug
+gomdebug
 ```
 
 ### Kod Stili
 
-GO+ kod stilini özelleştirin:
+GO-Minus kod stilini özelleştirin:
 
 - Girinti boyutu
 - Sekme kullanımı
@@ -121,20 +121,20 @@ Denetleyici seçeneklerini özelleştirin:
 
 ### Dil Sunucusu Başlatılamıyor
 
-1. `goplsp` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
+1. `gomlsp` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
 2. IDE'yi yeniden başlatın
 3. Dil sunucusu yapılandırmasını kontrol edin
 
 ### Hata Ayıklama Aracı Başlatılamıyor
 
-1. `gopdebug` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
+1. `gomdebug` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
 2. IDE'yi yeniden başlatın
 3. Hata ayıklama yapılandırmasını kontrol edin
 
 ## Katkıda Bulunma
 
-GO+ JetBrains Eklentisi, açık kaynaklı bir projedir. Katkıda bulunmak için, lütfen [katkı sağlama rehberini](../../CONTRIBUTING.md) okuyun.
+GO-Minus JetBrains Eklentisi, açık kaynaklı bir projedir. Katkıda bulunmak için, lütfen [katkı sağlama rehberini](../../CONTRIBUTING.md) okuyun.
 
 ## Lisans
 
-GO+ JetBrains Eklentisi, GO+ projesi ile aynı lisans altında dağıtılmaktadır.
+GO-Minus JetBrains Eklentisi, GO-Minus projesi ile aynı lisans altında dağıtılmaktadır.

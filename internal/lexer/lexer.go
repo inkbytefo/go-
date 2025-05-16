@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	"gominus/internal/token"
+	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // Lexer holds the state of the scanner.

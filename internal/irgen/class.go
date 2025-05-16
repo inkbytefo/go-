@@ -2,7 +2,8 @@ package irgen
 
 import (
 	"fmt"
-	"goplus/internal/ast"
+
+	"github.com/inkbytefo/go-minus/internal/ast"
 
 	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/constant"
@@ -53,8 +54,8 @@ func (g *IRGenerator) generateClassStatement(stmt *ast.ClassStatement) {
 	}
 
 	// Ebeveyn sınıfı varsa, onu işle
-	if stmt.Parent != nil {
-		parentName := stmt.Parent.Value
+	if stmt.Extends != nil {
+		parentName := stmt.Extends.Value
 		if parentInfo, exists := g.classTable[parentName]; exists {
 			classInfo.Parent = parentInfo
 		} else {
@@ -63,7 +64,7 @@ func (g *IRGenerator) generateClassStatement(stmt *ast.ClassStatement) {
 	}
 
 	// Arayüzleri işle
-	for _, iface := range stmt.Interfaces {
+	for _, iface := range stmt.Implements {
 		ifaceName := iface.Value
 		if ifaceInfo, exists := g.classTable[ifaceName]; exists {
 			classInfo.Interfaces = append(classInfo.Interfaces, ifaceInfo)
@@ -248,7 +249,13 @@ func (g *IRGenerator) generateClassStatement(stmt *ast.ClassStatement) {
 // generateNewExpression, bir new ifadesi için IR üretir.
 func (g *IRGenerator) generateNewExpression(expr *ast.NewExpression) value.Value {
 	// Sınıf adını al
-	className := expr.Type.Value
+	var className string
+	if classIdent, ok := expr.Class.(*ast.Identifier); ok {
+		className = classIdent.Value
+	} else {
+		g.ReportError("Sınıf adı bir tanımlayıcı olmalıdır")
+		return nil
+	}
 
 	// Sınıf bilgisini bul
 	classInfo, exists := g.classTable[className]
@@ -318,7 +325,13 @@ func (g *IRGenerator) generateMemberExpression(expr *ast.MemberExpression) value
 	}
 
 	// Üye adını al
-	memberName := expr.Property.Value
+	var memberName string
+	if memberIdent, ok := expr.Member.(*ast.Identifier); ok {
+		memberName = memberIdent.Value
+	} else {
+		g.ReportError("Üye adı bir tanımlayıcı olmalıdır")
+		return nil
+	}
 
 	// Nesnenin tipini kontrol et
 	objType := obj.Type()

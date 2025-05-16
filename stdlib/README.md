@@ -1,6 +1,6 @@
-# GO+ Standart Kütüphanesi
+# GO-Minus Standart Kütüphanesi
 
-Bu dizin, GO+ programlama dili için standart kütüphaneyi içerir. GO+ standart kütüphanesi, Go'nun standart kütüphanesini temel alır ve GO+'ın sınıf, şablon ve istisna işleme gibi özelliklerini kullanarak genişletilmiştir.
+Bu dizin, GO-Minus programlama dili için standart kütüphaneyi içerir. GO-Minus standart kütüphanesi, Go'nun standart kütüphanesini temel alır ve GO-Minus'ın sınıf, şablon ve istisna işleme gibi özelliklerini kullanarak genişletilmiştir.
 
 ## Paketler
 
@@ -34,7 +34,7 @@ Dize işleme fonksiyonları.
 
 ## Kullanım
 
-GO+ standart kütüphanesindeki paketleri kullanmak için, GO+ programınızda ilgili paketi import etmeniz yeterlidir:
+GO-Minus standart kütüphanesindeki paketleri kullanmak için, GO-Minus programınızda ilgili paketi import etmeniz yeterlidir:
 
 ```go
 import "fmt"
@@ -60,4 +60,4 @@ func main() {
 
 ## Geliştirme
 
-GO+ standart kütüphanesi, GO+ dilinin gelişimiyle birlikte sürekli olarak genişletilmektedir. Yeni paketler ve fonksiyonlar eklenmeye devam edilecektir.
+GO-Minus standart kütüphanesi, GO-Minus dilinin gelişimiyle birlikte sürekli olarak genişletilmektedir. Yeni paketler ve fonksiyonlar eklenmeye devam edilecektir.

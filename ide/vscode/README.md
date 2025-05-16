@@ -1,6 +1,6 @@
-# GO+ VS Code Eklentisi
+# GO-Minus VS Code Eklentisi
 
-GO+ VS Code Eklentisi, GO+ programlama dili için Visual Studio Code desteği sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme, hata ayıklama gibi özellikler sunar.
+GO-Minus VS Code Eklentisi, GO-Minus programlama dili için Visual Studio Code desteği sağlar. Bu eklenti, sözdizimi vurgulama, kod tamamlama, hata işaretleme, tanıma gitme, hata ayıklama gibi özellikler sunar.
 
 ## Özellikler
 
@@ -18,15 +18,15 @@ GO+ VS Code Eklentisi, GO+ programlama dili için Visual Studio Code desteği sa
 
 ### Ön Koşullar
 
-- GO+ derleyicisi ve araçları yüklü olmalıdır.
-- `goplsp` (GO+ Dil Sunucusu) ve `gopdebug` (GO+ Hata Ayıklama Aracı) PATH ortam değişkeninizde bulunmalıdır.
+- GO-Minus derleyicisi ve araçları yüklü olmalıdır.
+- `gomlsp` (GO-Minus Dil Sunucusu) ve `gomdebug` (GO-Minus Hata Ayıklama Aracı) PATH ortam değişkeninizde bulunmalıdır.
 
 ### VS Code Marketplace'den Kurulum
 
 1. VS Code'u açın
 2. Uzantılar görünümünü açın (`Ctrl+Shift+X` veya `Cmd+Shift+X`)
-3. "GO+" araması yapın
-4. "GO+ Language Support" eklentisini bulun ve "Install" düğmesine tıklayın
+3. "GO-Minus" araması yapın
+4. "GO-Minus Language Support" eklentisini bulun ve "Install" düğmesine tıklayın
 
 ### VSIX Dosyasından Kurulum
 
@@ -40,7 +40,7 @@ GO+ VS Code Eklentisi, GO+ programlama dili için Visual Studio Code desteği sa
 
 ### Sözdizimi Vurgulama
 
-GO+ dosyaları (`.gop` uzantılı) otomatik olarak sözdizimi vurgulaması ile açılır.
+GO-Minus dosyaları (`.gom` uzantılı) otomatik olarak sözdizimi vurgulaması ile açılır.
 
 ### Kod Tamamlama
 
@@ -60,69 +60,69 @@ Bir belgeyi biçimlendirmek için, `Shift+Alt+F` tuşlarına basın veya sağ t�
 
 ### Hata Ayıklama
 
-1. Hata ayıklamak istediğiniz GO+ dosyasını açın
+1. Hata ayıklamak istediğiniz GO-Minus dosyasını açın
 2. `F5` tuşuna basın veya "Run" menüsünden "Start Debugging" seçeneğini seçin
-3. Hata ayıklama yapılandırmasını seçin (ilk kez çalıştırıyorsanız, "GO+ Programını Çalıştır" seçeneğini seçin)
+3. Hata ayıklama yapılandırmasını seçin (ilk kez çalıştırıyorsanız, "GO-Minus Programını Çalıştır" seçeneğini seçin)
 4. Kesme noktaları ayarlamak için, satır numarasının solundaki boşluğa tıklayın
 5. Hata ayıklama araç çubuğunu kullanarak programı adım adım çalıştırın
 
 ### Testleri Çalıştırma
 
-1. Test dosyasını açın (`*_test.gop`)
-2. Sağ tıklayın ve "GO+: Testleri Çalıştır" seçeneğini seçin
+1. Test dosyasını açın (`*_test.gom`)
+2. Sağ tıklayın ve "GO-Minus: Testleri Çalıştır" seçeneğini seçin
 
 ## Yapılandırma
 
-Eklentiyi yapılandırmak için, VS Code ayarlarını açın (`Ctrl+,` veya `Cmd+,`) ve "GO+" araması yapın.
+Eklentiyi yapılandırmak için, VS Code ayarlarını açın (`Ctrl+,` veya `Cmd+,`) ve "GO-Minus" araması yapın.
 
 ### Dil Sunucusu Yolu
 
 ```json
-"goplus.languageServerPath": "goplsp"
+"gominus.languageServerPath": "gomlsp"
 ```
 
 ### Hata Ayıklama Aracı Yolu
 
 ```json
-"goplus.debuggerPath": "gopdebug"
+"gominus.debuggerPath": "gomdebug"
 ```
 
 ### Kaydetme Sırasında Biçimlendirme
 
 ```json
-"goplus.formatOnSave": true
+"gominus.formatOnSave": true
 ```
 
 ### Kaydetme Sırasında Denetleme
 
 ```json
-"goplus.lintOnSave": true
+"gominus.lintOnSave": true
 ```
 
 ### Kaydetme Sırasında Test Çalıştırma
 
 ```json
-"goplus.testOnSave": false
+"gominus.testOnSave": false
 ```
 
 ## Sorun Giderme
 
 ### Dil Sunucusu Başlatılamıyor
 
-1. `goplsp` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
+1. `gomlsp` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
 2. VS Code'u yeniden başlatın
-3. Dil sunucusunu manuel olarak başlatmak için, komut paletini açın (`Ctrl+Shift+P` veya `Cmd+Shift+P`) ve "GO+: Dil Sunucusunu Başlat" komutunu çalıştırın
+3. Dil sunucusunu manuel olarak başlatmak için, komut paletini açın (`Ctrl+Shift+P` veya `Cmd+Shift+P`) ve "GO-Minus: Dil Sunucusunu Başlat" komutunu çalıştırın
 
 ### Hata Ayıklama Aracı Başlatılamıyor
 
-1. `gopdebug` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
+1. `gomdebug` komutunun PATH ortam değişkeninizde olduğunu kontrol edin
 2. VS Code'u yeniden başlatın
 3. Hata ayıklama yapılandırmasını kontrol edin
 
 ## Katkıda Bulunma
 
-GO+ VS Code Eklentisi, açık kaynaklı bir projedir. Katkıda bulunmak için, lütfen [katkı sağlama rehberini](../../CONTRIBUTING.md) okuyun.
+GO-Minus VS Code Eklentisi, açık kaynaklı bir projedir. Katkıda bulunmak için, lütfen [katkı sağlama rehberini](../../CONTRIBUTING.md) okuyun.
 
 ## Lisans
 
-GO+ VS Code Eklentisi, GO+ projesi ile aynı lisans altında dağıtılmaktadır.
+GO-Minus VS Code Eklentisi, GO-Minus projesi ile aynı lisans altında dağıtılmaktadır.

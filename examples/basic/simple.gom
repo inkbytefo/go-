@@ -1,0 +1,13 @@
+// Basit bir GO-Minus programı
+package main
+
+import "fmt"
+
+func main() {
+    var x int = 10
+    var y int = 20
+    
+    z := x + y
+    
+    fmt.Println("Toplam:", z)
+}

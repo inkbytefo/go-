@@ -1,0 +1,44 @@
+# Derlenmiş dosyalar
+*.exe
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+*.ll
+
+# Test binary, built with `go test -c`
+*.test
+
+# Çıktı dosyaları
+*.out
+
+# Go özel
+/vendor/
+/Godeps/
+
+# IDE dosyaları
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS özel
+.DS_Store
+Thumbs.db
+
+# Geçici dosyalar
+*.tmp
+*.temp
+*.log
+
+# Derlenmiş Go paketleri
+*.pkg
+
+# Çalışma dizini
+/bin/
+/out/
+
+# Özel
+goplus.exe

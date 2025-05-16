@@ -2,8 +2,9 @@ package semantic
 
 import (
 	"fmt"
-	"gominus/internal/token"
 	"strings"
+
+	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // ErrorLevel, hata seviyesini temsil eder.

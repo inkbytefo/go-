@@ -1,4 +1,4 @@
-module gominus
+module github.com/inkbytefo/go-minus
 
 go 1.24.1
 

@@ -2,10 +2,11 @@ package parser
 
 import (
 	"fmt"
-	"goplus/internal/ast"
-	"goplus/internal/lexer"
-	"goplus/internal/token"
 	"strconv"
+
+	"github.com/inkbytefo/go-minus/internal/ast"
+	"github.com/inkbytefo/go-minus/internal/lexer"
+	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // Operatör öncelik seviyeleri

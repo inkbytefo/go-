@@ -10,7 +10,7 @@ import (
 
 // Komut satırı bayrakları
 var (
-	initCmd      = flag.Bool("init", false, "Yeni bir GO+ projesi başlat")
+	initCmd      = flag.Bool("init", false, "Yeni bir GO-Minus projesi başlat")
 	installCmd   = flag.Bool("install", false, "Belirtilen paketleri yükle")
 	uninstallCmd = flag.Bool("uninstall", false, "Belirtilen paketleri kaldır")
 	updateCmd    = flag.Bool("update", false, "Belirtilen paketleri güncelle")
@@ -29,7 +29,7 @@ func main() {
 
 	// Sürüm bilgisini göster
 	if *versionCmd {
-		fmt.Printf("GO+ Paket Yöneticisi v%s\n", version)
+		fmt.Printf("GO-Minus Paket Yöneticisi v%s\n", version)
 		os.Exit(0)
 	}
 
@@ -60,7 +60,7 @@ func main() {
 	}
 }
 
-// Yeni bir GO+ projesi başlat
+// Yeni bir GO-Minus projesi başlat
 func initProject() {
 	// Proje adını al
 	var projectName string
@@ -76,14 +76,14 @@ func initProject() {
 		projectName = filepath.Base(currentDir)
 	}
 
-	// gop.mod dosyasını oluştur
-	modFile := "gop.mod"
+	// gom.mod dosyasını oluştur
+	modFile := "gom.mod"
 	if _, err := os.Stat(modFile); err == nil {
 		fmt.Printf("Hata: %s dosyası zaten mevcut\n", modFile)
 		os.Exit(1)
 	}
 
-	// gop.mod içeriği
+	// gom.mod içeriği
 	modContent := fmt.Sprintf("module %s\n\ngo 1.18\n", projectName)
 	err := os.WriteFile(modFile, []byte(modContent), 0644)
 	if err != nil {
@@ -91,8 +91,8 @@ func initProject() {
 		os.Exit(1)
 	}
 
-	// gop.sum dosyasını oluştur
-	sumFile := "gop.sum"
+	// gom.sum dosyasını oluştur
+	sumFile := "gom.sum"
 	err = os.WriteFile(sumFile, []byte(""), 0644)
 	if err != nil {
 		fmt.Printf("Hata: %s dosyası oluşturulamadı: %v\n", sumFile, err)
@@ -115,21 +115,21 @@ func initProject() {
 		}
 	}
 
-	// main.gop dosyasını oluştur
-	mainFile := filepath.Join("cmd", projectName, "main.gop")
+	// main.gom dosyasını oluştur
+	mainFile := filepath.Join("cmd", projectName, "main.gom")
 	err = os.MkdirAll(filepath.Dir(mainFile), 0755)
 	if err != nil {
 		fmt.Printf("Hata: %s dizini oluşturulamadı: %v\n", filepath.Dir(mainFile), err)
 		os.Exit(1)
 	}
 
-	// main.gop içeriği
+	// main.gom içeriği
 	mainContent := `package main
 
 import "fmt"
 
 func main() {
-    fmt.Println("Merhaba, GO+!")
+    fmt.Println("Merhaba, GO-Minus!")
 }
 `
 	err = os.WriteFile(mainFile, []byte(mainContent), 0644)
@@ -138,7 +138,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("GO+ projesi başarıyla oluşturuldu: %s\n", projectName)
+	fmt.Printf("GO-Minus projesi başarıyla oluşturuldu: %s\n", projectName)
 }
 
 // Belirtilen paketleri yükle
@@ -148,10 +148,10 @@ func installPackages(packages []string) {
 		os.Exit(1)
 	}
 
-	// gop.mod dosyasını kontrol et
-	modFile := "gop.mod"
+	// gom.mod dosyasını kontrol et
+	modFile := "gom.mod"
 	if _, err := os.Stat(modFile); os.IsNotExist(err) {
-		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'goppm -init' komutunu çalıştırın.\n", modFile)
+		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'gompm -init' komutunu çalıştırın.\n", modFile)
 		os.Exit(1)
 	}
 
@@ -170,10 +170,10 @@ func uninstallPackages(packages []string) {
 		os.Exit(1)
 	}
 
-	// gop.mod dosyasını kontrol et
-	modFile := "gop.mod"
+	// gom.mod dosyasını kontrol et
+	modFile := "gom.mod"
 	if _, err := os.Stat(modFile); os.IsNotExist(err) {
-		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'goppm -init' komutunu çalıştırın.\n", modFile)
+		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'gompm -init' komutunu çalıştırın.\n", modFile)
 		os.Exit(1)
 	}
 
@@ -187,10 +187,10 @@ func uninstallPackages(packages []string) {
 
 // Belirtilen paketleri güncelle
 func updatePackages(packages []string) {
-	// gop.mod dosyasını kontrol et
-	modFile := "gop.mod"
+	// gom.mod dosyasını kontrol et
+	modFile := "gom.mod"
 	if _, err := os.Stat(modFile); os.IsNotExist(err) {
-		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'goppm -init' komutunu çalıştırın.\n", modFile)
+		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'gompm -init' komutunu çalıştırın.\n", modFile)
 		os.Exit(1)
 	}
 
@@ -212,10 +212,10 @@ func updatePackages(packages []string) {
 
 // Yüklü paketleri listele
 func listPackages() {
-	// gop.mod dosyasını kontrol et
-	modFile := "gop.mod"
+	// gom.mod dosyasını kontrol et
+	modFile := "gom.mod"
 	if _, err := os.Stat(modFile); os.IsNotExist(err) {
-		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'goppm -init' komutunu çalıştırın.\n", modFile)
+		fmt.Printf("Hata: %s dosyası bulunamadı. Önce 'gompm -init' komutunu çalıştırın.\n", modFile)
 		os.Exit(1)
 	}
 
@@ -238,16 +238,16 @@ func searchPackages(keywords []string) {
 
 // Yardım mesajını yazdır
 func printHelp() {
-	fmt.Println("GO+ Paket Yöneticisi")
+	fmt.Println("GO-Minus Paket Yöneticisi")
 	fmt.Println("\nKullanım:")
-	fmt.Println("  goppm [bayraklar] [argümanlar]")
+	fmt.Println("  gompm [bayraklar] [argümanlar]")
 	fmt.Println("\nBayraklar:")
 	flag.PrintDefaults()
 	fmt.Println("\nÖrnekler:")
-	fmt.Println("  goppm -init myproject       # Yeni bir GO+ projesi başlat")
-	fmt.Println("  goppm -install fmt strings  # fmt ve strings paketlerini yükle")
-	fmt.Println("  goppm -uninstall fmt        # fmt paketini kaldır")
-	fmt.Println("  goppm -update               # Tüm paketleri güncelle")
-	fmt.Println("  goppm -list                 # Yüklü paketleri listele")
-	fmt.Println("  goppm -search json          # json ile ilgili paketleri ara")
+	fmt.Println("  gompm -init myproject       # Yeni bir GO-Minus projesi başlat")
+	fmt.Println("  gompm -install fmt strings  # fmt ve strings paketlerini yükle")
+	fmt.Println("  gompm -uninstall fmt        # fmt paketini kaldır")
+	fmt.Println("  gompm -update               # Tüm paketleri güncelle")
+	fmt.Println("  gompm -list                 # Yüklü paketleri listele")
+	fmt.Println("  gompm -search json          # json ile ilgili paketleri ara")
 }

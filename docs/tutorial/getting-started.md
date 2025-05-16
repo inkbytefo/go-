@@ -1,66 +1,66 @@
-# GO-Minus Başlangıç Rehberi
+# GO-Minus Getting Started Guide
 
-Bu rehber, GO-Minus programlama dilini kullanmaya başlamak için gereken adımları açıklamaktadır. GO-Minus, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle genişletilmiş bir programlama dilidir.
+This guide explains the steps needed to start using the GO-Minus programming language. GO-Minus is a programming language that includes all features of the Go programming language and extends it with C++-like features.
 
-## İçindekiler
+## Contents
 
-1. [GO-Minus Kurulumu](#go-minus-kurulumu)
-2. [İlk GO-Minus Programı](#ilk-go-minus-programı)
-3. [Temel Sözdizimi](#temel-sözdizimi)
-4. [Sınıflar ve Nesneler](#sınıflar-ve-nesneler)
-5. [Şablonlar](#şablonlar)
-6. [İstisna İşleme](#istisna-işleme)
-7. [Paketler ve Modüller](#paketler-ve-modüller)
-8. [Derleme ve Çalıştırma](#derleme-ve-çalıştırma)
-9. [IDE Entegrasyonu](#ide-entegrasyonu)
-10. [Sonraki Adımlar](#sonraki-adımlar)
+1. [GO-Minus Installation](#go-minus-installation)
+2. [First GO-Minus Program](#first-go-minus-program)
+3. [Basic Syntax](#basic-syntax)
+4. [Classes and Objects](#classes-and-objects)
+5. [Templates](#templates)
+6. [Exception Handling](#exception-handling)
+7. [Packages and Modules](#packages-and-modules)
+8. [Compiling and Running](#compiling-and-running)
+9. [IDE Integration](#ide-integration)
+10. [Next Steps](#next-steps)
 
-## GO-Minus Kurulumu
+## GO-Minus Installation
 
-GO-Minus'u kurmak için aşağıdaki adımları izleyin:
+Follow these steps to install GO-Minus:
 
-### Ön Koşullar
+### Prerequisites
 
-- Go 1.18 veya üzeri
-- LLVM 14.0 veya üzeri
+- Go 1.18 or higher
+- LLVM 14.0 or higher
 - Git
 
-### Kurulum Adımları
+### Installation Steps
 
-1. GO-Minus deposunu klonlayın:
+1. Clone the GO-Minus repository:
 
 ```bash
 git clone https://github.com/gominus/gominus.git
 cd gominus
 ```
 
-2. GO-Minus derleyicisini derleyin:
+2. Build the GO-Minus compiler:
 
 ```bash
 go build -o gominus ./cmd/gominus
 ```
 
-3. Derleyiciyi PATH'e ekleyin:
+3. Add the compiler to PATH:
 
-Windows için:
+For Windows:
 ```bash
 copy gominus.exe C:\Windows\System32\
 ```
 
-Linux/macOS için:
+For Linux/macOS:
 ```bash
 sudo cp gominus /usr/local/bin/
 ```
 
-4. Kurulumu doğrulayın:
+4. Verify the installation:
 
 ```bash
 gominus version
 ```
 
-## İlk GO-Minus Programı
+## First GO-Minus Program
 
-GO-Minus ile ilk programınızı yazalım. Bir metin editörü açın ve aşağıdaki kodu `hello.gom` adlı bir dosyaya kaydedin:
+Let's write your first program with GO-Minus. Open a text editor and save the following code in a file named `hello.gom`:
 
 ```go
 // hello.gom
@@ -69,34 +69,34 @@ package main
 import "fmt"
 
 func main() {
-    fmt.Println("Merhaba, GO-Minus!")
+    fmt.Println("Hello, GO-Minus!")
 }
 ```
 
-Programı derlemek ve çalıştırmak için:
+To compile and run the program:
 
 ```bash
 gominus run hello.gom
 ```
 
-Çıktı:
+Output:
 ```
-Merhaba, GO-Minus!
+Hello, GO-Minus!
 ```
 
-## Temel Sözdizimi
+## Basic Syntax
 
-GO-Minus, Go'nun sözdizimini temel alır ve C++ benzeri özellikler ekler.
+GO-Minus is based on Go's syntax and adds C++-like features.
 
-### Değişkenler ve Sabitler
+### Variables and Constants
 
 ```go
-// Değişken tanımlama
+// Variable declaration
 var x int = 10
-var y = 20 // Tip çıkarımı
-z := 30    // Kısa değişken tanımlama
+var y = 20 // Type inference
+z := 30    // Short variable declaration
 
-// Sabit tanımlama
+// Constant declaration
 const pi = 3.14159
 const (
     a = 1
@@ -104,24 +104,24 @@ const (
 )
 ```
 
-### Kontrol Yapıları
+### Control Structures
 
 ```go
 // If-else
 if x > 0 {
-    fmt.Println("Pozitif")
+    fmt.Println("Positive")
 } else if x < 0 {
-    fmt.Println("Negatif")
+    fmt.Println("Negative")
 } else {
-    fmt.Println("Sıfır")
+    fmt.Println("Zero")
 }
 
-// For döngüsü
+// For loop
 for i := 0; i < 10; i++ {
     fmt.Println(i)
 }
 
-// Range döngüsü
+// Range loop
 nums := []int{1, 2, 3, 4, 5}
 for i, num := range nums {
     fmt.Printf("Index: %d, Value: %d\n", i, num)
@@ -129,32 +129,32 @@ for i, num := range nums {
 
 // Switch
 switch day {
-case "Pazartesi":
-    fmt.Println("Haftanın ilk günü")
-case "Cuma":
-    fmt.Println("Haftanın son iş günü")
+case "Monday":
+    fmt.Println("First day of the week")
+case "Friday":
+    fmt.Println("Last workday of the week")
 default:
-    fmt.Println("Başka bir gün")
+    fmt.Println("Another day")
 }
 ```
 
-### Fonksiyonlar
+### Functions
 
 ```go
-// Temel fonksiyon
+// Basic function
 func add(a int, b int) int {
     return a + b
 }
 
-// Çoklu dönüş değeri
+// Multiple return values
 func divide(a, b float64) (float64, error) {
     if b == 0 {
-        return 0, errors.New("sıfıra bölme hatası")
+        return 0, errors.New("division by zero error")
     }
     return a / b, nil
 }
 
-// Değişken sayıda parametre
+// Variadic parameters
 func sum(nums ...int) int {
     total := 0
     for _, num := range nums {
@@ -164,151 +164,151 @@ func sum(nums ...int) int {
 }
 ```
 
-## Sınıflar ve Nesneler
+## Classes and Objects
 
-GO-Minus, C++ benzeri sınıf ve nesne desteği sağlar.
+GO-Minus provides C++-like class and object support.
 
 ```go
-// Sınıf tanımlama
+// Class definition
 class Person {
     private:
         string name
         int age
-    
+
     public:
-        // Yapıcı metot
+        // Constructor
         Person(string name, int age) {
             this.name = name
             this.age = age
         }
-        
-        // Getter metotları
+
+        // Getter methods
         string getName() {
             return this.name
         }
-        
+
         int getAge() {
             return this.age
         }
-        
-        // Metot
+
+        // Method
         void birthday() {
             this.age++
         }
-        
-        // Statik metot
+
+        // Static method
         static Person createDefault() {
             return Person("John Doe", 30)
         }
 }
 
-// Sınıf kullanımı
+// Class usage
 func main() {
-    // Nesne oluşturma
-    person := Person("Ahmet", 30)
-    
-    // Metot çağırma
-    fmt.Println("İsim:", person.getName())
-    fmt.Println("Yaş:", person.getAge())
-    
+    // Object creation
+    person := Person("John", 30)
+
+    // Method calling
+    fmt.Println("Name:", person.getName())
+    fmt.Println("Age:", person.getAge())
+
     person.birthday()
-    fmt.Println("Yeni yaş:", person.getAge())
-    
-    // Statik metot çağırma
+    fmt.Println("New age:", person.getAge())
+
+    // Static method calling
     defaultPerson := Person.createDefault()
-    fmt.Println("Varsayılan isim:", defaultPerson.getName())
+    fmt.Println("Default name:", defaultPerson.getName())
 }
 ```
 
-### Kalıtım
+### Inheritance
 
 ```go
-// Temel sınıf
+// Base class
 class Animal {
     protected:
         string name
-    
+
     public:
         Animal(string name) {
             this.name = name
         }
-        
+
         virtual string makeSound() {
             return "..."
         }
 }
 
-// Türetilmiş sınıf
+// Derived class
 class Dog : Animal {
     private:
         string breed
-    
+
     public:
         Dog(string name, string breed) : Animal(name) {
             this.breed = breed
         }
-        
+
         override string makeSound() {
             return "Woof!"
         }
-        
+
         string getBreed() {
             return this.breed
         }
 }
 
-// Kalıtım kullanımı
+// Inheritance usage
 func main() {
     dog := Dog("Buddy", "Golden Retriever")
-    fmt.Println("Ses:", dog.makeSound())
-    fmt.Println("Irk:", dog.getBreed())
-    
-    // Polimorfizm
+    fmt.Println("Sound:", dog.makeSound())
+    fmt.Println("Breed:", dog.getBreed())
+
+    // Polymorphism
     var animal Animal = dog
-    fmt.Println("Polimorfik ses:", animal.makeSound())
+    fmt.Println("Polymorphic sound:", animal.makeSound())
 }
 ```
 
-## Şablonlar
+## Templates
 
-GO-Minus, C++ benzeri şablon desteği sağlar.
+GO-Minus provides C++-like template support.
 
 ```go
-// Şablon sınıf
+// Template class
 template<T>
 class Stack {
     private:
         T[] items
         int size
-    
+
     public:
         Stack() {
             this.items = T[]{}
             this.size = 0
         }
-        
+
         void push(T item) {
             this.items = append(this.items, item)
             this.size++
         }
-        
+
         T pop() {
             if this.size == 0 {
                 throw new Exception("Stack is empty")
             }
-            
+
             this.size--
             item := this.items[this.size]
             this.items = this.items[:this.size]
             return item
         }
-        
+
         bool isEmpty() {
             return this.size == 0
         }
 }
 
-// Şablon fonksiyon
+// Template function
 template<T>
 T max(T a, T b) {
     if a > b {
@@ -317,35 +317,35 @@ T max(T a, T b) {
     return b
 }
 
-// Şablon kullanımı
+// Template usage
 func main() {
-    // Şablon sınıf kullanımı
+    // Template class usage
     intStack := Stack<int>()
     intStack.push(1)
     intStack.push(2)
     intStack.push(3)
-    
+
     fmt.Println(intStack.pop())  // 3
     fmt.Println(intStack.pop())  // 2
-    
-    // Şablon fonksiyon kullanımı
+
+    // Template function usage
     fmt.Println(max<int>(5, 10))      // 10
     fmt.Println(max<string>("a", "b")) // "b"
 }
 ```
 
-## İstisna İşleme
+## Exception Handling
 
-GO-Minus, C++ benzeri istisna işleme desteği sağlar.
+GO-Minus provides C++-like exception handling support.
 
 ```go
-// İstisna tanımlama
+// Exception definition
 class DivisionByZeroException : Exception {
     public:
         DivisionByZeroException() : Exception("Division by zero") {}
 }
 
-// İstisna fırlatma
+// Throwing an exception
 func divide(a, b float64) float64 {
     if b == 0 {
         throw new DivisionByZeroException()
@@ -353,26 +353,26 @@ func divide(a, b float64) float64 {
     return a / b
 }
 
-// İstisna yakalama
+// Catching an exception
 func main() {
     try {
         result := divide(10, 0)
-        fmt.Println("Sonuç:", result)
+        fmt.Println("Result:", result)
     } catch (DivisionByZeroException e) {
-        fmt.Println("Hata:", e.message)
+        fmt.Println("Error:", e.message)
     } catch (Exception e) {
-        fmt.Println("Genel hata:", e.message)
+        fmt.Println("General error:", e.message)
     } finally {
-        fmt.Println("İşlem tamamlandı")
+        fmt.Println("Operation completed")
     }
 }
 ```
 
-## Paketler ve Modüller
+## Packages and Modules
 
-GO-Minus, Go'nun paket ve modül sistemini kullanır.
+GO-Minus uses Go's package and module system.
 
-### Paket Oluşturma
+### Creating a Package
 
 ```go
 // math/calculator.gom
@@ -383,19 +383,19 @@ class Calculator {
         static int add(int a, int b) {
             return a + b
         }
-        
+
         static int subtract(int a, int b) {
             return a - b
         }
 }
 
-// Dışa aktarılan fonksiyon
+// Exported function
 func Multiply(a, b int) int {
     return a * b
 }
 ```
 
-### Paket Kullanımı
+### Using a Package
 
 ```go
 // main.gom
@@ -407,82 +407,82 @@ import (
 )
 
 func main() {
-    // Sınıf kullanımı
+    // Class usage
     sum := math.Calculator.add(5, 3)
-    fmt.Println("Toplam:", sum)
-    
-    // Fonksiyon kullanımı
+    fmt.Println("Sum:", sum)
+
+    // Function usage
     product := math.Multiply(4, 2)
-    fmt.Println("Çarpım:", product)
+    fmt.Println("Product:", product)
 }
 ```
 
-## Derleme ve Çalıştırma
+## Compiling and Running
 
-GO-Minus programlarını derlemek ve çalıştırmak için çeşitli komutlar bulunmaktadır.
+There are various commands to compile and run GO-Minus programs.
 
-### Tek Dosya Derleme ve Çalıştırma
+### Single File Compilation and Execution
 
 ```bash
-# Derleme ve çalıştırma
+# Compile and run
 gominus run hello.gom
 
-# Sadece derleme
+# Compile only
 gominus build hello.gom
 
-# Çalıştırma
+# Run
 ./hello
 ```
 
-### Proje Derleme
+### Project Compilation
 
 ```bash
-# Proje dizininde
+# In the project directory
 gominus build
 
-# Belirli bir çıktı adı ile
+# With a specific output name
 gominus build -o myapp
 
-# Çalıştırma
+# Run
 ./myapp
 ```
 
-## IDE Entegrasyonu
+## IDE Integration
 
-GO-Minus, çeşitli IDE'ler için eklentiler sağlar.
+GO-Minus provides plugins for various IDEs.
 
 ### VS Code
 
-1. VS Code'u açın
-2. Eklentiler sekmesine gidin
-3. "GO-Minus" araması yapın
-4. GO-Minus eklentisini yükleyin
+1. Open VS Code
+2. Go to the Extensions tab
+3. Search for "GO-Minus"
+4. Install the GO-Minus extension
 
 ### JetBrains IDEs
 
-1. JetBrains IDE'nizi açın (IntelliJ IDEA, GoLand, vb.)
-2. Eklentiler sekmesine gidin
-3. Marketplace'te "GO-Minus" araması yapın
-4. GO-Minus eklentisini yükleyin
+1. Open your JetBrains IDE (IntelliJ IDEA, GoLand, etc.)
+2. Go to the Plugins tab
+3. Search for "GO-Minus" in the Marketplace
+4. Install the GO-Minus plugin
 
 ### Vim/Neovim
 
 ```bash
-# Vim-Plug ile
+# With Vim-Plug
 Plug 'gominus/vim-gominus'
 
-# Packer ile
+# With Packer
 use 'gominus/vim-gominus'
 ```
 
-## Sonraki Adımlar
+## Next Steps
 
-GO-Minus dilini öğrenmeye devam etmek için:
+To continue learning the GO-Minus language:
 
-1. [Dil Referansı](../reference/README.md) belgesini inceleyin
-2. [Standart Kütüphane](../../stdlib/README.md) belgelerini okuyun
-3. [Örnekler](../examples) klasöründeki örnek projeleri inceleyin
-4. [Discord](https://discord.gg/gominus) sunucumuza katılın
-5. [GitHub](https://github.com/gominus/gominus) üzerinden projeye katkıda bulunun
+1. Explore the [Language Reference](../reference/README.md) document
+2. Read the [Standard Library](../../stdlib/README.md) documentation
+3. Examine the example projects in the [Examples](../examples) directory
+4. Join our [Discord](https://discord.gg/gominus) server
+5. Contribute to the project via [GitHub](https://github.com/gominus/gominus)
 
-GO-Minus ile programlama yaparken herhangi bir sorunla karşılaşırsanız, [SSS](../faq.md) belgesine göz atabilir veya topluluk kanallarımızdan yardım isteyebilirsiniz.
+If you encounter any issues while programming with GO-Minus, you can check the [FAQ](../faq.md) document or ask for help through our community channels.
