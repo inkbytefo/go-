@@ -1,0 +1,308 @@
+// GO-Minus Standart Kütüphane - Async Paketi - System Calls Optimization Test
+package async_test
+
+import (
+    "async"
+    "testing"
+    "time"
+    "sync"
+    "math/rand"
+    "os"
+    "io"
+    "io/ioutil"
+    "path/filepath"
+    "fmt"
+    "syscall"
+)
+
+// TestSyscallBatcher, SyscallBatcher sınıfını test eder.
+func TestSyscallBatcher(t *testing.T) {
+    // EventLoop oluştur
+    loop, err := async.EventLoop.New()
+    if err != nil {
+        t.Fatalf("EventLoop.New: %v", err)
+    }
+    
+    // Olay döngüsünü başlat
+    err = loop.Start()
+    if err != nil {
+        t.Fatalf("EventLoop.Start: %v", err)
+    }
+    defer loop.Stop()
+    
+    // SyscallBatcher oluştur
+    batcher := async.SyscallBatcher.New()
+    
+    // Geçici dosya oluştur
+    tmpfile, err := ioutil.TempFile("", "test")
+    if err != nil {
+        t.Fatalf("Geçici dosya oluşturma hatası: %v", err)
+    }
+    defer os.Remove(tmpfile.Name())
+    defer tmpfile.Close()
+    
+    // Dosyaya veri yaz
+    data := []byte("Hello, World!")
+    _, err = tmpfile.Write(data)
+    if err != nil {
+        t.Fatalf("Dosyaya yazma hatası: %v", err)
+    }
+    
+    // Dosya işaretçisini başa al
+    _, err = tmpfile.Seek(0, io.SeekStart)
+    if err != nil {
+        t.Fatalf("Dosya işaretçisini başa alma hatası: %v", err)
+    }
+    
+    // Tamponlar oluştur
+    buffer1 := make([]byte, 5)
+    buffer2 := make([]byte, 8)
+    
+    // Toplu okuma işlemi gerçekleştir
+    n, err := batcher.ReadBatched(int(tmpfile.Fd()), [][]byte{buffer1, buffer2})
+    if err != nil {
+        t.Fatalf("SyscallBatcher.ReadBatched: %v", err)
+    }
+    
+    // Okunan verileri kontrol et
+    if n != 13 {
+        t.Errorf("SyscallBatcher.ReadBatched: beklenen okuma boyutu 13, alınan: %d", n)
+    }
+    
+    if string(buffer1) != "Hello" {
+        t.Errorf("SyscallBatcher.ReadBatched: beklenen veri 'Hello', alınan: '%s'", string(buffer1))
+    }
+    
+    if string(buffer2) != ", World!" {
+        t.Errorf("SyscallBatcher.ReadBatched: beklenen veri ', World!', alınan: '%s'", string(buffer2))
+    }
+    
+    // İstatistikleri kontrol et
+    stats := batcher.GetStats()
+    
+    if stats.TotalReadRequests == 0 {
+        t.Errorf("SyscallBatcher.GetStats: beklenen toplam okuma isteği sayısı en az 1, alınan: %d", stats.TotalReadRequests)
+    }
+    
+    // Dosya tanımlayıcısı önbelleğini test et
+    file, err := batcher.OpenFile(tmpfile.Name(), os.O_RDONLY, 0)
+    if err != nil {
+        t.Fatalf("SyscallBatcher.OpenFile: %v", err)
+    }
+    
+    // Dosyayı kapat
+    err = batcher.CloseFile(tmpfile.Name(), file)
+    if err != nil {
+        t.Fatalf("SyscallBatcher.CloseFile: %v", err)
+    }
+    
+    // Dosyayı tekrar aç
+    file, err = batcher.OpenFile(tmpfile.Name(), os.O_RDONLY, 0)
+    if err != nil {
+        t.Fatalf("SyscallBatcher.OpenFile: %v", err)
+    }
+    defer file.Close()
+    
+    // İstatistikleri kontrol et
+    stats = batcher.GetStats()
+    
+    if stats.CachedFileOpens == 0 {
+        t.Errorf("SyscallBatcher.GetStats: beklenen önbellekten açılan dosya sayısı en az 1, alınan: %d", stats.CachedFileOpens)
+    }
+}
+
+// TestZeroCopyFile, ZeroCopyFile sınıfını test eder.
+func TestZeroCopyFile(t *testing.T) {
+    // Geçici kaynak dosyası oluştur
+    srcFile, err := ioutil.TempFile("", "src")
+    if err != nil {
+        t.Fatalf("Geçici kaynak dosyası oluşturma hatası: %v", err)
+    }
+    defer os.Remove(srcFile.Name())
+    defer srcFile.Close()
+    
+    // Kaynak dosyaya veri yaz
+    data := make([]byte, 1024*1024) // 1MB
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    _, err = srcFile.Write(data)
+    if err != nil {
+        t.Fatalf("Kaynak dosyaya yazma hatası: %v", err)
+    }
+    
+    // Dosya işaretçisini başa al
+    _, err = srcFile.Seek(0, io.SeekStart)
+    if err != nil {
+        t.Fatalf("Dosya işaretçisini başa alma hatası: %v", err)
+    }
+    
+    // ZeroCopyFile oluştur
+    zcf := async.ZeroCopyFile.New(srcFile)
+    
+    // Geçici hedef dosyası oluştur
+    dstFile, err := ioutil.TempFile("", "dst")
+    if err != nil {
+        t.Fatalf("Geçici hedef dosyası oluşturma hatası: %v", err)
+    }
+    defer os.Remove(dstFile.Name())
+    defer dstFile.Close()
+    
+    // SendFile ile dosyayı kopyala
+    var offset int64 = 0
+    n, err := zcf.SendFile(dstFile, offset, len(data))
+    
+    // SendFile desteklenmiyorsa, testi atla
+    if err != nil && (err.Error() == "operation not supported" || err.Error() == "function not implemented") {
+        t.Skip("SendFile desteklenmiyor")
+    }
+    
+    if err != nil {
+        t.Fatalf("ZeroCopyFile.SendFile: %v", err)
+    }
+    
+    if n != int64(len(data)) {
+        t.Errorf("ZeroCopyFile.SendFile: beklenen kopyalanan bayt sayısı %d, alınan: %d", len(data), n)
+    }
+    
+    // Hedef dosyayı kontrol et
+    dstData, err := ioutil.ReadFile(dstFile.Name())
+    if err != nil {
+        t.Fatalf("Hedef dosyayı okuma hatası: %v", err)
+    }
+    
+    if len(dstData) != len(data) {
+        t.Errorf("ZeroCopyFile.SendFile: beklenen hedef dosya boyutu %d, alınan: %d", len(data), len(dstData))
+    }
+    
+    // İstatistikleri kontrol et
+    stats := zcf.GetStats()
+    
+    if stats.TotalSendFile != 1 {
+        t.Errorf("ZeroCopyFile.GetStats: beklenen toplam SendFile sayısı 1, alınan: %d", stats.TotalSendFile)
+    }
+    
+    if stats.BytesSent != uint64(len(data)) {
+        t.Errorf("ZeroCopyFile.GetStats: beklenen gönderilen bayt sayısı %d, alınan: %d", len(data), stats.BytesSent)
+    }
+}
+
+// BenchmarkSyscallBatcher, SyscallBatcher için benchmark.
+func BenchmarkSyscallBatcher(b *testing.B) {
+    // SyscallBatcher oluştur
+    batcher := async.SyscallBatcher.New()
+    
+    // Geçici dosya oluştur
+    tmpfile, err := ioutil.TempFile("", "bench")
+    if err != nil {
+        b.Fatalf("Geçici dosya oluşturma hatası: %v", err)
+    }
+    defer os.Remove(tmpfile.Name())
+    
+    // Dosyaya veri yaz
+    data := make([]byte, 1024*1024) // 1MB
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    _, err = tmpfile.Write(data)
+    if err != nil {
+        b.Fatalf("Dosyaya yazma hatası: %v", err)
+    }
+    
+    tmpfile.Close()
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        // Dosyayı aç
+        file, err := batcher.OpenFile(tmpfile.Name(), os.O_RDONLY, 0)
+        if err != nil {
+            b.Fatalf("SyscallBatcher.OpenFile: %v", err)
+        }
+        
+        // Dosyadan veri oku
+        buffer := make([]byte, 4096)
+        buffers := make([][]byte, 0, 256)
+        
+        for j := 0; j < 256; j++ {
+            buffers = append(buffers, buffer)
+        }
+        
+        // Toplu okuma işlemi gerçekleştir
+        _, err = batcher.ReadBatched(int(file.Fd()), buffers)
+        if err != nil {
+            b.Fatalf("SyscallBatcher.ReadBatched: %v", err)
+        }
+        
+        // Dosyayı kapat
+        batcher.CloseFile(tmpfile.Name(), file)
+    }
+}
+
+// BenchmarkZeroCopyFile, ZeroCopyFile için benchmark.
+func BenchmarkZeroCopyFile(b *testing.B) {
+    // Geçici kaynak dosyası oluştur
+    srcFile, err := ioutil.TempFile("", "src")
+    if err != nil {
+        b.Fatalf("Geçici kaynak dosyası oluşturma hatası: %v", err)
+    }
+    defer os.Remove(srcFile.Name())
+    
+    // Kaynak dosyaya veri yaz
+    data := make([]byte, 10*1024*1024) // 10MB
+    for i := 0; i < len(data); i++ {
+        data[i] = byte(i % 256)
+    }
+    
+    _, err = srcFile.Write(data)
+    if err != nil {
+        b.Fatalf("Kaynak dosyaya yazma hatası: %v", err)
+    }
+    
+    srcFile.Close()
+    
+    // Geçici hedef dizini oluştur
+    tmpDir, err := ioutil.TempDir("", "bench")
+    if err != nil {
+        b.Fatalf("Geçici dizin oluşturma hatası: %v", err)
+    }
+    defer os.RemoveAll(tmpDir)
+    
+    b.ResetTimer()
+    
+    for i := 0; i < b.N; i++ {
+        // Hedef dosya yolu
+        dstPath := filepath.Join(tmpDir, fmt.Sprintf("dst_%d", i))
+        
+        // Kaynak dosyayı aç
+        src, err := os.Open(srcFile.Name())
+        if err != nil {
+            b.Fatalf("Kaynak dosyayı açma hatası: %v", err)
+        }
+        
+        // ZeroCopyFile oluştur
+        zcf := async.ZeroCopyFile.New(src)
+        
+        // Hedef dosyayı oluştur
+        dst, err := os.Create(dstPath)
+        if err != nil {
+            b.Fatalf("Hedef dosyayı oluşturma hatası: %v", err)
+        }
+        
+        // Dosyayı kopyala
+        var offset int64 = 0
+        _, err = zcf.SendFile(dst, offset, len(data))
+        if err != nil && (err.Error() == "operation not supported" || err.Error() == "function not implemented") {
+            b.Skip("SendFile desteklenmiyor")
+        }
+        
+        if err != nil {
+            b.Fatalf("ZeroCopyFile.SendFile: %v", err)
+        }
+        
+        src.Close()
+        dst.Close()
+    }
+}

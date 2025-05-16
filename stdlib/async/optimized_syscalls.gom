@@ -8,6 +8,10 @@ import (
     "sync"
     "sync/atomic"
     "time"
+    "io"
+    "errors"
+    "math"
+    "sort"
 )
 
 // IOVec, bir I/O vektörünü temsil eder.
@@ -15,6 +19,259 @@ import (
 class IOVec {
     var Base unsafe.Pointer
     var Len int
+}
+
+// BatchIOStats, BatchedIO istatistiklerini içerir.
+class BatchIOStats {
+    var TotalBuffersAdded uint64
+    var TotalBytesQueued uint64
+    var TotalReadBatches uint64
+    var TotalWriteBatches uint64
+    var TotalReadOperations uint64
+    var TotalWriteOperations uint64
+    var TotalBytesRead uint64
+    var TotalBytesWritten uint64
+}
+
+// SyscallBatcherStats, SyscallBatcher istatistiklerini içerir.
+class SyscallBatcherStats {
+    var TotalFileOpens uint64
+    var CachedFileOpens uint64
+    var TotalFileCloses uint64
+    var TotalReadRequests uint64
+    var BatchedReadRequests uint64
+    var NonBatchedReadRequests uint64
+    var TotalWriteRequests uint64
+    var BatchedWriteRequests uint64
+    var NonBatchedWriteRequests uint64
+    var TotalSendFileRequests uint64
+    var TotalCopyFileRangeRequests uint64
+    var TotalQueuedSyscalls uint64
+    var TotalQueueProcessings uint64
+    var FDCacheSize int
+    var FDCacheHits uint64
+    var FDCacheMisses uint64
+}
+
+// SyscallRequest, bir sistem çağrısı isteğini temsil eder.
+class SyscallRequest {
+    var Type int
+    var FD int
+    var Data interface{}
+    var Priority int
+    var Promise *AsyncPromise<int>
+}
+
+// SyscallFuture, bir sistem çağrısının sonucunu temsil eder.
+class SyscallFuture {
+    private:
+        var future *AsyncFuture<int>
+
+    public:
+        // New, yeni bir SyscallFuture oluşturur.
+        static func New(future *AsyncFuture<int>) *SyscallFuture {
+            sf := new SyscallFuture()
+            sf.future = future
+
+            return sf
+        }
+
+        // Get, sistem çağrısının sonucunu döndürür.
+        func (sf *SyscallFuture) Get() (int, error) {
+            return sf.future.Get()
+        }
+
+        // GetWithTimeout, belirtilen süre içinde sistem çağrısının sonucunu döndürür.
+        func (sf *SyscallFuture) GetWithTimeout(timeout time.Duration) (int, error, bool) {
+            return sf.future.GetWithTimeout(timeout)
+        }
+
+        // IsDone, sistem çağrısının tamamlanıp tamamlanmadığını kontrol eder.
+        func (sf *SyscallFuture) IsDone() bool {
+            return sf.future.IsDone()
+        }
+
+        // Cancel, sistem çağrısını iptal eder.
+        func (sf *SyscallFuture) Cancel() bool {
+            return sf.future.Cancel()
+        }
+
+        // Then, sistem çağrısı tamamlandığında çağrılacak bir callback ekler.
+        func (sf *SyscallFuture) Then(callback func(int)) *SyscallFuture {
+            sf.future.Then(callback)
+            return sf
+        }
+
+        // Catch, sistem çağrısı bir hata ile tamamlandığında çağrılacak bir callback ekler.
+        func (sf *SyscallFuture) Catch(callback func(error)) *SyscallFuture {
+            sf.future.Catch(callback)
+            return sf
+        }
+}
+
+// SyscallPriorityQueue, sistem çağrılarını öncelik sırasına göre tutan bir kuyruktur.
+class SyscallPriorityQueue {
+    private:
+        var queue []*SyscallRequest
+        var mutex sync.Mutex
+        var eventLoop *EventLoop
+        var processing bool
+        var stats PriorityQueueStats
+
+    public:
+        // New, yeni bir SyscallPriorityQueue oluşturur.
+        static func New() *SyscallPriorityQueue {
+            spq := new SyscallPriorityQueue()
+            spq.queue = make([]*SyscallRequest, 0)
+            spq.processing = false
+
+            return spq
+        }
+
+        // SetEventLoop, event loop'u ayarlar.
+        func (spq *SyscallPriorityQueue) SetEventLoop(eventLoop *EventLoop) {
+            spq.mutex.Lock()
+            defer spq.mutex.Unlock()
+
+            spq.eventLoop = eventLoop
+        }
+
+        // Enqueue, bir sistem çağrısını kuyruğa ekler.
+        func (spq *SyscallPriorityQueue) Enqueue(request *SyscallRequest) *SyscallFuture {
+            spq.mutex.Lock()
+            defer spq.mutex.Unlock()
+
+            // Promise oluştur
+            promise, future := AsyncPromise.New<int>(spq.eventLoop)
+            request.Promise = promise
+
+            // İsteği kuyruğa ekle
+            spq.queue = append(spq.queue, request)
+
+            // Önceliğe göre sırala
+            spq.sortQueue()
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&spq.stats.TotalEnqueued, 1)
+
+            // SyscallFuture oluştur
+            return SyscallFuture.New(future)
+        }
+
+        // Dequeue, kuyruktaki bir sonraki sistem çağrısını döndürür.
+        func (spq *SyscallPriorityQueue) Dequeue() *SyscallRequest {
+            spq.mutex.Lock()
+            defer spq.mutex.Unlock()
+
+            if len(spq.queue) == 0 {
+                return nil
+            }
+
+            // İlk isteği al
+            request := spq.queue[0]
+
+            // İsteği kuyruktan kaldır
+            spq.queue = spq.queue[1:]
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&spq.stats.TotalDequeued, 1)
+
+            return request
+        }
+
+        // ProcessQueue, kuyruktaki tüm sistem çağrılarını işler.
+        func (spq *SyscallPriorityQueue) ProcessQueue() {
+            spq.mutex.Lock()
+
+            if spq.processing || len(spq.queue) == 0 {
+                spq.mutex.Unlock()
+                return
+            }
+
+            spq.processing = true
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&spq.stats.TotalProcessings, 1)
+
+            spq.mutex.Unlock()
+
+            // Kuyruktaki tüm istekleri işle
+            for {
+                request := spq.Dequeue()
+                if request == nil {
+                    break
+                }
+
+                // İsteği işle
+                go spq.processSyscall(request)
+            }
+
+            spq.mutex.Lock()
+            spq.processing = false
+            spq.mutex.Unlock()
+        }
+
+        // processSyscall, bir sistem çağrısını işler.
+        private func (spq *SyscallPriorityQueue) processSyscall(request *SyscallRequest) {
+            var result int
+            var err error
+
+            // Sistem çağrısı tipine göre işle
+            switch request.Type {
+                case 0: // Read
+                    buffer := request.Data.([]byte)
+                    result, err = syscall.Read(request.FD, buffer)
+
+                case 1: // Write
+                    buffer := request.Data.([]byte)
+                    result, err = syscall.Write(request.FD, buffer)
+
+                case 2: // Close
+                    err = syscall.Close(request.FD)
+                    if err == nil {
+                        result = 0
+                    }
+
+                default:
+                    err = errors.New("bilinmeyen sistem çağrısı tipi")
+            }
+
+            // Promise'i tamamla
+            if err != nil {
+                request.Promise.CompleteWithError(err)
+            } else {
+                request.Promise.Complete(result)
+            }
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&spq.stats.TotalProcessed, 1)
+        }
+
+        // sortQueue, kuyruğu önceliğe göre sıralar.
+        private func (spq *SyscallPriorityQueue) sortQueue() {
+            // Önceliğe göre sırala (yüksek öncelik önce)
+            sort.Slice(spq.queue, func(i, j int) bool {
+                return spq.queue[i].Priority > spq.queue[j].Priority
+            })
+        }
+
+        // GetStats, SyscallPriorityQueue istatistiklerini döndürür.
+        func (spq *SyscallPriorityQueue) GetStats() PriorityQueueStats {
+            return PriorityQueueStats{
+                TotalEnqueued:  atomic.LoadUint64(&spq.stats.TotalEnqueued),
+                TotalDequeued:  atomic.LoadUint64(&spq.stats.TotalDequeued),
+                TotalProcessed: atomic.LoadUint64(&spq.stats.TotalProcessed),
+                TotalProcessings: atomic.LoadUint64(&spq.stats.TotalProcessings),
+            }
+        }
+}
+
+// PriorityQueueStats, SyscallPriorityQueue istatistiklerini içerir.
+class PriorityQueueStats {
+    var TotalEnqueued uint64
+    var TotalDequeued uint64
+    var TotalProcessed uint64
+    var TotalProcessings uint64
 }
 
 // BatchedIO, toplu I/O işlemleri için kullanılan bir sınıftır.
@@ -27,7 +284,15 @@ class BatchedIO {
         var buffers [][]byte
         var maxIovecs int
         var mutex sync.Mutex
-    
+        var stats BatchIOStats
+        var optimalBatchSize int
+        var adaptiveBatching bool
+        var batchSizeHistory []int
+        var batchPerformanceHistory []float64
+        var lastBatchTime time.Time
+        var totalBatchedOperations uint64
+        var totalBatchedBytes uint64
+
     public:
         // New, yeni bir BatchedIO oluşturur.
         static func New(fd int) *BatchedIO {
@@ -36,77 +301,275 @@ class BatchedIO {
             bio.maxIovecs = 1024 // Sistem sınırı (platform bağımlı)
             bio.iovecs = make([]IOVec, 0, bio.maxIovecs)
             bio.buffers = make([][]byte, 0, bio.maxIovecs)
-            
+            bio.optimalBatchSize = 64 // Başlangıç değeri
+            bio.adaptiveBatching = true
+            bio.batchSizeHistory = make([]int, 0, 10)
+            bio.batchPerformanceHistory = make([]float64, 0, 10)
+            bio.lastBatchTime = time.Now()
+
             return bio
         }
-        
+
+        // SetAdaptiveBatching, adaptif batch boyutlandırma özelliğini açar veya kapatır.
+        func (bio *BatchedIO) SetAdaptiveBatching(enable bool) {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+
+            bio.adaptiveBatching = enable
+        }
+
+        // SetOptimalBatchSize, optimal batch boyutunu manuel olarak ayarlar.
+        func (bio *BatchedIO) SetOptimalBatchSize(size int) {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+
+            if size <= 0 {
+                size = 64 // Varsayılan değer
+            } else if size > bio.maxIovecs {
+                size = bio.maxIovecs
+            }
+
+            bio.optimalBatchSize = size
+        }
+
+        // GetOptimalBatchSize, mevcut optimal batch boyutunu döndürür.
+        func (bio *BatchedIO) GetOptimalBatchSize() int {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+
+            return bio.optimalBatchSize
+        }
+
         // AddBuffer, bir tamponu toplu işleme ekler.
         func (bio *BatchedIO) AddBuffer(buffer []byte) bool {
             bio.mutex.Lock()
             defer bio.mutex.Unlock()
-            
+
             if len(bio.iovecs) >= bio.maxIovecs {
                 return false
             }
-            
+
+            // Tampon boş mu kontrol et
+            if len(buffer) == 0 {
+                return true // Boş tamponları atla
+            }
+
             // IOVec oluştur
             iov := IOVec{
                 Base: unsafe.Pointer(&buffer[0]),
                 Len: len(buffer),
             }
-            
+
             // IOVec ve tamponu ekle
             bio.iovecs = append(bio.iovecs, iov)
             bio.buffers = append(bio.buffers, buffer)
-            
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bio.stats.TotalBuffersAdded, 1)
+            atomic.AddUint64(&bio.stats.TotalBytesQueued, uint64(len(buffer)))
+
+            // Optimal batch boyutuna ulaşıldı mı kontrol et
+            if bio.adaptiveBatching && len(bio.iovecs) >= bio.optimalBatchSize {
+                return false // Batch işlemi gerçekleştirilmeli
+            }
+
             return true
         }
-        
+
+        // AddBuffers, birden fazla tamponu toplu işleme ekler.
+        func (bio *BatchedIO) AddBuffers(buffers [][]byte) (int, bool) {
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+
+            added := 0
+
+            for _, buffer := range buffers {
+                if len(bio.iovecs) >= bio.maxIovecs {
+                    break
+                }
+
+                // Tampon boş mu kontrol et
+                if len(buffer) == 0 {
+                    continue // Boş tamponları atla
+                }
+
+                // IOVec oluştur
+                iov := IOVec{
+                    Base: unsafe.Pointer(&buffer[0]),
+                    Len: len(buffer),
+                }
+
+                // IOVec ve tamponu ekle
+                bio.iovecs = append(bio.iovecs, iov)
+                bio.buffers = append(bio.buffers, buffer)
+                added++
+
+                // İstatistikleri güncelle
+                atomic.AddUint64(&bio.stats.TotalBuffersAdded, 1)
+                atomic.AddUint64(&bio.stats.TotalBytesQueued, uint64(len(buffer)))
+            }
+
+            // Optimal batch boyutuna ulaşıldı mı kontrol et
+            if bio.adaptiveBatching && len(bio.iovecs) >= bio.optimalBatchSize {
+                return added, false // Batch işlemi gerçekleştirilmeli
+            }
+
+            return added, true
+        }
+
         // ReadBatched, toplu okuma işlemi gerçekleştirir.
         func (bio *BatchedIO) ReadBatched() (int, error) {
             bio.mutex.Lock()
-            defer bio.mutex.Unlock()
-            
+
             if len(bio.iovecs) == 0 {
+                bio.mutex.Unlock()
                 return 0, nil
             }
-            
-            // readv sistem çağrısı
-            n, err := syscall.Readv(bio.fd, bio.iovecs)
-            
+
+            // Yerel değişkenlere kopyala
+            iovecs := bio.iovecs
+            buffers := bio.buffers
+            batchSize := len(bio.iovecs)
+
             // Tamponları ve IOVec'leri temizle
-            bio.iovecs = bio.iovecs[:0]
-            bio.buffers = bio.buffers[:0]
-            
+            bio.iovecs = make([]IOVec, 0, bio.maxIovecs)
+            bio.buffers = make([][]byte, 0, bio.maxIovecs)
+
+            bio.mutex.Unlock()
+
+            startTime := time.Now()
+
+            // readv sistem çağrısı
+            n, err := syscall.Readv(bio.fd, iovecs)
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bio.stats.TotalReadBatches, 1)
+            atomic.AddUint64(&bio.stats.TotalReadOperations, uint64(batchSize))
+            atomic.AddUint64(&bio.stats.TotalBytesRead, uint64(n))
+
+            // Batch performansını güncelle
+            bio.updateBatchPerformance(batchSize, duration, n)
+
             return n, err
         }
-        
+
         // WriteBatched, toplu yazma işlemi gerçekleştirir.
         func (bio *BatchedIO) WriteBatched() (int, error) {
             bio.mutex.Lock()
-            defer bio.mutex.Unlock()
-            
+
             if len(bio.iovecs) == 0 {
+                bio.mutex.Unlock()
                 return 0, nil
             }
-            
-            // writev sistem çağrısı
-            n, err := syscall.Writev(bio.fd, bio.iovecs)
-            
+
+            // Yerel değişkenlere kopyala
+            iovecs := bio.iovecs
+            buffers := bio.buffers
+            batchSize := len(bio.iovecs)
+
             // Tamponları ve IOVec'leri temizle
-            bio.iovecs = bio.iovecs[:0]
-            bio.buffers = bio.buffers[:0]
-            
+            bio.iovecs = make([]IOVec, 0, bio.maxIovecs)
+            bio.buffers = make([][]byte, 0, bio.maxIovecs)
+
+            bio.mutex.Unlock()
+
+            startTime := time.Now()
+
+            // writev sistem çağrısı
+            n, err := syscall.Writev(bio.fd, iovecs)
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bio.stats.TotalWriteBatches, 1)
+            atomic.AddUint64(&bio.stats.TotalWriteOperations, uint64(batchSize))
+            atomic.AddUint64(&bio.stats.TotalBytesWritten, uint64(n))
+
+            // Batch performansını güncelle
+            bio.updateBatchPerformance(batchSize, duration, n)
+
             return n, err
         }
-        
+
         // Reset, toplu işlemi sıfırlar.
         func (bio *BatchedIO) Reset() {
             bio.mutex.Lock()
             defer bio.mutex.Unlock()
-            
+
             bio.iovecs = bio.iovecs[:0]
             bio.buffers = bio.buffers[:0]
+        }
+
+        // GetStats, BatchedIO istatistiklerini döndürür.
+        func (bio *BatchedIO) GetStats() BatchIOStats {
+            return BatchIOStats{
+                TotalBuffersAdded:    atomic.LoadUint64(&bio.stats.TotalBuffersAdded),
+                TotalBytesQueued:     atomic.LoadUint64(&bio.stats.TotalBytesQueued),
+                TotalReadBatches:     atomic.LoadUint64(&bio.stats.TotalReadBatches),
+                TotalWriteBatches:    atomic.LoadUint64(&bio.stats.TotalWriteBatches),
+                TotalReadOperations:  atomic.LoadUint64(&bio.stats.TotalReadOperations),
+                TotalWriteOperations: atomic.LoadUint64(&bio.stats.TotalWriteOperations),
+                TotalBytesRead:       atomic.LoadUint64(&bio.stats.TotalBytesRead),
+                TotalBytesWritten:    atomic.LoadUint64(&bio.stats.TotalBytesWritten),
+            }
+        }
+
+        // updateBatchPerformance, batch performansını günceller ve optimal batch boyutunu ayarlar.
+        private func (bio *BatchedIO) updateBatchPerformance(batchSize int, duration time.Duration, bytesProcessed int) {
+            if !bio.adaptiveBatching || bytesProcessed <= 0 {
+                return
+            }
+
+            bio.mutex.Lock()
+            defer bio.mutex.Unlock()
+
+            // Throughput hesapla (bytes/ns)
+            throughput := float64(bytesProcessed) / float64(duration.Nanoseconds())
+
+            // Geçmiş verileri güncelle
+            bio.batchSizeHistory = append(bio.batchSizeHistory, batchSize)
+            bio.batchPerformanceHistory = append(bio.batchPerformanceHistory, throughput)
+
+            // Geçmiş verileri sınırla (son 10 batch)
+            if len(bio.batchSizeHistory) > 10 {
+                bio.batchSizeHistory = bio.batchSizeHistory[1:]
+                bio.batchPerformanceHistory = bio.batchPerformanceHistory[1:]
+            }
+
+            // En az 5 veri noktası olduğunda optimal batch boyutunu hesapla
+            if len(bio.batchSizeHistory) >= 5 {
+                // En iyi performansı veren batch boyutunu bul
+                bestIndex := 0
+                bestPerformance := bio.batchPerformanceHistory[0]
+
+                for i := 1; i < len(bio.batchPerformanceHistory); i++ {
+                    if bio.batchPerformanceHistory[i] > bestPerformance {
+                        bestPerformance = bio.batchPerformanceHistory[i]
+                        bestIndex = i
+                    }
+                }
+
+                // Optimal batch boyutunu güncelle
+                newOptimalSize := bio.batchSizeHistory[bestIndex]
+
+                // Ani değişimleri önlemek için kademeli olarak değiştir
+                if newOptimalSize > bio.optimalBatchSize {
+                    bio.optimalBatchSize = min(bio.optimalBatchSize+10, newOptimalSize)
+                } else if newOptimalSize < bio.optimalBatchSize {
+                    bio.optimalBatchSize = max(bio.optimalBatchSize-5, newOptimalSize)
+                }
+
+                // Sınırları kontrol et
+                if bio.optimalBatchSize < 10 {
+                    bio.optimalBatchSize = 10
+                } else if bio.optimalBatchSize > bio.maxIovecs {
+                    bio.optimalBatchSize = bio.maxIovecs
+                }
+            }
         }
 }
 
@@ -120,92 +583,219 @@ class FileDescriptorCache {
         var size int
         var hits uint64
         var misses uint64
-    
+        var evictions uint64
+        var cleanupTimer *time.Timer
+        var cleanupInterval time.Duration
+        var ttl time.Duration
+        var cacheMode int
+        var stats FDCacheStats
+        var closed bool
+
+    public:
+        // CacheMode, önbellek modunu belirtir.
+        const (
+            // LRUCache, en az kullanılan elemanı çıkarır.
+            LRUCache = iota
+
+            // LFUCache, en az sıklıkta kullanılan elemanı çıkarır.
+            LFUCache
+
+            // FIFOCache, ilk giren ilk çıkar prensibine göre çalışır.
+            FIFOCache
+
+            // TTLCache, belirli bir süre sonra elemanları çıkarır.
+            TTLCache
+        )
+
     public:
         // New, yeni bir FileDescriptorCache oluşturur.
         static func New(maxSize int) *FileDescriptorCache {
             if maxSize <= 0 {
                 maxSize = 100
             }
-            
+
             fdc := new FileDescriptorCache()
             fdc.cache = make(map[string]*CachedFD)
             fdc.maxSize = maxSize
             fdc.size = 0
-            
+            fdc.cacheMode = LRUCache
+            fdc.cleanupInterval = 5 * time.Minute
+            fdc.ttl = 30 * time.Minute
+
+            // Temizleme zamanlayıcısını başlat
+            fdc.startCleanupTimer()
+
             return fdc
         }
-        
+
+        // NewWithOptions, belirtilen seçeneklerle yeni bir FileDescriptorCache oluşturur.
+        static func NewWithOptions(maxSize int, cacheMode int, ttl time.Duration, cleanupInterval time.Duration) *FileDescriptorCache {
+            if maxSize <= 0 {
+                maxSize = 100
+            }
+
+            fdc := new FileDescriptorCache()
+            fdc.cache = make(map[string]*CachedFD)
+            fdc.maxSize = maxSize
+            fdc.size = 0
+            fdc.cacheMode = cacheMode
+            fdc.ttl = ttl
+            fdc.cleanupInterval = cleanupInterval
+
+            // Temizleme zamanlayıcısını başlat
+            fdc.startCleanupTimer()
+
+            return fdc
+        }
+
+        // startCleanupTimer, temizleme zamanlayıcısını başlatır.
+        private func (fdc *FileDescriptorCache) startCleanupTimer() {
+            if fdc.closed {
+                return
+            }
+
+            fdc.cleanupTimer = time.AfterFunc(fdc.cleanupInterval, func() {
+                fdc.cleanup()
+
+                // Zamanlayıcıyı yeniden başlat
+                fdc.mutex.Lock()
+                defer fdc.mutex.Unlock()
+
+                if !fdc.closed {
+                    fdc.startCleanupTimer()
+                }
+            })
+        }
+
+        // cleanup, süresi dolmuş dosya tanımlayıcılarını temizler.
+        private func (fdc *FileDescriptorCache) cleanup() {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+
+            if fdc.cacheMode != TTLCache {
+                return
+            }
+
+            now := time.Now()
+            expiredPaths := make([]string, 0)
+
+            // Süresi dolmuş dosya tanımlayıcılarını bul
+            for path, cached := range fdc.cache {
+                if now.Sub(cached.lastUsed) > fdc.ttl {
+                    expiredPaths = append(expiredPaths, path)
+                }
+            }
+
+            // Süresi dolmuş dosya tanımlayıcılarını kaldır
+            for _, path := range expiredPaths {
+                delete(fdc.cache, path)
+                fdc.size--
+                atomic.AddUint64(&fdc.evictions, 1)
+                atomic.AddUint64(&fdc.stats.TotalEvictions, 1)
+            }
+        }
+
         // Get, belirtilen yol için bir dosya tanımlayıcısı alır.
         func (fdc *FileDescriptorCache) Get(path string, flag int, perm os.FileMode) (*os.File, error) {
             fdc.mutex.Lock()
-            defer fdc.mutex.Unlock()
-            
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&fdc.stats.TotalRequests, 1)
+
             // Önbellekte ara
             if cached, ok := fdc.cache[path]; ok {
                 // Önbellek isabet
                 atomic.AddUint64(&fdc.hits, 1)
-                
-                // Son kullanım zamanını güncelle
+                atomic.AddUint64(&fdc.stats.CacheHits, 1)
+
+                // Son kullanım zamanını ve kullanım sayısını güncelle
                 cached.lastUsed = time.Now()
-                
+                cached.useCount++
+
                 // Dosya tanımlayıcısını döndür
-                return os.NewFile(uintptr(cached.fd), path), nil
+                file := os.NewFile(uintptr(cached.fd), path)
+
+                fdc.mutex.Unlock()
+                return file, nil
             }
-            
+
             // Önbellek ıskalama
             atomic.AddUint64(&fdc.misses, 1)
-            
+            atomic.AddUint64(&fdc.stats.CacheMisses, 1)
+
+            // Önbellek dolu mu kontrol et
+            if fdc.size >= fdc.maxSize {
+                // Önbellek moduna göre eleman çıkar
+                switch fdc.cacheMode {
+                    case LRUCache:
+                        fdc.evictLRU()
+                    case LFUCache:
+                        fdc.evictLFU()
+                    case FIFOCache:
+                        fdc.evictFIFO()
+                    case TTLCache:
+                        fdc.evictTTL()
+                }
+            }
+
+            fdc.mutex.Unlock()
+
             // Dosyayı aç
             file, err := os.OpenFile(path, flag, perm)
             if err != nil {
                 return nil, err
             }
-            
-            // Önbellek dolu mu kontrol et
-            if fdc.size >= fdc.maxSize {
-                // En eski dosya tanımlayıcısını bul ve kaldır
-                fdc.evictOldest()
-            }
-            
+
             // Dosya tanımlayıcısını önbelleğe ekle
-            fd := int(file.Fd())
-            fdc.cache[path] = &CachedFD{
-                fd: fd,
-                lastUsed: time.Now(),
-            }
-            fdc.size++
-            
+            fdc.Put(path, file)
+
             return file, nil
         }
-        
+
         // Put, bir dosya tanımlayıcısını önbelleğe ekler.
         func (fdc *FileDescriptorCache) Put(path string, file *os.File) {
             fdc.mutex.Lock()
             defer fdc.mutex.Unlock()
-            
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&fdc.stats.TotalPuts, 1)
+
             // Dosya tanımlayıcısını al
             fd := int(file.Fd())
-            
+
             // Önbellek dolu mu kontrol et
             if fdc.size >= fdc.maxSize {
-                // En eski dosya tanımlayıcısını bul ve kaldır
-                fdc.evictOldest()
+                // Önbellek moduna göre eleman çıkar
+                switch fdc.cacheMode {
+                    case LRUCache:
+                        fdc.evictLRU()
+                    case LFUCache:
+                        fdc.evictLFU()
+                    case FIFOCache:
+                        fdc.evictFIFO()
+                    case TTLCache:
+                        fdc.evictTTL()
+                }
             }
-            
+
             // Dosya tanımlayıcısını önbelleğe ekle
             fdc.cache[path] = &CachedFD{
                 fd: fd,
                 lastUsed: time.Now(),
+                createdAt: time.Now(),
+                useCount: 1,
             }
             fdc.size++
         }
-        
+
         // Remove, bir dosya tanımlayıcısını önbellekten kaldırır.
         func (fdc *FileDescriptorCache) Remove(path string) {
             fdc.mutex.Lock()
             defer fdc.mutex.Unlock()
-            
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&fdc.stats.TotalRemoves, 1)
+
             // Önbellekte ara
             if _, ok := fdc.cache[path]; ok {
                 // Önbellekten kaldır
@@ -213,42 +803,108 @@ class FileDescriptorCache {
                 fdc.size--
             }
         }
-        
+
         // Clear, önbelleği temizler.
         func (fdc *FileDescriptorCache) Clear() {
             fdc.mutex.Lock()
             defer fdc.mutex.Unlock()
-            
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&fdc.stats.TotalClears, 1)
+
             // Önbelleği temizle
             fdc.cache = make(map[string]*CachedFD)
             fdc.size = 0
         }
-        
+
+        // SetCacheMode, önbellek modunu ayarlar.
+        func (fdc *FileDescriptorCache) SetCacheMode(mode int) {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+
+            fdc.cacheMode = mode
+        }
+
+        // SetTTL, TTL değerini ayarlar.
+        func (fdc *FileDescriptorCache) SetTTL(ttl time.Duration) {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+
+            fdc.ttl = ttl
+        }
+
+        // SetCleanupInterval, temizleme aralığını ayarlar.
+        func (fdc *FileDescriptorCache) SetCleanupInterval(interval time.Duration) {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+
+            fdc.cleanupInterval = interval
+
+            // Zamanlayıcıyı yeniden başlat
+            if fdc.cleanupTimer != nil {
+                fdc.cleanupTimer.Stop()
+            }
+
+            fdc.startCleanupTimer()
+        }
+
         // GetStats, önbellek istatistiklerini döndürür.
         func (fdc *FileDescriptorCache) GetStats() map[string]interface{} {
             fdc.mutex.Lock()
             defer fdc.mutex.Unlock()
-            
+
             return map[string]interface{}{
-                "size":   fdc.size,
-                "maxSize": fdc.maxSize,
-                "hits":   atomic.LoadUint64(&fdc.hits),
-                "misses": atomic.LoadUint64(&fdc.misses),
+                "size":           fdc.size,
+                "maxSize":        fdc.maxSize,
+                "hits":           atomic.LoadUint64(&fdc.hits),
+                "misses":         atomic.LoadUint64(&fdc.misses),
+                "evictions":      atomic.LoadUint64(&fdc.evictions),
+                "cacheMode":      fdc.cacheMode,
+                "ttl":            fdc.ttl.String(),
+                "cleanupInterval": fdc.cleanupInterval.String(),
+                "totalRequests":  atomic.LoadUint64(&fdc.stats.TotalRequests),
+                "cacheHits":      atomic.LoadUint64(&fdc.stats.CacheHits),
+                "cacheMisses":    atomic.LoadUint64(&fdc.stats.CacheMisses),
+                "totalPuts":      atomic.LoadUint64(&fdc.stats.TotalPuts),
+                "totalRemoves":   atomic.LoadUint64(&fdc.stats.TotalRemoves),
+                "totalClears":    atomic.LoadUint64(&fdc.stats.TotalClears),
+                "totalEvictions": atomic.LoadUint64(&fdc.stats.TotalEvictions),
             }
         }
-        
-        // evictOldest, en eski dosya tanımlayıcısını önbellekten kaldırır.
-        private func (fdc *FileDescriptorCache) evictOldest() {
+
+        // Close, FileDescriptorCache'i kapatır.
+        func (fdc *FileDescriptorCache) Close() {
+            fdc.mutex.Lock()
+            defer fdc.mutex.Unlock()
+
+            if fdc.closed {
+                return
+            }
+
+            fdc.closed = true
+
+            // Zamanlayıcıyı durdur
+            if fdc.cleanupTimer != nil {
+                fdc.cleanupTimer.Stop()
+            }
+
+            // Önbelleği temizle
+            fdc.cache = make(map[string]*CachedFD)
+            fdc.size = 0
+        }
+
+        // evictLRU, en az kullanılan elemanı önbellekten kaldırır.
+        private func (fdc *FileDescriptorCache) evictLRU() {
             var oldestPath string
             var oldestTime time.Time
-            
+
             // İlk elemanı en eski olarak ayarla
             for path, cached := range fdc.cache {
                 oldestPath = path
                 oldestTime = cached.lastUsed
                 break
             }
-            
+
             // En eski elemanı bul
             for path, cached := range fdc.cache {
                 if cached.lastUsed.Before(oldestTime) {
@@ -256,11 +912,97 @@ class FileDescriptorCache {
                     oldestTime = cached.lastUsed
                 }
             }
-            
+
             // En eski elemanı kaldır
             if oldestPath != "" {
                 delete(fdc.cache, oldestPath)
                 fdc.size--
+                atomic.AddUint64(&fdc.evictions, 1)
+                atomic.AddUint64(&fdc.stats.TotalEvictions, 1)
+            }
+        }
+
+        // evictLFU, en az sıklıkta kullanılan elemanı önbellekten kaldırır.
+        private func (fdc *FileDescriptorCache) evictLFU() {
+            var leastUsedPath string
+            var leastUseCount uint64 = math.MaxUint64
+
+            // İlk elemanı en az kullanılan olarak ayarla
+            for path, cached := range fdc.cache {
+                leastUsedPath = path
+                leastUseCount = cached.useCount
+                break
+            }
+
+            // En az kullanılan elemanı bul
+            for path, cached := range fdc.cache {
+                if cached.useCount < leastUseCount {
+                    leastUsedPath = path
+                    leastUseCount = cached.useCount
+                }
+            }
+
+            // En az kullanılan elemanı kaldır
+            if leastUsedPath != "" {
+                delete(fdc.cache, leastUsedPath)
+                fdc.size--
+                atomic.AddUint64(&fdc.evictions, 1)
+                atomic.AddUint64(&fdc.stats.TotalEvictions, 1)
+            }
+        }
+
+        // evictFIFO, ilk giren elemanı önbellekten kaldırır.
+        private func (fdc *FileDescriptorCache) evictFIFO() {
+            var oldestPath string
+            var oldestTime time.Time
+
+            // İlk elemanı en eski olarak ayarla
+            for path, cached := range fdc.cache {
+                oldestPath = path
+                oldestTime = cached.createdAt
+                break
+            }
+
+            // En eski oluşturulan elemanı bul
+            for path, cached := range fdc.cache {
+                if cached.createdAt.Before(oldestTime) {
+                    oldestPath = path
+                    oldestTime = cached.createdAt
+                }
+            }
+
+            // En eski oluşturulan elemanı kaldır
+            if oldestPath != "" {
+                delete(fdc.cache, oldestPath)
+                fdc.size--
+                atomic.AddUint64(&fdc.evictions, 1)
+                atomic.AddUint64(&fdc.stats.TotalEvictions, 1)
+            }
+        }
+
+        // evictTTL, süresi dolmuş elemanları önbellekten kaldırır.
+        private func (fdc *FileDescriptorCache) evictTTL() {
+            now := time.Now()
+            expiredPaths := make([]string, 0)
+
+            // Süresi dolmuş dosya tanımlayıcılarını bul
+            for path, cached := range fdc.cache {
+                if now.Sub(cached.lastUsed) > fdc.ttl {
+                    expiredPaths = append(expiredPaths, path)
+                }
+            }
+
+            // Süresi dolmuş dosya tanımlayıcılarını kaldır
+            for _, path := range expiredPaths {
+                delete(fdc.cache, path)
+                fdc.size--
+                atomic.AddUint64(&fdc.evictions, 1)
+                atomic.AddUint64(&fdc.stats.TotalEvictions, 1)
+            }
+
+            // Hala yer açılmadıysa, LRU stratejisini kullan
+            if fdc.size >= fdc.maxSize {
+                fdc.evictLRU()
             }
         }
 }
@@ -269,6 +1011,20 @@ class FileDescriptorCache {
 class CachedFD {
     var fd int
     var lastUsed time.Time
+    var createdAt time.Time
+    var useCount uint64
+    var metadata map[string]interface{}
+}
+
+// FDCacheStats, FileDescriptorCache istatistiklerini içerir.
+class FDCacheStats {
+    var TotalRequests uint64
+    var CacheHits uint64
+    var CacheMisses uint64
+    var TotalPuts uint64
+    var TotalRemoves uint64
+    var TotalClears uint64
+    var TotalEvictions uint64
 }
 
 // ZeroCopyFile, zero-copy dosya işlemleri için kullanılan bir sınıftır.
@@ -278,36 +1034,888 @@ class ZeroCopyFile {
     private:
         var file *os.File
         var fd int
-    
+        var stats ZeroCopyFileStats
+        var useDirectIO bool
+        var alignment int
+        var buffer []byte
+        var mmapRegion *MMapRegion
+        var mmapEnabled bool
+        var mutex sync.Mutex
+
     public:
         // New, yeni bir ZeroCopyFile oluşturur.
         static func New(file *os.File) *ZeroCopyFile {
             zcf := new ZeroCopyFile()
             zcf.file = file
             zcf.fd = int(file.Fd())
-            
+            zcf.useDirectIO = false
+            zcf.alignment = 512 // Varsayılan hizalama
+            zcf.mmapEnabled = false
+
             return zcf
         }
-        
+
         // Open, belirtilen yolu açar ve bir ZeroCopyFile döndürür.
         static func Open(path string, flag int, perm os.FileMode) (*ZeroCopyFile, error) {
             file, err := os.OpenFile(path, flag, perm)
             if err != nil {
                 return nil, err
             }
-            
+
             return ZeroCopyFile.New(file), nil
         }
-        
+
+        // OpenWithDirectIO, belirtilen yolu doğrudan I/O ile açar ve bir ZeroCopyFile döndürür.
+        static func OpenWithDirectIO(path string, flag int, perm os.FileMode) (*ZeroCopyFile, error) {
+            // O_DIRECT bayrağını ekle
+            flag |= syscall.O_DIRECT
+
+            file, err := os.OpenFile(path, flag, perm)
+            if err != nil {
+                return nil, err
+            }
+
+            zcf := ZeroCopyFile.New(file)
+            zcf.useDirectIO = true
+
+            return zcf, nil
+        }
+
+        // SetAlignment, hizalama değerini ayarlar.
+        func (zcf *ZeroCopyFile) SetAlignment(alignment int) {
+            zcf.mutex.Lock()
+            defer zcf.mutex.Unlock()
+
+            zcf.alignment = alignment
+        }
+
+        // SetUseDirectIO, doğrudan I/O kullanımını ayarlar.
+        func (zcf *ZeroCopyFile) SetUseDirectIO(useDirectIO bool) error {
+            zcf.mutex.Lock()
+            defer zcf.mutex.Unlock()
+
+            if zcf.useDirectIO == useDirectIO {
+                return nil
+            }
+
+            // Dosyayı yeniden aç
+            path := zcf.file.Name()
+            flag := syscall.O_RDWR
+
+            if useDirectIO {
+                flag |= syscall.O_DIRECT
+            }
+
+            // Mevcut dosyayı kapat
+            zcf.file.Close()
+
+            // Yeni dosyayı aç
+            file, err := os.OpenFile(path, flag, 0666)
+            if err != nil {
+                return err
+            }
+
+            zcf.file = file
+            zcf.fd = int(file.Fd())
+            zcf.useDirectIO = useDirectIO
+
+            return nil
+        }
+
+        // EnableMMap, bellek eşleme özelliğini etkinleştirir.
+        func (zcf *ZeroCopyFile) EnableMMap(offset int64, length int, prot int, flags int) error {
+            zcf.mutex.Lock()
+            defer zcf.mutex.Unlock()
+
+            // Mevcut bellek eşlemesini kaldır
+            if zcf.mmapRegion != nil {
+                syscall.Munmap(zcf.mmapRegion.Data)
+                zcf.mmapRegion = nil
+            }
+
+            // Bellek eşleme
+            data, err := syscall.Mmap(zcf.fd, offset, length, prot, flags)
+            if err != nil {
+                return err
+            }
+
+            // MMapRegion oluştur
+            zcf.mmapRegion = &MMapRegion{
+                Data: data,
+                Length: length,
+                Offset: offset,
+                File: zcf.file,
+                Flags: flags,
+            }
+
+            zcf.mmapEnabled = true
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.TotalMMap, 1)
+
+            return nil
+        }
+
+        // DisableMMap, bellek eşleme özelliğini devre dışı bırakır.
+        func (zcf *ZeroCopyFile) DisableMMap() error {
+            zcf.mutex.Lock()
+            defer zcf.mutex.Unlock()
+
+            if zcf.mmapRegion == nil {
+                return nil
+            }
+
+            // Bellek eşlemesini kaldır
+            err := syscall.Munmap(zcf.mmapRegion.Data)
+            if err != nil {
+                return err
+            }
+
+            zcf.mmapRegion = nil
+            zcf.mmapEnabled = false
+
+            return nil
+        }
+
         // SendFile, dosya içeriğini doğrudan ağ soketine gönderir.
         func (zcf *ZeroCopyFile) SendFile(socket *os.File, offset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.TotalSendFile, 1)
+
+            startTime := time.Now()
+
             // sendfile sistem çağrısı
-            return syscall.Sendfile(int(socket.Fd()), zcf.fd, &offset, count)
+            n, err := syscall.Sendfile(int(socket.Fd()), zcf.fd, &offset, count)
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.BytesSent, uint64(n))
+            atomic.AddUint64(&zcf.stats.TotalSendFileDuration, uint64(duration.Nanoseconds()))
+
+            return n, err
         }
-        
+
+        // Splice, bir dosya tanımlayıcısından diğerine veri kopyalar.
+        func (zcf *ZeroCopyFile) Splice(dst *os.File, dstOffset int64, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.TotalSplice, 1)
+
+            startTime := time.Now()
+
+            // Pipe oluştur
+            r, w, err := os.Pipe()
+            if err != nil {
+                return 0, err
+            }
+            defer r.Close()
+            defer w.Close()
+
+            // splice sistem çağrısı (src -> pipe)
+            var written int64
+            var total int64
+
+            for total < int64(count) {
+                // Kalan baytları hesapla
+                remaining := int64(count) - total
+
+                // Chunk boyutunu ayarla
+                chunkSize := int(remaining)
+                if chunkSize > 64*1024 {
+                    chunkSize = 64*1024
+                }
+
+                // splice sistem çağrısı (src -> pipe)
+                n, err := syscall.Splice(zcf.fd, &srcOffset, int(w.Fd()), nil, chunkSize, 0)
+                if err != nil {
+                    return total, err
+                }
+
+                if n == 0 {
+                    break
+                }
+
+                // splice sistem çağrısı (pipe -> dst)
+                written, err = syscall.Splice(int(r.Fd()), nil, int(dst.Fd()), &dstOffset, int(n), 0)
+                if err != nil {
+                    return total, err
+                }
+
+                total += written
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.BytesSent, uint64(total))
+            atomic.AddUint64(&zcf.stats.TotalSpliceDuration, uint64(duration.Nanoseconds()))
+
+            return total, nil
+        }
+
+        // CopyFileRange, bir dosyadan diğerine veri kopyalar.
+        func (zcf *ZeroCopyFile) CopyFileRange(dst *os.File, dstOffset int64, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.TotalCopyFileRange, 1)
+
+            startTime := time.Now()
+
+            // copy_file_range sistem çağrısı
+            n, err := syscall.CopyFileRange(zcf.fd, &srcOffset, int(dst.Fd()), &dstOffset, count, 0)
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.BytesSent, uint64(n))
+            atomic.AddUint64(&zcf.stats.TotalCopyFileRangeDuration, uint64(duration.Nanoseconds()))
+
+            return n, err
+        }
+
+        // Read, dosyadan veri okur.
+        func (zcf *ZeroCopyFile) Read(p []byte) (int, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.TotalRead, 1)
+
+            startTime := time.Now()
+
+            var n int
+            var err error
+
+            if zcf.mmapEnabled && zcf.mmapRegion != nil {
+                // Bellek eşleme ile oku
+                n = copy(p, zcf.mmapRegion.Data)
+                if n < len(p) {
+                    err = io.EOF
+                }
+            } else if zcf.useDirectIO {
+                // Doğrudan I/O ile oku
+                n, err = zcf.readWithDirectIO(p)
+            } else {
+                // Normal oku
+                n, err = zcf.file.Read(p)
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.BytesRead, uint64(n))
+            atomic.AddUint64(&zcf.stats.TotalReadDuration, uint64(duration.Nanoseconds()))
+
+            return n, err
+        }
+
+        // Write, dosyaya veri yazar.
+        func (zcf *ZeroCopyFile) Write(p []byte) (int, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.TotalWrite, 1)
+
+            startTime := time.Now()
+
+            var n int
+            var err error
+
+            if zcf.mmapEnabled && zcf.mmapRegion != nil {
+                // Bellek eşleme ile yaz
+                n = copy(zcf.mmapRegion.Data, p)
+                if n < len(p) {
+                    err = io.ErrShortWrite
+                }
+            } else if zcf.useDirectIO {
+                // Doğrudan I/O ile yaz
+                n, err = zcf.writeWithDirectIO(p)
+            } else {
+                // Normal yaz
+                n, err = zcf.file.Write(p)
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&zcf.stats.BytesWritten, uint64(n))
+            atomic.AddUint64(&zcf.stats.TotalWriteDuration, uint64(duration.Nanoseconds()))
+
+            return n, err
+        }
+
+        // readWithDirectIO, doğrudan I/O ile okuma işlemi gerçekleştirir.
+        private func (zcf *ZeroCopyFile) readWithDirectIO(p []byte) (int, error) {
+            // Hizalama kontrolü
+            if len(p) % zcf.alignment != 0 {
+                // Hizalanmış tampon oluştur
+                alignedSize := (len(p) + zcf.alignment - 1) & ^(zcf.alignment - 1)
+
+                if zcf.buffer == nil || len(zcf.buffer) < alignedSize {
+                    zcf.buffer = make([]byte, alignedSize)
+                }
+
+                // Hizalanmış tampondan oku
+                n, err := zcf.file.Read(zcf.buffer[:alignedSize])
+                if err != nil {
+                    return 0, err
+                }
+
+                // Verileri kopyala
+                copy(p, zcf.buffer[:n])
+
+                return n, nil
+            }
+
+            // Doğrudan oku
+            return zcf.file.Read(p)
+        }
+
+        // writeWithDirectIO, doğrudan I/O ile yazma işlemi gerçekleştirir.
+        private func (zcf *ZeroCopyFile) writeWithDirectIO(p []byte) (int, error) {
+            // Hizalama kontrolü
+            if len(p) % zcf.alignment != 0 {
+                // Hizalanmış tampon oluştur
+                alignedSize := (len(p) + zcf.alignment - 1) & ^(zcf.alignment - 1)
+
+                if zcf.buffer == nil || len(zcf.buffer) < alignedSize {
+                    zcf.buffer = make([]byte, alignedSize)
+                }
+
+                // Verileri kopyala
+                copy(zcf.buffer, p)
+
+                // Hizalanmış tampona yaz
+                return zcf.file.Write(zcf.buffer[:alignedSize])
+            }
+
+            // Doğrudan yaz
+            return zcf.file.Write(p)
+        }
+
+        // Seek, dosya işaretçisini konumlandırır.
+        func (zcf *ZeroCopyFile) Seek(offset int64, whence int) (int64, error) {
+            return zcf.file.Seek(offset, whence)
+        }
+
         // Close, dosyayı kapatır.
         func (zcf *ZeroCopyFile) Close() error {
+            zcf.mutex.Lock()
+            defer zcf.mutex.Unlock()
+
+            // Bellek eşlemesini kaldır
+            if zcf.mmapRegion != nil {
+                syscall.Munmap(zcf.mmapRegion.Data)
+                zcf.mmapRegion = nil
+            }
+
             return zcf.file.Close()
+        }
+
+        // GetStats, ZeroCopyFile istatistiklerini döndürür.
+        func (zcf *ZeroCopyFile) GetStats() ZeroCopyFileStats {
+            return ZeroCopyFileStats{
+                TotalSendFile:             atomic.LoadUint64(&zcf.stats.TotalSendFile),
+                TotalSplice:               atomic.LoadUint64(&zcf.stats.TotalSplice),
+                TotalCopyFileRange:        atomic.LoadUint64(&zcf.stats.TotalCopyFileRange),
+                TotalMMap:                 atomic.LoadUint64(&zcf.stats.TotalMMap),
+                TotalRead:                 atomic.LoadUint64(&zcf.stats.TotalRead),
+                TotalWrite:                atomic.LoadUint64(&zcf.stats.TotalWrite),
+                BytesSent:                 atomic.LoadUint64(&zcf.stats.BytesSent),
+                BytesRead:                 atomic.LoadUint64(&zcf.stats.BytesRead),
+                BytesWritten:              atomic.LoadUint64(&zcf.stats.BytesWritten),
+                TotalSendFileDuration:     atomic.LoadUint64(&zcf.stats.TotalSendFileDuration),
+                TotalSpliceDuration:       atomic.LoadUint64(&zcf.stats.TotalSpliceDuration),
+                TotalCopyFileRangeDuration: atomic.LoadUint64(&zcf.stats.TotalCopyFileRangeDuration),
+                TotalReadDuration:         atomic.LoadUint64(&zcf.stats.TotalReadDuration),
+                TotalWriteDuration:        atomic.LoadUint64(&zcf.stats.TotalWriteDuration),
+            }
+        }
+}
+
+// ZeroCopyFileStats, ZeroCopyFile istatistiklerini içerir.
+class ZeroCopyFileStats {
+    var TotalSendFile uint64
+    var TotalSplice uint64
+    var TotalCopyFileRange uint64
+    var TotalMMap uint64
+    var TotalRead uint64
+    var TotalWrite uint64
+    var BytesSent uint64
+    var BytesRead uint64
+    var BytesWritten uint64
+    var TotalSendFileDuration uint64
+    var TotalSpliceDuration uint64
+    var TotalCopyFileRangeDuration uint64
+    var TotalReadDuration uint64
+    var TotalWriteDuration uint64
+}
+
+// MMapRegion, bellek eşleme bölgesini temsil eder.
+class MMapRegion {
+    var Data []byte
+    var Length int
+    var Offset int64
+    var File *os.File
+    var Flags int
+}
+
+// BufferPool, tampon havuzunu temsil eder.
+class BufferPool {
+    private:
+        var buffers [][]byte
+        var size int
+        var bufferSize int
+        var mutex sync.Mutex
+        var stats BufferPoolStats
+        var maxBuffers int
+        var currentBuffers int
+        var allocatedBuffers uint64
+        var releasedBuffers uint64
+        var missedBuffers uint64
+        var hitBuffers uint64
+
+    public:
+        // New, yeni bir BufferPool oluşturur.
+        static func New(bufferSize int, maxBuffers int) *BufferPool {
+            if bufferSize <= 0 {
+                bufferSize = 4096 // 4KB varsayılan tampon boyutu
+            }
+
+            if maxBuffers <= 0 {
+                maxBuffers = 16 // Varsayılan olarak 16 tampon
+            }
+
+            bp := new BufferPool()
+            bp.bufferSize = bufferSize
+            bp.maxBuffers = maxBuffers
+            bp.buffers = make([][]byte, 0, maxBuffers)
+
+            return bp
+        }
+
+        // Get, havuzdan bir tampon alır.
+        func (bp *BufferPool) Get() []byte {
+            bp.mutex.Lock()
+            defer bp.mutex.Unlock()
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bp.stats.TotalRequests, 1)
+
+            // Havuzda tampon var mı kontrol et
+            if len(bp.buffers) > 0 {
+                // Son tamponu al
+                buffer := bp.buffers[len(bp.buffers)-1]
+                bp.buffers = bp.buffers[:len(bp.buffers)-1]
+
+                // İstatistikleri güncelle
+                atomic.AddUint64(&bp.hitBuffers, 1)
+                atomic.AddUint64(&bp.stats.CacheHits, 1)
+
+                return buffer
+            }
+
+            // Havuzda tampon yok, yeni tampon oluştur
+            buffer := make([]byte, bp.bufferSize)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bp.allocatedBuffers, 1)
+            atomic.AddUint64(&bp.missedBuffers, 1)
+            atomic.AddUint64(&bp.stats.CacheMisses, 1)
+            atomic.AddUint64(&bp.stats.TotalAllocations, 1)
+
+            return buffer
+        }
+
+        // Put, bir tamponu havuza geri verir.
+        func (bp *BufferPool) Put(buffer []byte) {
+            // Tampon boyutu uygun mu kontrol et
+            if len(buffer) != bp.bufferSize {
+                return
+            }
+
+            bp.mutex.Lock()
+            defer bp.mutex.Unlock()
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bp.stats.TotalReturns, 1)
+
+            // Havuz dolu mu kontrol et
+            if len(bp.buffers) >= bp.maxBuffers {
+                // İstatistikleri güncelle
+                atomic.AddUint64(&bp.stats.PoolFullRejects, 1)
+                return
+            }
+
+            // Tamponu temizle
+            for i := range buffer {
+                buffer[i] = 0
+            }
+
+            // Tamponu havuza ekle
+            bp.buffers = append(bp.buffers, buffer)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bp.releasedBuffers, 1)
+        }
+
+        // Resize, tampon boyutunu değiştirir.
+        func (bp *BufferPool) Resize(newBufferSize int) {
+            if newBufferSize <= 0 {
+                return
+            }
+
+            bp.mutex.Lock()
+            defer bp.mutex.Unlock()
+
+            // Tampon boyutu aynı mı kontrol et
+            if newBufferSize == bp.bufferSize {
+                return
+            }
+
+            // Mevcut tamponları temizle
+            bp.buffers = make([][]byte, 0, bp.maxBuffers)
+
+            // Yeni tampon boyutunu ayarla
+            bp.bufferSize = newBufferSize
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bp.stats.Resizes, 1)
+        }
+
+        // SetMaxBuffers, maksimum tampon sayısını ayarlar.
+        func (bp *BufferPool) SetMaxBuffers(maxBuffers int) {
+            if maxBuffers <= 0 {
+                return
+            }
+
+            bp.mutex.Lock()
+            defer bp.mutex.Unlock()
+
+            // Maksimum tampon sayısı aynı mı kontrol et
+            if maxBuffers == bp.maxBuffers {
+                return
+            }
+
+            // Yeni maksimum tampon sayısını ayarla
+            bp.maxBuffers = maxBuffers
+
+            // Tamponları yeni boyuta göre ayarla
+            if len(bp.buffers) > maxBuffers {
+                bp.buffers = bp.buffers[:maxBuffers]
+            }
+        }
+
+        // Clear, havuzu temizler.
+        func (bp *BufferPool) Clear() {
+            bp.mutex.Lock()
+            defer bp.mutex.Unlock()
+
+            // Tamponları temizle
+            bp.buffers = make([][]byte, 0, bp.maxBuffers)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&bp.stats.Clears, 1)
+        }
+
+        // GetStats, BufferPool istatistiklerini döndürür.
+        func (bp *BufferPool) GetStats() BufferPoolStats {
+            return BufferPoolStats{
+                TotalRequests:    atomic.LoadUint64(&bp.stats.TotalRequests),
+                TotalReturns:     atomic.LoadUint64(&bp.stats.TotalReturns),
+                CacheHits:        atomic.LoadUint64(&bp.stats.CacheHits),
+                CacheMisses:      atomic.LoadUint64(&bp.stats.CacheMisses),
+                TotalAllocations: atomic.LoadUint64(&bp.stats.TotalAllocations),
+                PoolFullRejects:  atomic.LoadUint64(&bp.stats.PoolFullRejects),
+                Resizes:          atomic.LoadUint64(&bp.stats.Resizes),
+                Clears:           atomic.LoadUint64(&bp.stats.Clears),
+            }
+        }
+}
+
+// BufferPoolStats, BufferPool istatistiklerini içerir.
+class BufferPoolStats {
+    var TotalRequests uint64
+    var TotalReturns uint64
+    var CacheHits uint64
+    var CacheMisses uint64
+    var TotalAllocations uint64
+    var PoolFullRejects uint64
+    var Resizes uint64
+    var Clears uint64
+}
+
+// ZeroCopyOptions, zero-copy seçeneklerini içerir.
+class ZeroCopyOptions {
+    var Mode int
+    var ChunkSize int
+    var UseDirectIO bool
+}
+
+// ZeroCopyMode, zero-copy modunu belirtir.
+const (
+    // SendFileMode, sendfile sistem çağrısını kullanır.
+    SendFileMode = iota
+
+    // SpliceMode, splice sistem çağrısını kullanır.
+    SpliceMode
+
+    // CopyFileRangeMode, copy_file_range sistem çağrısını kullanır.
+    CopyFileRangeMode
+
+    // MMapMode, mmap sistem çağrısını kullanır.
+    MMapMode
+)
+
+// OptimizedZeroCopy, optimize edilmiş zero-copy işlemleri için kullanılan bir sınıftır.
+class OptimizedZeroCopy {
+    private:
+        var mode int
+        var chunkSize int
+        var useDirectIO bool
+        var stats ZeroCopyFileStats
+
+    public:
+        // New, yeni bir OptimizedZeroCopy oluşturur.
+        static func New(options ZeroCopyOptions) *OptimizedZeroCopy {
+            ozc := new OptimizedZeroCopy()
+            ozc.mode = options.Mode
+            ozc.chunkSize = options.ChunkSize
+            ozc.useDirectIO = options.UseDirectIO
+
+            if ozc.chunkSize <= 0 {
+                ozc.chunkSize = 64 * 1024 // 64KB
+            }
+
+            return ozc
+        }
+
+        // SendFile, dosya içeriğini doğrudan ağ soketine gönderir.
+        func (ozc *OptimizedZeroCopy) SendFile(dst *os.File, src *os.File, offset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.TotalSendFile, 1)
+
+            startTime := time.Now()
+
+            var n int64
+            var err error
+
+            switch ozc.mode {
+                case SendFileMode:
+                    // sendfile sistem çağrısı
+                    n, err = syscall.Sendfile(int(dst.Fd()), int(src.Fd()), &offset, count)
+
+                case SpliceMode:
+                    // splice sistem çağrısı
+                    n, err = ozc.spliceFile(dst, src, offset, count)
+
+                case CopyFileRangeMode:
+                    // copy_file_range sistem çağrısı
+                    n, err = ozc.copyFileRange(dst, src, offset, count)
+
+                case MMapMode:
+                    // mmap sistem çağrısı
+                    n, err = ozc.mmapFile(dst, src, offset, count)
+
+                default:
+                    // Varsayılan olarak sendfile kullan
+                    n, err = syscall.Sendfile(int(dst.Fd()), int(src.Fd()), &offset, count)
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.BytesSent, uint64(n))
+            atomic.AddUint64(&ozc.stats.TotalSendFileDuration, uint64(duration.Nanoseconds()))
+
+            return n, err
+        }
+
+        // CopyFileRange, bir dosyadan diğerine veri kopyalar.
+        func (ozc *OptimizedZeroCopy) CopyFileRange(dst *os.File, dstOffset int64, src *os.File, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.TotalCopyFileRange, 1)
+
+            startTime := time.Now()
+
+            var n int64
+            var err error
+
+            // copy_file_range sistem çağrısı
+            n, err = syscall.CopyFileRange(int(src.Fd()), &srcOffset, int(dst.Fd()), &dstOffset, count, 0)
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.BytesSent, uint64(n))
+            atomic.AddUint64(&ozc.stats.TotalCopyFileRangeDuration, uint64(duration.Nanoseconds()))
+
+            return n, err
+        }
+
+        // spliceFile, splice sistem çağrısını kullanarak dosya içeriğini kopyalar.
+        private func (ozc *OptimizedZeroCopy) spliceFile(dst *os.File, src *os.File, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.TotalSplice, 1)
+
+            startTime := time.Now()
+
+            // Pipe oluştur
+            r, w, err := os.Pipe()
+            if err != nil {
+                return 0, err
+            }
+            defer r.Close()
+            defer w.Close()
+
+            // splice sistem çağrısı (src -> pipe)
+            var written int64
+            var total int64
+
+            for total < int64(count) {
+                // Kalan baytları hesapla
+                remaining := int64(count) - total
+
+                // Chunk boyutunu ayarla
+                chunkSize := int(remaining)
+                if chunkSize > ozc.chunkSize {
+                    chunkSize = ozc.chunkSize
+                }
+
+                // splice sistem çağrısı (src -> pipe)
+                n, err := syscall.Splice(int(src.Fd()), &srcOffset, int(w.Fd()), nil, chunkSize, 0)
+                if err != nil {
+                    return total, err
+                }
+
+                if n == 0 {
+                    break
+                }
+
+                // splice sistem çağrısı (pipe -> dst)
+                var dstOffset int64 = 0
+                written, err = syscall.Splice(int(r.Fd()), nil, int(dst.Fd()), &dstOffset, int(n), 0)
+                if err != nil {
+                    return total, err
+                }
+
+                total += written
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.BytesSent, uint64(total))
+            atomic.AddUint64(&ozc.stats.TotalSpliceDuration, uint64(duration.Nanoseconds()))
+
+            return total, nil
+        }
+
+        // copyFileRange, copy_file_range sistem çağrısını kullanarak dosya içeriğini kopyalar.
+        private func (ozc *OptimizedZeroCopy) copyFileRange(dst *os.File, src *os.File, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.TotalCopyFileRange, 1)
+
+            startTime := time.Now()
+
+            var dstOffset int64 = 0
+            var total int64
+
+            for total < int64(count) {
+                // Kalan baytları hesapla
+                remaining := int64(count) - total
+
+                // Chunk boyutunu ayarla
+                chunkSize := int(remaining)
+                if chunkSize > ozc.chunkSize {
+                    chunkSize = ozc.chunkSize
+                }
+
+                // copy_file_range sistem çağrısı
+                n, err := syscall.CopyFileRange(int(src.Fd()), &srcOffset, int(dst.Fd()), &dstOffset, chunkSize, 0)
+                if err != nil {
+                    return total, err
+                }
+
+                if n == 0 {
+                    break
+                }
+
+                total += n
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.BytesSent, uint64(total))
+            atomic.AddUint64(&ozc.stats.TotalCopyFileRangeDuration, uint64(duration.Nanoseconds()))
+
+            return total, nil
+        }
+
+        // mmapFile, mmap sistem çağrısını kullanarak dosya içeriğini kopyalar.
+        private func (ozc *OptimizedZeroCopy) mmapFile(dst *os.File, src *os.File, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.TotalMMap, 1)
+
+            startTime := time.Now()
+
+            // Dosya boyutunu al
+            srcInfo, err := src.Stat()
+            if err != nil {
+                return 0, err
+            }
+
+            // Kopyalanacak bayt sayısını hesapla
+            size := int(srcInfo.Size())
+            if count < size {
+                size = count
+            }
+
+            // mmap sistem çağrısı
+            data, err := syscall.Mmap(int(src.Fd()), srcOffset, size, syscall.PROT_READ, syscall.MAP_SHARED)
+            if err != nil {
+                return 0, err
+            }
+            defer syscall.Munmap(data)
+
+            // Dosyaya yaz
+            n, err := dst.Write(data)
+            if err != nil {
+                return int64(n), err
+            }
+
+            endTime := time.Now()
+            duration := endTime.Sub(startTime)
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&ozc.stats.BytesSent, uint64(n))
+            atomic.AddUint64(&ozc.stats.TotalReadDuration, uint64(duration.Nanoseconds()))
+
+            return int64(n), nil
+        }
+
+        // GetStats, OptimizedZeroCopy istatistiklerini döndürür.
+        func (ozc *OptimizedZeroCopy) GetStats() ZeroCopyFileStats {
+            return ZeroCopyFileStats{
+                TotalSendFile:             atomic.LoadUint64(&ozc.stats.TotalSendFile),
+                TotalSplice:               atomic.LoadUint64(&ozc.stats.TotalSplice),
+                TotalCopyFileRange:        atomic.LoadUint64(&ozc.stats.TotalCopyFileRange),
+                TotalMMap:                 atomic.LoadUint64(&ozc.stats.TotalMMap),
+                TotalRead:                 atomic.LoadUint64(&ozc.stats.TotalRead),
+                TotalWrite:                atomic.LoadUint64(&ozc.stats.TotalWrite),
+                BytesSent:                 atomic.LoadUint64(&ozc.stats.BytesSent),
+                BytesRead:                 atomic.LoadUint64(&ozc.stats.BytesRead),
+                BytesWritten:              atomic.LoadUint64(&ozc.stats.BytesWritten),
+                TotalSendFileDuration:     atomic.LoadUint64(&ozc.stats.TotalSendFileDuration),
+                TotalSpliceDuration:       atomic.LoadUint64(&ozc.stats.TotalSpliceDuration),
+                TotalCopyFileRangeDuration: atomic.LoadUint64(&ozc.stats.TotalCopyFileRangeDuration),
+                TotalReadDuration:         atomic.LoadUint64(&ozc.stats.TotalReadDuration),
+                TotalWriteDuration:        atomic.LoadUint64(&ozc.stats.TotalWriteDuration),
+            }
         }
 }
 
@@ -318,98 +1926,361 @@ class SyscallBatcher {
         var fdCache *FileDescriptorCache
         var batchedIOs map[int]*BatchedIO
         var mutex sync.Mutex
-    
+        var stats SyscallBatcherStats
+        var autoFlushInterval time.Duration
+        var autoFlushTimer *time.Timer
+        var closed bool
+        var zeroCopy *OptimizedZeroCopy
+        var priorityQueue *SyscallPriorityQueue
+        var batchingEnabled bool
+        var batchTimeout time.Duration
+
     public:
         // New, yeni bir SyscallBatcher oluşturur.
         static func New() *SyscallBatcher {
             sb := new SyscallBatcher()
             sb.fdCache = FileDescriptorCache.New(100)
             sb.batchedIOs = make(map[int]*BatchedIO)
-            
+            sb.autoFlushInterval = 5 * time.Millisecond
+            sb.batchingEnabled = true
+            sb.batchTimeout = 20 * time.Millisecond
+
+            // ZeroCopy oluştur
+            options := ZeroCopyOptions{
+                Mode:       SendFileMode,
+                ChunkSize:  64 * 1024, // 64KB
+                UseDirectIO: false,
+            }
+            sb.zeroCopy = OptimizedZeroCopy.New(options)
+
+            // Öncelik kuyruğu oluştur
+            sb.priorityQueue = SyscallPriorityQueue.New()
+
+            // Otomatik flush zamanlayıcısını başlat
+            sb.startAutoFlushTimer()
+
             return sb
         }
-        
+
+        // SetBatchingEnabled, batch işleme özelliğini açar veya kapatır.
+        func (sb *SyscallBatcher) SetBatchingEnabled(enabled bool) {
+            sb.mutex.Lock()
+            defer sb.mutex.Unlock()
+
+            sb.batchingEnabled = enabled
+        }
+
+        // SetAutoFlushInterval, otomatik flush aralığını ayarlar.
+        func (sb *SyscallBatcher) SetAutoFlushInterval(interval time.Duration) {
+            sb.mutex.Lock()
+            defer sb.mutex.Unlock()
+
+            sb.autoFlushInterval = interval
+
+            // Zamanlayıcıyı yeniden başlat
+            if sb.autoFlushTimer != nil {
+                sb.autoFlushTimer.Stop()
+            }
+
+            sb.startAutoFlushTimer()
+        }
+
+        // SetBatchTimeout, batch zaman aşımını ayarlar.
+        func (sb *SyscallBatcher) SetBatchTimeout(timeout time.Duration) {
+            sb.mutex.Lock()
+            defer sb.mutex.Unlock()
+
+            sb.batchTimeout = timeout
+        }
+
+        // startAutoFlushTimer, otomatik flush zamanlayıcısını başlatır.
+        private func (sb *SyscallBatcher) startAutoFlushTimer() {
+            if sb.closed {
+                return
+            }
+
+            sb.autoFlushTimer = time.AfterFunc(sb.autoFlushInterval, func() {
+                sb.FlushAll()
+
+                // Zamanlayıcıyı yeniden başlat
+                sb.mutex.Lock()
+                defer sb.mutex.Unlock()
+
+                if !sb.closed {
+                    sb.startAutoFlushTimer()
+                }
+            })
+        }
+
         // GetBatchedIO, belirtilen dosya tanımlayıcısı için bir BatchedIO döndürür.
         func (sb *SyscallBatcher) GetBatchedIO(fd int) *BatchedIO {
             sb.mutex.Lock()
             defer sb.mutex.Unlock()
-            
+
             // BatchedIO ara
             if bio, ok := sb.batchedIOs[fd]; ok {
                 return bio
             }
-            
+
             // Yeni BatchedIO oluştur
             bio := BatchedIO.New(fd)
             sb.batchedIOs[fd] = bio
-            
+
             return bio
         }
-        
+
         // GetFileDescriptorCache, dosya tanımlayıcısı önbelleğini döndürür.
         func (sb *SyscallBatcher) GetFileDescriptorCache() *FileDescriptorCache {
             return sb.fdCache
         }
-        
+
         // OpenFile, bir dosyayı açar ve dosya tanımlayıcısını önbelleğe alır.
         func (sb *SyscallBatcher) OpenFile(path string, flag int, perm os.FileMode) (*os.File, error) {
-            return sb.fdCache.Get(path, flag, perm)
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalFileOpens, 1)
+
+            file, err := sb.fdCache.Get(path, flag, perm)
+
+            if err == nil {
+                atomic.AddUint64(&sb.stats.CachedFileOpens, 1)
+            }
+
+            return file, err
         }
-        
+
         // CloseFile, bir dosyayı kapatır ve dosya tanımlayıcısını önbellekten kaldırır.
         func (sb *SyscallBatcher) CloseFile(path string, file *os.File) error {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalFileCloses, 1)
+
             sb.fdCache.Remove(path)
             return file.Close()
         }
-        
+
         // ReadBatched, toplu okuma işlemi gerçekleştirir.
         func (sb *SyscallBatcher) ReadBatched(fd int, buffers [][]byte) (int, error) {
+            if !sb.batchingEnabled {
+                // Batching devre dışı, normal okuma işlemi gerçekleştir
+                return sb.readNonBatched(fd, buffers)
+            }
+
             bio := sb.GetBatchedIO(fd)
-            
+
             // Tamponları ekle
+            added, canAddMore := bio.AddBuffers(buffers)
+
+            if !canAddMore {
+                // Batch doldu, hemen flush yap
+                return bio.ReadBatched()
+            }
+
+            // Zaman aşımı ile flush
+            go func() {
+                time.Sleep(sb.batchTimeout)
+                bio.ReadBatched()
+            }()
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalReadRequests, 1)
+            atomic.AddUint64(&sb.stats.BatchedReadRequests, 1)
+
+            // Başarılı, ancak asenkron olarak tamamlanacak
+            return 0, nil
+        }
+
+        // readNonBatched, batch olmadan okuma işlemi gerçekleştirir.
+        private func (sb *SyscallBatcher) readNonBatched(fd int, buffers [][]byte) (int, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalReadRequests, 1)
+            atomic.AddUint64(&sb.stats.NonBatchedReadRequests, 1)
+
+            // Her tampon için ayrı okuma işlemi gerçekleştir
+            totalRead := 0
+
             for _, buffer := range buffers {
-                if !bio.AddBuffer(buffer) {
-                    // Tampon eklenemedi, mevcut tamponları oku
-                    n, err := bio.ReadBatched()
-                    if err != nil {
-                        return n, err
-                    }
-                    
-                    // Yeni tamponu ekle
-                    bio.AddBuffer(buffer)
+                n, err := syscall.Read(fd, buffer)
+                if err != nil {
+                    return totalRead, err
+                }
+
+                totalRead += n
+
+                if n < len(buffer) {
+                    // Tampon tamamen dolmadı, okuma işlemi tamamlandı
+                    break
                 }
             }
-            
-            // Toplu okuma işlemi gerçekleştir
-            return bio.ReadBatched()
+
+            return totalRead, nil
         }
-        
+
         // WriteBatched, toplu yazma işlemi gerçekleştirir.
         func (sb *SyscallBatcher) WriteBatched(fd int, buffers [][]byte) (int, error) {
+            if !sb.batchingEnabled {
+                // Batching devre dışı, normal yazma işlemi gerçekleştir
+                return sb.writeNonBatched(fd, buffers)
+            }
+
             bio := sb.GetBatchedIO(fd)
-            
+
             // Tamponları ekle
+            added, canAddMore := bio.AddBuffers(buffers)
+
+            if !canAddMore {
+                // Batch doldu, hemen flush yap
+                return bio.WriteBatched()
+            }
+
+            // Zaman aşımı ile flush
+            go func() {
+                time.Sleep(sb.batchTimeout)
+                bio.WriteBatched()
+            }()
+
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalWriteRequests, 1)
+            atomic.AddUint64(&sb.stats.BatchedWriteRequests, 1)
+
+            // Başarılı, ancak asenkron olarak tamamlanacak
+            return 0, nil
+        }
+
+        // writeNonBatched, batch olmadan yazma işlemi gerçekleştirir.
+        private func (sb *SyscallBatcher) writeNonBatched(fd int, buffers [][]byte) (int, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalWriteRequests, 1)
+            atomic.AddUint64(&sb.stats.NonBatchedWriteRequests, 1)
+
+            // Her tampon için ayrı yazma işlemi gerçekleştir
+            totalWritten := 0
+
             for _, buffer := range buffers {
-                if !bio.AddBuffer(buffer) {
-                    // Tampon eklenemedi, mevcut tamponları yaz
-                    n, err := bio.WriteBatched()
-                    if err != nil {
-                        return n, err
-                    }
-                    
-                    // Yeni tamponu ekle
-                    bio.AddBuffer(buffer)
+                n, err := syscall.Write(fd, buffer)
+                if err != nil {
+                    return totalWritten, err
+                }
+
+                totalWritten += n
+
+                if n < len(buffer) {
+                    // Tampon tamamen yazılamadı, yazma işlemi tamamlandı
+                    break
                 }
             }
-            
-            // Toplu yazma işlemi gerçekleştir
-            return bio.WriteBatched()
+
+            return totalWritten, nil
         }
-        
+
         // SendFile, dosya içeriğini doğrudan ağ soketine gönderir.
         func (sb *SyscallBatcher) SendFile(socket *os.File, file *os.File, offset int64, count int) (int64, error) {
-            zcf := ZeroCopyFile.New(file)
-            return zcf.SendFile(socket, offset, count)
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalSendFileRequests, 1)
+
+            return sb.zeroCopy.SendFile(socket, file, offset, count)
+        }
+
+        // CopyFileRange, bir dosyadan diğerine veri kopyalar.
+        func (sb *SyscallBatcher) CopyFileRange(dst *os.File, dstOffset int64, src *os.File, srcOffset int64, count int) (int64, error) {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalCopyFileRangeRequests, 1)
+
+            return sb.zeroCopy.CopyFileRange(dst, dstOffset, src, srcOffset, count)
+        }
+
+        // FlushAll, tüm BatchedIO'ları flush eder.
+        func (sb *SyscallBatcher) FlushAll() {
+            sb.mutex.Lock()
+            bios := make([]*BatchedIO, 0, len(sb.batchedIOs))
+
+            // BatchedIO'ları kopyala
+            for _, bio := range sb.batchedIOs {
+                bios = append(bios, bio)
+            }
+
+            sb.mutex.Unlock()
+
+            // Her BatchedIO'yu flush et
+            for _, bio := range bios {
+                bio.ReadBatched()
+                bio.WriteBatched()
+            }
+        }
+
+        // QueueSyscall, bir sistem çağrısını kuyruğa ekler.
+        func (sb *SyscallBatcher) QueueSyscall(syscallType int, fd int, data interface{}, priority int) *SyscallFuture {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalQueuedSyscalls, 1)
+
+            // Sistem çağrısını oluştur
+            syscall := &SyscallRequest{
+                Type:     syscallType,
+                FD:       fd,
+                Data:     data,
+                Priority: priority,
+            }
+
+            // Sistem çağrısını kuyruğa ekle
+            future := sb.priorityQueue.Enqueue(syscall)
+
+            return future
+        }
+
+        // ProcessSyscallQueue, sistem çağrısı kuyruğunu işler.
+        func (sb *SyscallBatcher) ProcessSyscallQueue() {
+            // İstatistikleri güncelle
+            atomic.AddUint64(&sb.stats.TotalQueueProcessings, 1)
+
+            // Kuyruktaki sistem çağrılarını işle
+            sb.priorityQueue.ProcessQueue()
+        }
+
+        // GetStats, SyscallBatcher istatistiklerini döndürür.
+        func (sb *SyscallBatcher) GetStats() SyscallBatcherStats {
+            fdCacheStats := sb.fdCache.GetStats()
+
+            return SyscallBatcherStats{
+                TotalFileOpens:            atomic.LoadUint64(&sb.stats.TotalFileOpens),
+                CachedFileOpens:           atomic.LoadUint64(&sb.stats.CachedFileOpens),
+                TotalFileCloses:           atomic.LoadUint64(&sb.stats.TotalFileCloses),
+                TotalReadRequests:         atomic.LoadUint64(&sb.stats.TotalReadRequests),
+                BatchedReadRequests:       atomic.LoadUint64(&sb.stats.BatchedReadRequests),
+                NonBatchedReadRequests:    atomic.LoadUint64(&sb.stats.NonBatchedReadRequests),
+                TotalWriteRequests:        atomic.LoadUint64(&sb.stats.TotalWriteRequests),
+                BatchedWriteRequests:      atomic.LoadUint64(&sb.stats.BatchedWriteRequests),
+                NonBatchedWriteRequests:   atomic.LoadUint64(&sb.stats.NonBatchedWriteRequests),
+                TotalSendFileRequests:     atomic.LoadUint64(&sb.stats.TotalSendFileRequests),
+                TotalCopyFileRangeRequests: atomic.LoadUint64(&sb.stats.TotalCopyFileRangeRequests),
+                TotalQueuedSyscalls:       atomic.LoadUint64(&sb.stats.TotalQueuedSyscalls),
+                TotalQueueProcessings:     atomic.LoadUint64(&sb.stats.TotalQueueProcessings),
+                FDCacheSize:               fdCacheStats["size"].(int),
+                FDCacheHits:               fdCacheStats["hits"].(uint64),
+                FDCacheMisses:             fdCacheStats["misses"].(uint64),
+            }
+        }
+
+        // Close, SyscallBatcher'ı kapatır.
+        func (sb *SyscallBatcher) Close() {
+            sb.mutex.Lock()
+            defer sb.mutex.Unlock()
+
+            if sb.closed {
+                return
+            }
+
+            sb.closed = true
+
+            // Zamanlayıcıyı durdur
+            if sb.autoFlushTimer != nil {
+                sb.autoFlushTimer.Stop()
+            }
+
+            // Tüm BatchedIO'ları flush et
+            sb.mutex.Unlock()
+            sb.FlushAll()
+            sb.mutex.Lock()
+
+            // Önbelleği temizle
+            sb.fdCache.Clear()
         }
 }
 

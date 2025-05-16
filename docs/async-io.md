@@ -85,22 +85,22 @@ Event Loop, asenkron olayları işleyen bir olay döngüsüdür. GO-Minus'un eve
 class EventLoop {
     // New, yeni bir EventLoop oluşturur.
     static func New() (*EventLoop, error)
-    
+
     // Start, olay döngüsünü başlatır.
     func (loop *EventLoop) Start() error
-    
+
     // Stop, olay döngüsünü durdurur.
     func (loop *EventLoop) Stop() error
-    
+
     // Register, bir dosya tanımlayıcısını olay döngüsüne kaydeder.
     func (loop *EventLoop) Register(fd int, events int, handler AsyncHandler) (int, error)
-    
+
     // Unregister, bir dosya tanımlayıcısını olay döngüsünden kaldırır.
     func (loop *EventLoop) Unregister(id int) error
-    
+
     // Wakeup, olay döngüsünü uyandırır.
     func (loop *EventLoop) Wakeup()
-    
+
     // Post, bir olayı olay döngüsüne gönderir.
     func (loop *EventLoop) Post(event Event, handler AsyncHandler)
 }
@@ -117,16 +117,16 @@ GO-Minus, farklı platformlar için IO multiplexing implementasyonları sağlar:
 class EpollPoller {
     // Add, bir dosya tanımlayıcısını epoll örneğine ekler.
     func (ep *EpollPoller) Add(fd int, events int) error
-    
+
     // Remove, bir dosya tanımlayıcısını epoll örneğinden kaldırır.
     func (ep *EpollPoller) Remove(fd int) error
-    
+
     // Modify, bir dosya tanımlayıcısının epoll olaylarını değiştirir.
     func (ep *EpollPoller) Modify(fd int, events int) error
-    
+
     // Wait, epoll olaylarını bekler.
     func (ep *EpollPoller) Wait(timeout int) ([]Event, error)
-    
+
     // Close, epoll örneğini kapatır.
     func (ep *EpollPoller) Close() error
 }
@@ -139,16 +139,16 @@ class EpollPoller {
 class KqueuePoller {
     // Add, bir dosya tanımlayıcısını kqueue örneğine ekler.
     func (kp *KqueuePoller) Add(fd int, events int) error
-    
+
     // Remove, bir dosya tanımlayıcısını kqueue örneğinden kaldırır.
     func (kp *KqueuePoller) Remove(fd int) error
-    
+
     // Modify, bir dosya tanımlayıcısının kqueue olaylarını değiştirir.
     func (kp *KqueuePoller) Modify(fd int, events int) error
-    
+
     // Wait, kqueue olaylarını bekler.
     func (kp *KqueuePoller) Wait(timeout int) ([]Event, error)
-    
+
     // Close, kqueue örneğini kapatır.
     func (kp *KqueuePoller) Close() error
 }
@@ -161,16 +161,16 @@ class KqueuePoller {
 class IOCPPoller {
     // Add, bir handle'ı IOCP'ye ekler.
     func (ip *IOCPPoller) Add(fd int, events int) error
-    
+
     // Remove, bir handle'ı IOCP'den kaldırır.
     func (ip *IOCPPoller) Remove(fd int) error
-    
+
     // Modify, bir handle'ın IOCP olaylarını değiştirir.
     func (ip *IOCPPoller) Modify(fd int, events int) error
-    
+
     // Wait, IOCP olaylarını bekler.
     func (ip *IOCPPoller) Wait(timeout int) ([]Event, error)
-    
+
     // Close, IOCP örneğini kapatır.
     func (ip *IOCPPoller) Close() error
 }
@@ -185,31 +185,31 @@ GO-Minus'un Future/Promise pattern implementasyonu, asenkron işlemlerin sonuçl
 class AsyncFuture<T> {
     // Get, Future'ın sonucunu döndürür.
     func (af *AsyncFuture<T>) Get() (T, error)
-    
+
     // GetWithTimeout, belirtilen süre içinde Future'ın sonucunu döndürür.
     func (af *AsyncFuture<T>) GetWithTimeout(timeout time.Duration) (T, error, bool)
-    
+
     // IsDone, Future'ın tamamlanıp tamamlanmadığını kontrol eder.
     func (af *AsyncFuture<T>) IsDone() bool
-    
+
     // IsCancelled, Future'ın iptal edilip edilmediğini kontrol eder.
     func (af *AsyncFuture<T>) IsCancelled() bool
-    
+
     // Cancel, Future'ı iptal eder.
     func (af *AsyncFuture<T>) Cancel() bool
-    
+
     // Then, Future tamamlandığında çağrılacak bir callback ekler.
     func (af *AsyncFuture<T>) Then(callback func(T)) *AsyncFuture<T>
-    
+
     // Catch, Future bir hata ile tamamlandığında çağrılacak bir callback ekler.
     func (af *AsyncFuture<T>) Catch(callback func(error)) *AsyncFuture<T>
-    
+
     // Finally, Future tamamlandığında veya iptal edildiğinde çağrılacak bir callback ekler.
     func (af *AsyncFuture<T>) Finally(callback func()) *AsyncFuture<T>
-    
+
     // Map, Future'ın sonucunu dönüştürür.
     template<U> func (af *AsyncFuture<T>) Map(mapper func(T) U) *AsyncFuture<U>
-    
+
     // FlatMap, Future'ın sonucunu başka bir Future'a dönüştürür.
     template<U> func (af *AsyncFuture<T>) FlatMap(mapper func(T) *AsyncFuture<U>) *AsyncFuture<U>
 }
@@ -218,10 +218,10 @@ class AsyncFuture<T> {
 class AsyncPromise<T> {
     // Complete, Promise'i tamamlar ve sonucu ayarlar.
     func (p *AsyncPromise<T>) Complete(result T)
-    
+
     // CompleteWithError, Promise'i bir hata ile tamamlar.
     func (p *AsyncPromise<T>) CompleteWithError(err interface{})
-    
+
     // GetFuture, Promise ile ilişkili Future'ı döndürür.
     func (p *AsyncPromise<T>) GetFuture() *AsyncFuture<T>
 }
@@ -243,11 +243,29 @@ GO-Minus'un asenkron IO implementasyonu, aşağıdaki performans optimizasyonlar
 - İş çalma algoritması (work stealing)
 - Atomik sayaçlar
 
-### Sistem Çağrıları Optimizasyonu (Devam Ediyor)
+### Sistem Çağrıları Optimizasyonu
 
 - Sistem çağrı sayısını azaltma
-- Batch işleme
-- Syscall overhead azaltma
+  - BatchedIO: readv/writev sistem çağrılarını kullanarak çoklu okuma/yazma işlemlerini tek bir sistem çağrısında gruplandırır
+  - SyscallBatcher: Sistem çağrılarını gruplandırarak toplam sistem çağrısı sayısını azaltır
+  - Otomatik batch boyutu ayarlama: Dinamik olarak optimal batch boyutunu belirler
+  - Öncelikli sistem çağrı kuyruğu: Sistem çağrılarını öncelik sırasına göre işler
+
+- Zero-Copy Optimizasyonları
+  - ZeroCopyFile: sendfile sistem çağrısını kullanarak dosya içeriğini doğrudan ağ soketine gönderir
+  - Splice: splice sistem çağrısını kullanarak dosya içeriğini kopyalar
+  - CopyFileRange: copy_file_range sistem çağrısını kullanarak dosya içeriğini kopyalar
+  - Memory-Mapped IO: mmap sistem çağrısını kullanarak dosya içeriğini belleğe eşler
+
+- Dosya Tanımlayıcı Yönetimi
+  - FileDescriptorCache: Dosya tanımlayıcılarını önbellekte tutarak tekrarlanan dosya açma işlemlerini azaltır
+  - Farklı önbellek stratejileri: LRU, LFU, FIFO ve TTL
+  - Otomatik temizleme: Belirli aralıklarla kullanılmayan dosya tanımlayıcılarını temizler
+
+- Syscall Overhead Azaltma
+  - Doğrudan I/O: O_DIRECT bayrağını kullanarak kernel buffer cache'i atlar
+  - Hizalanmış I/O: Hizalanmış tamponlar kullanarak I/O performansını artırır
+  - Asenkron sistem çağrıları: Sistem çağrılarını asenkron olarak işler
 
 ### Buffer Havuzu (Devam Ediyor)
 
@@ -270,7 +288,7 @@ func main() {
         fmt.Println("Event loop oluşturma hatası:", err)
         return
     }
-    
+
     // Event loop başlat
     err = loop.Start()
     if err != nil {
@@ -278,28 +296,28 @@ func main() {
         return
     }
     defer loop.Stop()
-    
+
     // Asenkron bir işlem başlat
     future := async.SupplyAsync<string>(loop, func() string {
         // Asenkron işlem simülasyonu
         time.Sleep(1 * time.Second)
         return "Merhaba, Dünya!"
     })
-    
+
     // Callback ekle
     future.Then(func(result string) {
         fmt.Println("Sonuç:", result)
     }).Catch(func(err error) {
         fmt.Println("Hata:", err)
     })
-    
+
     // Sonucu bekle
     result, err := future.Get()
     if err != nil {
         fmt.Println("Hata:", err)
         return
     }
-    
+
     fmt.Println("Sonuç:", result)
 }
 ```
