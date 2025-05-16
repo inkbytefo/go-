@@ -1,41 +1,41 @@
-# GO-Minus Dili Geliştirme İlerleme Raporu
+# GO-Minus Language Development Progress Report
 
-Bu belge, GO-Minus programlama dilinin geliştirme sürecini takip etmek için kullanılmaktadır. Tamamlanan görevler, devam eden çalışmalar ve gelecek planlar burada belgelenecektir.
+This document is used to track the development process of the GO-Minus programming language. Completed tasks, ongoing work, and future plans will be documented here.
 
-## Proje Genel Bakış
+## Project Overview
 
-GO-Minus dili, Go programlama dilinin tüm özelliklerini içeren ve C++ benzeri özelliklerle (sınıflar, şablonlar, istisna işleme vb.) genişletilmiş bir dil olarak tasarlanmıştır. GO-Minus dosyaları `.gom` uzantısını kullanır.
+The GO-Minus language is designed as a language that includes all features of the Go programming language and extends it with C++-like features (classes, templates, exception handling, etc.). GO-Minus files use the `.gom` extension.
 
-## Tamamlanan Görevler
+## Completed Tasks
 
-### Temel Altyapı
+### Basic Infrastructure
 
-- [x] **Token Paketi**: Token türleri ve token yapısı tanımlandı.
-  - Token türleri (anahtar kelimeler, operatörler, ayırıcılar vb.) tanımlandı.
-  - Token yapısı (tür, değer, satır, sütun, pozisyon) tanımlandı.
-  - GO-Minus için özel token türleri (class, template, throw vb.) eklendi.
+- [x] **Token Package**: Token types and token structure defined.
+  - Token types (keywords, operators, separators, etc.) defined.
+  - Token structure (type, value, line, column, position) defined.
+  - Special token types for GO-Minus (class, template, throw, etc.) added.
 
-- [x] **Lexer Paketi**: Kaynak kodu token'lara ayıran lexer geliştirildi.
-  - Temel token tanıma işlevleri eklendi.
-  - Yorum, string, sayı vb. özel token türleri için işleme eklendi.
-  - Satır ve sütun numaralarını takip etme eklendi.
+- [x] **Lexer Package**: Lexer that separates source code into tokens developed.
+  - Basic token recognition functions added.
+  - Processing for special token types such as comments, strings, numbers, etc. added.
+  - Line and column number tracking added.
 
-- [x] **AST Paketi**: Soyut Sözdizimi Ağacı (AST) düğümleri tanımlandı.
-  - Temel AST düğüm arayüzleri (Node, Statement, Expression) tanımlandı.
-  - İfade düğümleri (Identifier, IntegerLiteral, StringLiteral vb.) tanımlandı.
-  - Deyim düğümleri (VarStatement, ReturnStatement, BlockStatement vb.) tanımlandı.
-  - GO-Minus için özel AST düğümleri (ClassStatement, TemplateExpression vb.) tanımlandı.
+- [x] **AST Package**: Abstract Syntax Tree (AST) nodes defined.
+  - Basic AST node interfaces (Node, Statement, Expression) defined.
+  - Expression nodes (Identifier, IntegerLiteral, StringLiteral, etc.) defined.
+  - Statement nodes (VarStatement, ReturnStatement, BlockStatement, etc.) defined.
+  - Special AST nodes for GO-Minus (ClassStatement, TemplateExpression, etc.) defined.
 
-- [x] **Parser Paketi (Temel)**: Token dizisini AST'ye dönüştüren parser'ın temel yapısı geliştirildi.
-  - Recursive descent parser yapısı oluşturuldu.
-  - Temel ifade ayrıştırma (expression parsing) eklendi.
-  - Operatör öncelik tablosu eklendi.
-  - Basit ifadeleri ayrıştırma yeteneği eklendi.
+- [x] **Parser Package (Basic)**: Basic structure of the parser that converts token sequence to AST developed.
+  - Recursive descent parser structure created.
+  - Basic expression parsing added.
+  - Operator precedence table added.
+  - Ability to parse simple expressions added.
 
-### Testler ve Örnekler
+### Tests and Examples
 
-- [x] **Minimal Örnek**: Basit bir ifadeyi ayrıştıran minimal örnek oluşturuldu.
-  - `5 + 10` ifadesini ayrıştıran ve AST'yi yazdıran örnek çalıştırıldı.
+- [x] **Minimal Example**: Minimal example that parses a simple expression created.
+  - Example that parses the expression `5 + 10` and prints the AST run.
 
 ## Devam Eden Çalışmalar
 

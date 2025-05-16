@@ -1,91 +1,91 @@
-# GO-Minus Trie Paketi
+# GO-Minus Trie Package
 
-Bu paket, GO-Minus programlama dili için Trie (Önek Ağacı) veri yapısı implementasyonu sağlar. Trie, string anahtarları verimli bir şekilde depolamak ve aramak için kullanılan bir ağaç veri yapısıdır.
+This package provides a Trie (Prefix Tree) data structure implementation for the GO-Minus programming language. Trie is a tree data structure used to efficiently store and search for string keys.
 
-## Özellikler
+## Features
 
-- Jenerik tip desteği (herhangi bir tip için kullanılabilir)
-- Kelime ekleme, arama ve silme işlemleri
-- Önek araması
-- Belirli bir önekle başlayan tüm kelimeleri bulma
-- Trie'deki tüm kelimeleri listeleme
-- Boş kontrol ve boyut hesaplama
+- Generic type support (can be used for any type)
+- Word insertion, search, and deletion operations
+- Prefix search
+- Finding all words starting with a specific prefix
+- Listing all words in the Trie
+- Empty check and size calculation
 
-## Kullanım
+## Usage
 
 ```go
 import "container/trie"
 
 func main() {
-    // String değerler için bir Trie oluştur
+    // Create a Trie for string values
     t := trie.Trie.New<string>()
-    
-    // Kelimeler ekle
-    t.Insert("apple", "elma")
-    t.Insert("banana", "muz")
-    t.Insert("application", "uygulama")
-    
-    // Kelime ara
+
+    // Add words
+    t.Insert("apple", "apple")
+    t.Insert("banana", "banana")
+    t.Insert("application", "application")
+
+    // Search for a word
     value, found := t.Search("apple")
     if found {
-        fmt.Println("Değer:", value) // "elma" yazdırır
+        fmt.Println("Value:", value) // Prints "apple"
     }
-    
-    // Önek kontrolü
+
+    // Prefix check
     if t.StartsWith("app") {
-        fmt.Println("'app' öneki ile başlayan kelimeler var")
+        fmt.Println("There are words starting with the prefix 'app'")
     }
-    
-    // Belirli önekle başlayan tüm kelimeleri al
+
+    // Get all words starting with a specific prefix
     appWords := t.GetWordsWithPrefix("app")
     for word, value := range appWords {
         fmt.Printf("%s: %s\n", word, value)
     }
-    
-    // Kelime sil
+
+    // Delete a word
     t.Delete("banana")
-    
-    // Trie'deki tüm kelimeleri al
+
+    // Get all words in the Trie
     allWords := t.GetAllWords()
     for word, value := range allWords {
         fmt.Printf("%s: %s\n", word, value)
     }
-    
-    // Trie'yi temizle
+
+    // Clear the Trie
     t.Clear()
 }
 ```
 
-## Performans
+## Performance
 
-Trie veri yapısı, string anahtarları için aşağıdaki karmaşıklıklara sahiptir:
+The Trie data structure has the following complexities for string keys:
 
-- Ekleme: O(m), m = anahtar uzunluğu
-- Arama: O(m), m = anahtar uzunluğu
-- Silme: O(m), m = anahtar uzunluğu
-- Önek araması: O(m), m = önek uzunluğu
-- Belirli önekle başlayan tüm kelimeleri bulma: O(n), n = eşleşen kelime sayısı
+- Insertion: O(m), m = key length
+- Search: O(m), m = key length
+- Deletion: O(m), m = key length
+- Prefix search: O(m), m = prefix length
+- Finding all words starting with a specific prefix: O(n), n = number of matching words
 
-## Uygulama Detayları
+## Implementation Details
 
-Trie implementasyonu, iki ana sınıftan oluşur:
+The Trie implementation consists of two main classes:
 
-1. `TrieNode<T>`: Trie ağacındaki her bir düğümü temsil eder. Her düğüm, çocuk düğümleri, bir kelimenin sonu olup olmadığı bilgisini ve bir değer içerir.
+1. `TrieNode<T>`: Represents each node in the Trie tree. Each node contains child nodes, information about whether it is the end of a word, and a value.
 
-2. `Trie<T>`: Trie veri yapısını temsil eder. Kök düğümü ve trie üzerinde işlem yapmak için metotları içerir.
+2. `Trie<T>`: Represents the Trie data structure. Contains the root node and methods for operating on the trie.
 
-## Kullanım Senaryoları
+## Use Cases
 
-Trie veri yapısı aşağıdaki senaryolarda kullanışlıdır:
+The Trie data structure is useful in the following scenarios:
 
-- Otomatik tamamlama
-- Yazım denetimi
-- Sözlük implementasyonu
-- Önek tabanlı arama
-- IP yönlendirme tabloları
-- Metin sıkıştırma algoritmaları
+- Autocomplete
+- Spell checking
+- Dictionary implementation
+- Prefix-based search
+- IP routing tables
+- Text compression algorithms
 
-## Sınırlamalar
+## Limitations
 
-- Trie veri yapısı, bellek kullanımı açısından diğer veri yapılarına göre daha fazla yer kaplayabilir.
-- Trie, string anahtarlar için optimize edilmiştir. Diğer tip anahtarlar için hash tabloları veya ikili arama ağaçları daha uygun olabilir.
+- The Trie data structure may take up more space in terms of memory usage compared to other data structures.
+- Trie is optimized for string keys. Hash tables or binary search trees may be more suitable for other types of keys.

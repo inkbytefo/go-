@@ -1,18 +1,18 @@
-// GO-Minus Standart Kütüphane - Regex Paketi
+// GO-Minus Standard Library - Regex Package
 package regex
 
 import (
     "strings"
 )
 
-// RegexPattern, bir düzenli ifade desenini temsil eder.
+// RegexPattern represents a regular expression pattern.
 class RegexPattern {
     private:
         string pattern
         bool caseSensitive
         bool multiline
-        
-        // Derleme sonrası oluşturulan iç veri yapıları
+
+        // Internal data structures created after compilation
         bool compiled
         string[] literals
         bool hasSpecialChars
@@ -20,36 +20,36 @@ class RegexPattern {
         int[] captureGroupIndices
 
     public:
-        // New, yeni bir RegexPattern oluşturur.
+        // New creates a new RegexPattern.
         static func New(pattern string, caseSensitive bool, multiline bool) *RegexPattern {
             rp := new RegexPattern()
             rp.pattern = pattern
             rp.caseSensitive = caseSensitive
             rp.multiline = multiline
             rp.compiled = false
-            
-            // Deseni derle
+
+            // Compile the pattern
             rp.compile()
-            
+
             return rp
         }
-        
-        // Compile, düzenli ifade desenini derler.
+
+        // Compile compiles the regular expression pattern.
         private func (rp *RegexPattern) compile() {
             if rp.compiled {
                 return
             }
-            
-            // Deseni analiz et
+
+            // Analyze the pattern
             rp.analyzePattern()
-            
-            // Derleme tamamlandı
+
+            // Compilation completed
             rp.compiled = true
         }
-        
-        // AnalyzePattern, düzenli ifade desenini analiz eder.
+
+        // AnalyzePattern analyzes the regular expression pattern.
         private func (rp *RegexPattern) analyzePattern() {
-            // Özel karakterleri kontrol et
+            // Check for special characters
             rp.hasSpecialChars = false
             for _, ch := range rp.pattern {
                 if isSpecialChar(ch) {
@@ -57,11 +57,11 @@ class RegexPattern {
                     break
                 }
             }
-            
-            // Yakalama gruplarını kontrol et
+
+            // Check for capture groups
             rp.hasCaptureGroups = false
             rp.captureGroupIndices = []int{}
-            
+
             inGroup := false
             for i, ch := range rp.pattern {
                 if ch == '(' && (i == 0 || rp.pattern[i-1] != '\\') {
@@ -72,184 +72,184 @@ class RegexPattern {
                     inGroup = false
                 }
             }
-            
-            // Basit desenler için literal dizileri oluştur
+
+            // Create literal arrays for simple patterns
             if !rp.hasSpecialChars {
                 rp.literals = []string{rp.pattern}
             } else {
-                // Karmaşık desenler için daha gelişmiş bir analiz gerekir
-                // Bu basit implementasyonda, sadece basit desenleri destekliyoruz
+                // More advanced analysis is needed for complex patterns
+                // In this simple implementation, we only support simple patterns
                 rp.literals = []string{}
             }
         }
-        
-        // Match, bir metni düzenli ifade deseniyle eşleştirir.
+
+        // Match matches a text with the regular expression pattern.
         func (rp *RegexPattern) Match(text string) bool {
-            // Desen derlenmemişse, derle
+            // Compile the pattern if not compiled
             if !rp.compiled {
                 rp.compile()
             }
-            
-            // Büyük/küçük harf duyarsız eşleştirme için metni küçük harfe çevir
+
+            // Convert text to lowercase for case-insensitive matching
             matchText := text
             matchPattern := rp.pattern
-            
+
             if !rp.caseSensitive {
                 matchText = strings.ToLower(matchText)
                 matchPattern = strings.ToLower(matchPattern)
             }
-            
-            // Basit desenler için doğrudan kontrol
+
+            // Direct check for simple patterns
             if !rp.hasSpecialChars {
                 return strings.Contains(matchText, matchPattern)
             }
-            
-            // Karmaşık desenler için daha gelişmiş bir eşleştirme gerekir
-            // Bu basit implementasyonda, sadece basit desenleri destekliyoruz
+
+            // More advanced matching is needed for complex patterns
+            // In this simple implementation, we only support simple patterns
             return false
         }
-        
-        // FindAll, bir metindeki tüm eşleşmeleri bulur.
+
+        // FindAll finds all matches in a text.
         func (rp *RegexPattern) FindAll(text string) []string {
-            // Desen derlenmemişse, derle
+            // Compile the pattern if not compiled
             if !rp.compiled {
                 rp.compile()
             }
-            
-            // Büyük/küçük harf duyarsız eşleştirme için metni küçük harfe çevir
+
+            // Convert text to lowercase for case-insensitive matching
             matchText := text
             matchPattern := rp.pattern
-            
+
             if !rp.caseSensitive {
                 matchText = strings.ToLower(matchText)
                 matchPattern = strings.ToLower(matchPattern)
             }
-            
-            // Basit desenler için doğrudan arama
+
+            // Direct search for simple patterns
             if !rp.hasSpecialChars {
                 var results []string
-                
+
                 index := 0
                 for {
                     index = strings.Index(matchText[index:], matchPattern)
                     if index == -1 {
                         break
                     }
-                    
+
                     results = append(results, text[index:index+len(matchPattern)])
                     index += len(matchPattern)
                 }
-                
+
                 return results
             }
-            
-            // Karmaşık desenler için daha gelişmiş bir arama gerekir
-            // Bu basit implementasyonda, sadece basit desenleri destekliyoruz
+
+            // More advanced search is needed for complex patterns
+            // In this simple implementation, we only support simple patterns
             return []string{}
         }
-        
-        // Replace, bir metindeki tüm eşleşmeleri belirtilen metinle değiştirir.
+
+        // Replace replaces all matches in a text with the specified replacement.
         func (rp *RegexPattern) Replace(text string, replacement string) string {
-            // Desen derlenmemişse, derle
+            // Compile the pattern if not compiled
             if !rp.compiled {
                 rp.compile()
             }
-            
-            // Basit desenler için doğrudan değiştirme
+
+            // Direct replacement for simple patterns
             if !rp.hasSpecialChars {
                 if rp.caseSensitive {
                     return strings.ReplaceAll(text, rp.pattern, replacement)
                 } else {
-                    // Büyük/küçük harf duyarsız değiştirme için daha karmaşık bir işlem gerekir
-                    // Bu basit implementasyonda, sadece basit değiştirmeleri destekliyoruz
+                    // More complex operation is needed for case-insensitive replacement
+                    // In this simple implementation, we only support simple replacements
                     return text
                 }
             }
-            
-            // Karmaşık desenler için daha gelişmiş bir değiştirme gerekir
-            // Bu basit implementasyonda, sadece basit desenleri destekliyoruz
+
+            // More advanced replacement is needed for complex patterns
+            // In this simple implementation, we only support simple patterns
             return text
         }
-        
-        // Split, bir metni düzenli ifade deseniyle böler.
+
+        // Split splits a text with the regular expression pattern.
         func (rp *RegexPattern) Split(text string) []string {
-            // Desen derlenmemişse, derle
+            // Compile the pattern if not compiled
             if !rp.compiled {
                 rp.compile()
             }
-            
-            // Basit desenler için doğrudan bölme
+
+            // Direct split for simple patterns
             if !rp.hasSpecialChars {
                 if rp.caseSensitive {
                     return strings.Split(text, rp.pattern)
                 } else {
-                    // Büyük/küçük harf duyarsız bölme için daha karmaşık bir işlem gerekir
-                    // Bu basit implementasyonda, sadece basit bölmeleri destekliyoruz
+                    // More complex operation is needed for case-insensitive split
+                    // In this simple implementation, we only support simple splits
                     return []string{text}
                 }
             }
-            
-            // Karmaşık desenler için daha gelişmiş bir bölme gerekir
-            // Bu basit implementasyonda, sadece basit desenleri destekliyoruz
+
+            // More advanced split is needed for complex patterns
+            // In this simple implementation, we only support simple patterns
             return []string{text}
         }
-        
-        // GetPattern, düzenli ifade desenini döndürür.
+
+        // GetPattern returns the regular expression pattern.
         func (rp *RegexPattern) GetPattern() string {
             return rp.pattern
         }
-        
-        // IsCaseSensitive, düzenli ifade deseninin büyük/küçük harf duyarlı olup olmadığını döndürür.
+
+        // IsCaseSensitive returns whether the regular expression pattern is case-sensitive.
         func (rp *RegexPattern) IsCaseSensitive() bool {
             return rp.caseSensitive
         }
-        
-        // IsMultiline, düzenli ifade deseninin çok satırlı olup olmadığını döndürür.
+
+        // IsMultiline returns whether the regular expression pattern is multiline.
         func (rp *RegexPattern) IsMultiline() bool {
             return rp.multiline
         }
 }
 
-// Compile, bir düzenli ifade desenini derler.
+// Compile compiles a regular expression pattern.
 func Compile(pattern string) *RegexPattern {
     return RegexPattern.New(pattern, true, false)
 }
 
-// CompileIgnoreCase, bir düzenli ifade desenini büyük/küçük harf duyarsız olarak derler.
+// CompileIgnoreCase compiles a regular expression pattern with case insensitivity.
 func CompileIgnoreCase(pattern string) *RegexPattern {
     return RegexPattern.New(pattern, false, false)
 }
 
-// CompileMultiline, bir düzenli ifade desenini çok satırlı olarak derler.
+// CompileMultiline compiles a regular expression pattern with multiline mode.
 func CompileMultiline(pattern string) *RegexPattern {
     return RegexPattern.New(pattern, true, true)
 }
 
-// Match, bir metni düzenli ifade deseniyle eşleştirir.
+// Match matches a text with a regular expression pattern.
 func Match(pattern string, text string) bool {
     regex := Compile(pattern)
     return regex.Match(text)
 }
 
-// MatchIgnoreCase, bir metni büyük/küçük harf duyarsız olarak düzenli ifade deseniyle eşleştirir.
+// MatchIgnoreCase matches a text with a regular expression pattern with case insensitivity.
 func MatchIgnoreCase(pattern string, text string) bool {
     regex := CompileIgnoreCase(pattern)
     return regex.Match(text)
 }
 
-// Replace, bir metindeki tüm eşleşmeleri belirtilen metinle değiştirir.
+// Replace replaces all matches in a text with the specified replacement.
 func Replace(pattern string, text string, replacement string) string {
     regex := Compile(pattern)
     return regex.Replace(text, replacement)
 }
 
-// Split, bir metni düzenli ifade deseniyle böler.
+// Split splits a text with a regular expression pattern.
 func Split(pattern string, text string) []string {
     regex := Compile(pattern)
     return regex.Split(text)
 }
 
-// isSpecialChar, bir karakterin düzenli ifade özel karakteri olup olmadığını kontrol eder.
+// isSpecialChar checks if a character is a regular expression special character.
 func isSpecialChar(ch rune) bool {
     specialChars := "\\^$.|?*+()[{"
     for _, specialChar := range specialChars {

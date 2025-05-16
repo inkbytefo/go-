@@ -1,236 +1,236 @@
-# GO-Minus Geliştirme Araçları
+# GO-Minus Development Tools
 
-Bu belge, GO-Minus programlama dili ile geliştirme yaparken kullanabileceğiniz araçları açıklamaktadır. Bu araçlar, GO-Minus kodunu derleme, test etme, belgelendirme, biçimlendirme ve paket yönetimi gibi işlemleri gerçekleştirmenize yardımcı olur.
+This document describes the tools you can use when developing with the GO-Minus programming language. These tools help you perform operations such as compiling, testing, documenting, formatting, and package management of GO-Minus code.
 
-## İçindekiler
+## Contents
 
-1. [Derleyici (gominus)](#derleyici-gominus)
-2. [Paket Yöneticisi (gompm)](#paket-yöneticisi-gompm)
-3. [Test Aracı (gomtest)](#test-aracı-gomtest)
-4. [Belgelendirme Aracı (gomdoc)](#belgelendirme-aracı-gomdoc)
-5. [Kod Biçimlendirme Aracı (gomfmt)](#kod-biçimlendirme-aracı-gomfmt)
-6. [Dil Sunucusu (gomlsp)](#dil-sunucusu-gomlsp)
-7. [Hata Ayıklama Aracı (gomdebug)](#hata-ayıklama-aracı-gomdebug)
-8. [IDE Entegrasyonu](#ide-entegrasyonu)
+1. [Compiler (gominus)](#compiler-gominus)
+2. [Package Manager (gompm)](#package-manager-gompm)
+3. [Testing Tool (gomtest)](#testing-tool-gomtest)
+4. [Documentation Tool (gomdoc)](#documentation-tool-gomdoc)
+5. [Code Formatting Tool (gomfmt)](#code-formatting-tool-gomfmt)
+6. [Language Server (gomlsp)](#language-server-gomlsp)
+7. [Debugging Tool (gomdebug)](#debugging-tool-gomdebug)
+8. [IDE Integration](#ide-integration)
 
-## Derleyici (gominus)
+## Compiler (gominus)
 
-GO-Minus derleyicisi, GO-Minus kaynak kodunu derleyerek çalıştırılabilir dosyalar oluşturur.
+The GO-Minus compiler compiles GO-Minus source code to create executable files.
 
-### Kullanım
+### Usage
 
 ```bash
-# Tek bir dosyayı derle
-gominus dosya.gom
+# Compile a single file
+gominus file.gom
 
-# Birden fazla dosyayı derle
-gominus dosya1.gom dosya2.gom
+# Compile multiple files
+gominus file1.gom file2.gom
 
-# Çıktı dosyasını belirt
-gominus -o program dosya.gom
+# Specify output file
+gominus -o program file.gom
 
-# Optimizasyon seviyesini belirt
-gominus -O2 dosya.gom
+# Specify optimization level
+gominus -O2 file.gom
 
-# Hata ayıklama bilgisi ekle
-gominus -g dosya.gom
+# Add debugging information
+gominus -g file.gom
 
-# Uyarıları etkinleştir
-gominus -Wall dosya.gom
+# Enable warnings
+gominus -Wall file.gom
 
-# Belirli bir hedef platform için derle
-gominus -target=x86_64-linux dosya.gom
+# Compile for a specific target platform
+gominus -target=x86_64-linux file.gom
 
-# Kütüphane olarak derle
-gominus -lib dosya.gom
+# Compile as a library
+gominus -lib file.gom
 
-# Derleme ve çalıştırma
-gominus -run dosya.gom
+# Compile and run
+gominus -run file.gom
 ```
 
-### Çıktı Formatları
+### Output Formats
 
-GO-Minus derleyicisi, aşağıdaki çıktı formatlarını destekler:
+The GO-Minus compiler supports the following output formats:
 
-- Çalıştırılabilir dosya (varsayılan)
-- Nesne dosyası (`.o`)
+- Executable file (default)
+- Object file (`.o`)
 - LLVM IR (`.ll`)
-- Kütüphane (`.a`, `.so`, `.dll`)
+- Library (`.a`, `.so`, `.dll`)
 
-## Paket Yöneticisi (gompm)
+## Package Manager (gompm)
 
-GO-Minus Paket Yöneticisi (gompm), GO-Minus paketlerini indirme, kurma, kaldırma, güncelleme ve arama işlemlerini gerçekleştirir. Bu araç, GO-Minus ekosistemindeki paketlerin yönetimini kolaylaştırır ve bağımlılık çözümleme işlemlerini otomatikleştirir.
+The GO-Minus Package Manager (gompm) performs downloading, installing, removing, updating, and searching operations for GO-Minus packages. This tool facilitates the management of packages in the GO-Minus ecosystem and automates dependency resolution processes.
 
-### Özellikler
+### Features
 
-- Yeni projeler oluşturma
-- Paketleri kurma ve kaldırma
-- Paketleri güncelleme
-- Kurulu paketleri listeleme
-- Paket deposunda arama yapma
-- Paket bilgilerini görüntüleme
-- Bağımlılık yönetimi
-- Geliştirme bağımlılıkları desteği
-- Sürüm kısıtlamaları
-- Paket deposu entegrasyonu
+- Creating new projects
+- Installing and removing packages
+- Updating packages
+- Listing installed packages
+- Searching in the package repository
+- Viewing package information
+- Dependency management
+- Development dependencies support
+- Version constraints
+- Package repository integration
 
-### Kullanım
+### Usage
 
 ```bash
-# Yeni bir proje başlat
-gompm init [proje-adı]
+# Start a new project
+gompm init [project-name]
 
-# Paket kur
-gompm install paket-adı
+# Install a package
+gompm install package-name
 
-# Belirli bir sürümü kur
-gompm install paket-adı@1.0.0
+# Install a specific version
+gompm install package-name@1.0.0
 
-# Geliştirme bağımlılığı olarak kur
-gompm install paket-adı --dev
+# Install as a development dependency
+gompm install package-name --dev
 
-# Paket kaldır
-gompm remove paket-adı
+# Remove a package
+gompm remove package-name
 
-# Tüm paketleri güncelle
+# Update all packages
 gompm update
 
-# Kurulu paketleri listele
+# List installed packages
 gompm list
 
-# Paket deposunda ara
-gompm search sorgu
+# Search in the package repository
+gompm search query
 
-# Paket bilgisi göster
-gompm info paket-adı
+# Show package information
+gompm info package-name
 
-# Yardım mesajını göster
+# Show help message
 gompm help
 
-# Sürüm bilgisini göster
+# Show version information
 gompm version
 ```
 
-### Paket Yapılandırma Dosyası
+### Package Configuration File
 
-Paket yapılandırma dosyası (`gompm.json`), projenin meta verilerini ve bağımlılıklarını içerir:
+The package configuration file (`gompm.json`) contains the project's metadata and dependencies:
 
 ```json
 {
-  "name": "proje-adı",
+  "name": "project-name",
   "version": "1.0.0",
-  "description": "Proje açıklaması",
-  "author": "Yazar Adı",
+  "description": "Project description",
+  "author": "Author Name",
   "license": "MIT",
   "dependencies": {
-    "paket1": "1.0.0",
-    "paket2": "^2.0.0"
+    "package1": "1.0.0",
+    "package2": "^2.0.0"
   },
   "devDependencies": {
-    "test-paketi": "1.0.0"
+    "test-package": "1.0.0"
   },
-  "keywords": ["anahtar", "kelime"],
+  "keywords": ["keyword", "term"],
   "homepage": "https://example.com",
-  "repository": "https://github.com/kullanici/proje"
+  "repository": "https://github.com/user/project"
 }
 ```
 
-### Sürüm Belirtme
+### Version Specification
 
-Paket sürümleri, [Semantic Versioning](https://semver.org/) kurallarına göre belirtilir. Sürüm belirtme formatları:
+Package versions are specified according to [Semantic Versioning](https://semver.org/) rules. Version specification formats:
 
-- `1.0.0`: Tam olarak 1.0.0 sürümü
-- `^1.0.0`: 1.0.0 veya daha yüksek, ancak 2.0.0'dan düşük
-- `~1.0.0`: 1.0.0 veya daha yüksek, ancak 1.1.0'dan düşük
-- `>=1.0.0`: 1.0.0 veya daha yüksek
-- `<=1.0.0`: 1.0.0 veya daha düşük
-- `1.0.0 - 2.0.0`: 1.0.0 ile 2.0.0 arasında (her ikisi de dahil)
-- `latest`: En son sürüm
+- `1.0.0`: Exactly version 1.0.0
+- `^1.0.0`: 1.0.0 or higher, but less than 2.0.0
+- `~1.0.0`: 1.0.0 or higher, but less than 1.1.0
+- `>=1.0.0`: 1.0.0 or higher
+- `<=1.0.0`: 1.0.0 or lower
+- `1.0.0 - 2.0.0`: Between 1.0.0 and 2.0.0 (inclusive)
+- `latest`: Latest version
 
-### Paket Deposu
+### Package Repository
 
-GO-Minus paketleri, merkezi bir paket deposunda (https://repo.gominus.org) saklanır. Bu depo, paketlerin meta verilerini ve kaynak kodlarını içerir. gompm, bu depodan paketleri indirir ve kurar.
+GO-Minus packages are stored in a central package repository (https://repo.gominus.org). This repository contains the metadata and source code of packages. gompm downloads and installs packages from this repository.
 
-### Bağımlılık Çözümleme
+### Dependency Resolution
 
-gompm, paketlerin bağımlılıklarını otomatik olarak çözümler ve kurar. Bağımlılık çözümleme algoritması, sürüm kısıtlamalarını dikkate alarak en uygun sürümleri seçer. Bu, paketler arasındaki sürüm çakışmalarını önlemeye yardımcı olur.
+gompm automatically resolves and installs package dependencies. The dependency resolution algorithm selects the most appropriate versions considering version constraints. This helps prevent version conflicts between packages.
 
-### Güvenlik
+### Security
 
-gompm, paketlerin bütünlüğünü doğrulamak için dijital imzalar kullanır. Bu, kötü amaçlı paketlerin kurulmasını önlemeye yardımcı olur. Ayrıca, paketlerin güvenlik açıklarını kontrol etmek için bir güvenlik taraması da gerçekleştirir.
+gompm uses digital signatures to verify the integrity of packages. This helps prevent the installation of malicious packages. It also performs a security scan to check for vulnerabilities in packages.
 
-### Örnek: Yeni Bir Proje Oluşturma
+### Example: Creating a New Project
 
 ```bash
-# Yeni bir proje oluştur
+# Create a new project
 gompm init my-project
 
-# Proje dizinine git
+# Go to the project directory
 cd my-project
 
-# Paketleri kur
+# Install packages
 gompm install logger@1.0.0
 gompm install http-client@^2.0.0
 gompm install test-framework@latest --dev
 
-# Kurulu paketleri listele
+# List installed packages
 gompm list
 ```
 
-### Örnek: Paket Bilgisi Görüntüleme
+### Example: Viewing Package Information
 
 ```bash
-# Paket bilgisini görüntüle
+# View package information
 gompm info http-client
 
-# Çıktı:
-# Paket: http-client
-# Sürüm: 2.1.0
-# Açıklama: HTTP istemci kütüphanesi
-# Yazar: GO-Minus Ekibi
-# Lisans: MIT
-# Bağımlılıklar:
+# Output:
+# Package: http-client
+# Version: 2.1.0
+# Description: HTTP client library
+# Author: GO-Minus Team
+# License: MIT
+# Dependencies:
 #   - logger@1.0.0
 #   - url-parser@^1.5.0
-# Anahtar Kelimeler: http, client, request, response
-# Ana Sayfa: https://example.com/http-client
-# Depo: https://github.com/gominus/http-client
+# Keywords: http, client, request, response
+# Homepage: https://example.com/http-client
+# Repository: https://github.com/gominus/http-client
 ```
 
-Daha fazla bilgi için [Paket Yöneticisi Belgelendirmesi](../cmd/gompm/README.md) belgesine bakın.
+For more information, see the [Package Manager Documentation](../cmd/gompm/README.md).
 
-## Test Aracı (gomtest)
+## Testing Tool (gomtest)
 
-GO-Minus Test Aracı (gomtest), GO-Minus kodunu test etmek için kullanılır. Test dosyalarını bulur, testleri çalıştırır ve sonuçları raporlar.
+The GO-Minus Testing Tool (gomtest) is used to test GO-Minus code. It finds test files, runs tests, and reports results.
 
-### Kullanım
+### Usage
 
 ```bash
-# Mevcut dizindeki testleri çalıştır
+# Run tests in the current directory
 gomtest
 
-# Ayrıntılı çıktı ile testleri çalıştır
+# Run tests with detailed output
 gomtest -v
 
-# Alt dizinlerdeki testleri de çalıştır
+# Run tests in subdirectories as well
 gomtest -r
 
-# Belirli bir test desenine uyan testleri çalıştır
+# Run tests matching a specific pattern
 gomtest -pattern=TestAdd
 
-# Benchmark testlerini çalıştır
+# Run benchmark tests
 gomtest -bench
 
-# Kod kapsama analizi yap
+# Perform code coverage analysis
 gomtest -cover
 
-# Belirtilen dizinlerdeki testleri çalıştır
+# Run tests in specified directories
 gomtest ./pkg ./internal
 ```
 
-### Test Dosyaları
+### Test Files
 
-Test dosyaları, `_test.gom` son ekiyle biten dosyalardır. Test fonksiyonları, `Test` önekiyle başlar ve `*testing.T` parametresi alır:
+Test files are files ending with the `_test.gom` suffix. Test functions start with the `Test` prefix and take a `*testing.T` parameter:
 
 ```go
 // math_test.gom
@@ -241,206 +241,206 @@ import "testing"
 func TestAdd(t *testing.T) {
     result := Add(2, 3)
     if result != 5 {
-        t.Errorf("Add(2, 3) = %d; beklenen 5", result)
+        t.Errorf("Add(2, 3) = %d; expected 5", result)
     }
 }
 ```
 
-## Belgelendirme Aracı (gomdoc)
+## Documentation Tool (gomdoc)
 
-GO-Minus Belgelendirme Aracı (gomdoc), GO-Minus kodunu belgelendirmek için kullanılır. Kod içindeki yorumları ve yapıları analiz ederek belgelendirme oluşturur.
+The GO-Minus Documentation Tool (gomdoc) is used to document GO-Minus code. It analyzes comments and structures in the code to create documentation.
 
-### Kullanım
+### Usage
 
 ```bash
-# Mevcut dizindeki paketi belgele
+# Document the package in the current directory
 gomdoc
 
-# HTML formatında belgelendirme oluştur
+# Create documentation in HTML format
 gomdoc -html
 
-# Markdown formatında belgelendirme oluştur
+# Create documentation in Markdown format
 gomdoc -markdown
 
-# Belgelendirmeyi belirli bir dizine kaydet
+# Save documentation to a specific directory
 gomdoc -output=docs
 
-# Belgelendirme sunucusu başlat
+# Start a documentation server
 gomdoc -server
 
-# Belgelendirme sunucusunu belirli bir portta başlat
+# Start a documentation server on a specific port
 gomdoc -server -port=8080
 
-# Belirtilen paketleri belgele
+# Document specified packages
 gomdoc ./pkg ./internal
 ```
 
-### Belgelendirme Yorumları
+### Documentation Comments
 
-GO-Minus belgelendirme yorumları, `//` veya `/* */` ile başlar ve belgelendirilen öğeden hemen önce yer alır:
+GO-Minus documentation comments start with `//` or `/* */` and are placed immediately before the documented item:
 
 ```go
-// Add, iki sayıyı toplar ve sonucu döndürür.
+// Add adds two numbers and returns the result.
 //
-// Parametreler:
-//   - a: İlk sayı
-//   - b: İkinci sayı
+// Parameters:
+//   - a: First number
+//   - b: Second number
 //
-// Dönüş değeri:
-//   - İki sayının toplamı
+// Return value:
+//   - The sum of the two numbers
 func Add(a, b int) int {
     return a + b
 }
 ```
 
-## Kod Biçimlendirme Aracı (gomfmt)
+## Code Formatting Tool (gomfmt)
 
-GO-Minus Kod Biçimlendirme Aracı (gomfmt), GO-Minus kodunu standart bir biçimde düzenlemek için kullanılır. Kod stilini tutarlı hale getirir.
+The GO-Minus Code Formatting Tool (gomfmt) is used to format GO-Minus code in a standard way. It makes the code style consistent.
 
-### Kullanım
+### Usage
 
 ```bash
-# Mevcut dizindeki GO-Minus dosyalarını biçimlendir
+# Format GO-Minus files in the current directory
 gomfmt
 
-# Değişiklikleri dosyalara yaz
+# Write changes to files
 gomfmt -w
 
-# Değişiklikleri diff formatında göster
+# Show changes in diff format
 gomfmt -d
 
-# Biçimlendirilmesi gereken dosyaları listele
+# List files that need formatting
 gomfmt -l
 
-# Alt dizinlerdeki dosyaları da biçimlendir
+# Format files in subdirectories as well
 gomfmt -r
 
-# Kodu basitleştir
+# Simplify code
 gomfmt -s
 
-# Belirtilen dosyaları biçimlendir
-gomfmt dosya1.gom dosya2.gom
+# Format specified files
+gomfmt file1.gom file2.gom
 
-# Belirtilen dizinlerdeki dosyaları biçimlendir
+# Format files in specified directories
 gomfmt ./pkg ./internal
 ```
 
-## Dil Sunucusu (gomlsp)
+## Language Server (gomlsp)
 
-GO-Minus Dil Sunucusu (gomlsp), GO-Minus için Language Server Protocol (LSP) implementasyonu sağlar. Bu, IDE ve metin düzenleyicileri ile entegrasyon için kullanılır.
+The GO-Minus Language Server (gomlsp) provides a Language Server Protocol (LSP) implementation for GO-Minus. This is used for integration with IDEs and text editors.
 
-### Özellikler
+### Features
 
-- Kod tamamlama
-- Hata ve uyarı gösterimi
-- Tanıma gitme
-- Yeniden adlandırma
-- Kod biçimlendirme
-- Kod katlama
-- Sembol arama
-- Referans bulma
-- Kod eylemleri
+- Code completion
+- Error and warning display
+- Go to definition
+- Rename
+- Code formatting
+- Code folding
+- Symbol search
+- Find references
+- Code actions
 
-### Kullanım
+### Usage
 
 ```bash
-# Dil sunucusunu başlat
+# Start the language server
 gomlsp
 
-# Belirli bir portta başlat
+# Start on a specific port
 gomlsp --port=8080
 
-# Ayrıntılı günlük kaydı etkinleştir
+# Enable verbose logging
 gomlsp --verbose
 ```
 
-## Hata Ayıklama Aracı (gomdebug)
+## Debugging Tool (gomdebug)
 
-GO-Minus Hata Ayıklama Aracı (gomdebug), GO-Minus programlarında hata ayıklamak için kullanılır.
+The GO-Minus Debugging Tool (gomdebug) is used to debug GO-Minus programs.
 
-### Kullanım
+### Usage
 
 ```bash
-# Programı hata ayıklama modunda başlat
+# Start the program in debug mode
 gomdebug program
 
-# Belirli argümanlarla programı başlat
+# Start the program with specific arguments
 gomdebug program arg1 arg2
 
-# Belirli bir dosya ve satırda kesme noktası ekle
-gomdebug --break=dosya.gom:10 program
+# Add a breakpoint at a specific file and line
+gomdebug --break=file.gom:10 program
 
-# Hata ayıklama sunucusunu başlat
+# Start the debug server
 gomdebug --server program
 
-# Belirli bir portta hata ayıklama sunucusunu başlat
+# Start the debug server on a specific port
 gomdebug --server --port=8080 program
 ```
 
-### Hata Ayıklama Komutları
+### Debugging Commands
 
-Hata ayıklama oturumu sırasında aşağıdaki komutları kullanabilirsiniz:
+During a debugging session, you can use the following commands:
 
-- `break dosya:satır`: Kesme noktası ekle
-- `continue`: Çalıştırmaya devam et
-- `step`: Bir satır ilerle (fonksiyonlara gir)
-- `next`: Bir satır ilerle (fonksiyonları atla)
-- `print ifade`: İfadeyi değerlendir ve yazdır
-- `backtrace`: Çağrı yığınını göster
-- `frame n`: n. çağrı çerçevesine geç
-- `list`: Kaynak kodu göster
-- `quit`: Hata ayıklayıcıdan çık
+- `break file:line`: Add a breakpoint
+- `continue`: Continue execution
+- `step`: Step one line (enter functions)
+- `next`: Step one line (skip functions)
+- `print expression`: Evaluate and print an expression
+- `backtrace`: Show call stack
+- `frame n`: Go to the nth call frame
+- `list`: Show source code
+- `quit`: Exit the debugger
 
-## IDE Entegrasyonu
+## IDE Integration
 
-GO-Minus, çeşitli IDE ve metin düzenleyicileri ile entegre edilebilir.
+GO-Minus can be integrated with various IDEs and text editors.
 
 ### Visual Studio Code
 
-VS Code için GO-Minus eklentisi, aşağıdaki özellikleri sağlar:
+The GO-Minus extension for VS Code provides the following features:
 
-- Sözdizimi vurgulama
-- Kod tamamlama
-- Hata ve uyarı gösterimi
-- Tanıma gitme
-- Yeniden adlandırma
-- Kod biçimlendirme
-- Kod katlama
-- Sembol arama
-- Referans bulma
-- Kod eylemleri
+- Syntax highlighting
+- Code completion
+- Error and warning display
+- Go to definition
+- Rename
+- Code formatting
+- Code folding
+- Symbol search
+- Find references
+- Code actions
 
-### JetBrains IDE'leri
+### JetBrains IDEs
 
-JetBrains IDE'leri (IntelliJ IDEA, GoLand, vb.) için GO-Minus eklentisi, aşağıdaki özellikleri sağlar:
+The GO-Minus extension for JetBrains IDEs (IntelliJ IDEA, GoLand, etc.) provides the following features:
 
-- Sözdizimi vurgulama
-- Kod tamamlama
-- Hata ve uyarı gösterimi
-- Tanıma gitme
-- Yeniden adlandırma
-- Kod biçimlendirme
-- Kod katlama
-- Sembol arama
-- Referans bulma
-- Kod eylemleri
+- Syntax highlighting
+- Code completion
+- Error and warning display
+- Go to definition
+- Rename
+- Code formatting
+- Code folding
+- Symbol search
+- Find references
+- Code actions
 
 ### Vim/Neovim
 
-Vim/Neovim için GO-Minus eklentisi, aşağıdaki özellikleri sağlar:
+The GO-Minus extension for Vim/Neovim provides the following features:
 
-- Sözdizimi vurgulama
-- Kod tamamlama (coc.nvim veya YouCompleteMe ile)
-- Hata ve uyarı gösterimi
-- Tanıma gitme
-- Kod biçimlendirme
+- Syntax highlighting
+- Code completion (with coc.nvim or YouCompleteMe)
+- Error and warning display
+- Go to definition
+- Code formatting
 
 ### Emacs
 
-Emacs için GO-Minus modu, aşağıdaki özellikleri sağlar:
+The GO-Minus mode for Emacs provides the following features:
 
-- Sözdizimi vurgulama
-- Kod tamamlama (company-mode ile)
-- Hata ve uyarı gösterimi (flycheck ile)
-- Tanıma gitme
-- Kod biçimlendirme
+- Syntax highlighting
+- Code completion (with company-mode)
+- Error and warning display (with flycheck)
+- Go to definition
+- Code formatting

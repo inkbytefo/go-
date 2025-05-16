@@ -1,12 +1,12 @@
-# GO-Minus Trie (Önek Ağacı) Örneği
+# GO-Minus Trie Example
 
-Bu örnek, GO-Minus'un standart kütüphanesinde bulunan Trie (Önek Ağacı) veri yapısının kullanımını göstermektedir. Trie, string anahtarları verimli bir şekilde depolamak ve aramak için kullanılan bir ağaç veri yapısıdır.
+This example demonstrates the use of the Trie data structure found in GO-Minus's standard library. Trie is a tree data structure used to efficiently store and search for string keys.
 
-## Trie Nedir?
+## What is a Trie?
 
-Trie (önek ağacı veya dijital ağaç olarak da bilinir), string anahtarları depolamak için kullanılan bir ağaç veri yapısıdır. Her düğüm, bir karakteri temsil eder ve kök düğümden herhangi bir düğüme giden yol, bir string oluşturur. Trie, özellikle önek tabanlı arama ve otomatik tamamlama gibi işlemler için idealdir.
+Trie (also known as a prefix tree or digital tree) is a tree data structure used to store string keys. Each node represents a character, and the path from the root node to any node forms a string. Trie is ideal for operations such as prefix-based searching and autocomplete.
 
-## Temel Trie Kullanımı
+## Basic Trie Usage
 
 ```go
 // trie_basic.gom
@@ -18,59 +18,59 @@ import (
 )
 
 func main() {
-    // String değerler için bir Trie oluştur
+    // Create a Trie for string values
     t := trie.Trie.New<string>()
-    
-    // Kelimeler ekle
-    t.Insert("apple", "elma")
-    t.Insert("banana", "muz")
-    t.Insert("application", "uygulama")
-    
-    // Kelime ara
+
+    // Add words
+    t.Insert("apple", "apple")
+    t.Insert("banana", "banana")
+    t.Insert("application", "application")
+
+    // Search for a word
     value, found := t.Search("apple")
     if found {
-        fmt.Println("apple:", value) // "elma" yazdırır
+        fmt.Println("apple:", value) // Prints "apple"
     } else {
-        fmt.Println("apple bulunamadı")
+        fmt.Println("apple not found")
     }
-    
-    // Var olmayan bir kelime ara
+
+    // Search for a non-existent word
     value, found = t.Search("orange")
     if found {
         fmt.Println("orange:", value)
     } else {
-        fmt.Println("orange bulunamadı") // Bu satır çalışır
+        fmt.Println("orange not found") // This line executes
     }
-    
-    // Önek kontrolü
+
+    // Prefix check
     if t.StartsWith("app") {
-        fmt.Println("'app' öneki ile başlayan kelimeler var")
+        fmt.Println("There are words starting with the prefix 'app'")
     } else {
-        fmt.Println("'app' öneki ile başlayan kelime yok")
+        fmt.Println("No words start with the prefix 'app'")
     }
-    
-    // Trie'deki kelime sayısı
-    fmt.Println("Kelime sayısı:", t.Size()) // 3 yazdırır
-    
-    // Kelime sil
+
+    // Number of words in the Trie
+    fmt.Println("Word count:", t.Size()) // Prints 3
+
+    // Delete a word
     t.Delete("banana")
-    fmt.Println("'banana' silindikten sonra kelime sayısı:", t.Size()) // 2 yazdırır
+    fmt.Println("Word count after deleting 'banana':", t.Size()) // Prints 2
 }
 ```
 
-## Çıktı
+## Output
 
 ```
-apple: elma
-orange bulunamadı
-'app' öneki ile başlayan kelimeler var
-Kelime sayısı: 3
-'banana' silindikten sonra kelime sayısı: 2
+apple: apple
+orange not found
+There are words starting with the prefix 'app'
+Word count: 3
+Word count after deleting 'banana': 2
 ```
 
-## Önek Araması
+## Prefix Search
 
-Trie'nin en güçlü özelliklerinden biri, belirli bir önekle başlayan tüm kelimeleri hızlı bir şekilde bulabilmesidir. Bu, otomatik tamamlama gibi özellikler için idealdir.
+One of the most powerful features of Trie is its ability to quickly find all words that start with a specific prefix. This is ideal for features such as autocomplete.
 
 ```go
 // trie_prefix.gom
@@ -82,59 +82,59 @@ import (
 )
 
 func main() {
-    // Yeni bir Trie oluştur
+    // Create a new Trie
     t := trie.Trie.New<string>()
-    
-    // Kelimeler ekle
-    t.Insert("apple", "elma")
-    t.Insert("application", "uygulama")
-    t.Insert("append", "ekle")
-    t.Insert("banana", "muz")
-    t.Insert("ball", "top")
-    t.Insert("cat", "kedi")
-    
-    // "app" öneki ile başlayan tüm kelimeleri bul
+
+    // Add words
+    t.Insert("apple", "apple")
+    t.Insert("application", "application")
+    t.Insert("append", "append")
+    t.Insert("banana", "banana")
+    t.Insert("ball", "ball")
+    t.Insert("cat", "cat")
+
+    // Find all words starting with the prefix "app"
     appWords := t.GetWordsWithPrefix("app")
-    fmt.Println("'app' öneki ile başlayan kelimeler:")
+    fmt.Println("Words starting with the prefix 'app':")
     for word, value := range appWords {
         fmt.Printf("  %s: %s\n", word, value)
     }
-    
-    // "ba" öneki ile başlayan tüm kelimeleri bul
+
+    // Find all words starting with the prefix "ba"
     baWords := t.GetWordsWithPrefix("ba")
-    fmt.Println("\n'ba' öneki ile başlayan kelimeler:")
+    fmt.Println("\nWords starting with the prefix 'ba':")
     for word, value := range baWords {
         fmt.Printf("  %s: %s\n", word, value)
     }
-    
-    // "x" öneki ile başlayan kelimeler (boş sonuç)
+
+    // Words starting with the prefix "x" (empty result)
     xWords := t.GetWordsWithPrefix("x")
-    fmt.Println("\n'x' öneki ile başlayan kelimeler:")
+    fmt.Println("\nWords starting with the prefix 'x':")
     if len(xWords) == 0 {
-        fmt.Println("  Sonuç bulunamadı")
+        fmt.Println("  No results found")
     }
 }
 ```
 
-## Çıktı
+## Output
 
 ```
-'app' öneki ile başlayan kelimeler:
-  apple: elma
-  application: uygulama
-  append: ekle
+Words starting with the prefix 'app':
+  apple: apple
+  application: application
+  append: append
 
-'ba' öneki ile başlayan kelimeler:
-  banana: muz
-  ball: top
+Words starting with the prefix 'ba':
+  banana: banana
+  ball: ball
 
-'x' öneki ile başlayan kelimeler:
-  Sonuç bulunamadı
+Words starting with the prefix 'x':
+  No results found
 ```
 
-## Otomatik Tamamlama Uygulaması
+## Autocomplete Application
 
-Trie'nin pratik bir uygulaması olarak, basit bir otomatik tamamlama sistemi oluşturalım:
+As a practical application of Trie, let's create a simple autocomplete system:
 
 ```go
 // trie_autocomplete.gom
@@ -146,62 +146,62 @@ import (
     "strings"
 )
 
-// AutocompleteSystem, otomatik tamamlama sistemi
+// AutocompleteSystem, autocomplete system
 class AutocompleteSystem {
     private:
         trie.Trie<string> dictionary
-    
+
     public:
-        // Yeni bir otomatik tamamlama sistemi oluştur
+        // Create a new autocomplete system
         AutocompleteSystem() {
             this.dictionary = trie.Trie.New<string>()
         }
-        
-        // Sözlüğe kelime ekle
+
+        // Add a word to the dictionary
         void AddWord(string word, string meaning) {
             this.dictionary.Insert(strings.ToLower(word), meaning)
         }
-        
-        // Önek ile başlayan kelimeleri bul
+
+        // Find words starting with the prefix
         map[string]string GetSuggestions(string prefix) {
             return this.dictionary.GetWordsWithPrefix(strings.ToLower(prefix))
         }
-        
-        // Kelime ara
+
+        // Search for a word
         string GetMeaning(string word) {
             meaning, found := this.dictionary.Search(strings.ToLower(word))
             if found {
                 return meaning
             }
-            return "Bulunamadı"
+            return "Not found"
         }
 }
 
 func main() {
-    // Otomatik tamamlama sistemi oluştur
+    // Create an autocomplete system
     ac := AutocompleteSystem()
-    
-    // Sözlüğe kelimeler ekle
-    ac.AddWord("apple", "elma")
-    ac.AddWord("application", "uygulama")
-    ac.AddWord("append", "ekle")
-    ac.AddWord("banana", "muz")
-    ac.AddWord("ball", "top")
-    ac.AddWord("cat", "kedi")
-    ac.AddWord("computer", "bilgisayar")
-    ac.AddWord("calculate", "hesapla")
-    
-    // Kullanıcı girişi simülasyonu
+
+    // Add words to the dictionary
+    ac.AddWord("apple", "apple")
+    ac.AddWord("application", "application")
+    ac.AddWord("append", "append")
+    ac.AddWord("banana", "banana")
+    ac.AddWord("ball", "ball")
+    ac.AddWord("cat", "cat")
+    ac.AddWord("computer", "computer")
+    ac.AddWord("calculate", "calculate")
+
+    // User input simulation
     userInputs := []string{"a", "ap", "app", "c", "co", "x"}
-    
+
     for _, input := range userInputs {
-        fmt.Printf("Kullanıcı girişi: '%s'\n", input)
+        fmt.Printf("User input: '%s'\n", input)
         suggestions := ac.GetSuggestions(input)
-        
+
         if len(suggestions) == 0 {
-            fmt.Println("  Öneri bulunamadı")
+            fmt.Println("  No suggestions found")
         } else {
-            fmt.Println("  Öneriler:")
+            fmt.Println("  Suggestions:")
             for word, meaning := range suggestions {
                 fmt.Printf("    %s: %s\n", word, meaning)
             }
@@ -211,44 +211,44 @@ func main() {
 }
 ```
 
-## Çıktı
+## Output
 
 ```
-Kullanıcı girişi: 'a'
-  Öneriler:
-    apple: elma
-    application: uygulama
-    append: ekle
+User input: 'a'
+  Suggestions:
+    apple: apple
+    application: application
+    append: append
 
-Kullanıcı girişi: 'ap'
-  Öneriler:
-    apple: elma
-    application: uygulama
-    append: ekle
+User input: 'ap'
+  Suggestions:
+    apple: apple
+    application: application
+    append: append
 
-Kullanıcı girişi: 'app'
-  Öneriler:
-    apple: elma
-    application: uygulama
-    append: ekle
+User input: 'app'
+  Suggestions:
+    apple: apple
+    application: application
+    append: append
 
-Kullanıcı girişi: 'c'
-  Öneriler:
-    cat: kedi
-    computer: bilgisayar
-    calculate: hesapla
+User input: 'c'
+  Suggestions:
+    cat: cat
+    computer: computer
+    calculate: calculate
 
-Kullanıcı girişi: 'co'
-  Öneriler:
-    computer: bilgisayar
+User input: 'co'
+  Suggestions:
+    computer: computer
 
-Kullanıcı girişi: 'x'
-  Öneri bulunamadı
+User input: 'x'
+  No suggestions found
 ```
 
-## Farklı Veri Tipleri ile Trie Kullanımı
+## Using Trie with Different Data Types
 
-Trie, jenerik bir veri yapısı olduğu için, string dışındaki değerler için de kullanılabilir:
+Since Trie is a generic data structure, it can be used for values other than strings:
 
 ```go
 // trie_generic.gom
@@ -260,47 +260,47 @@ import (
 )
 
 func main() {
-    // Int değerler için bir Trie oluştur
+    // Create a Trie for int values
     intTrie := trie.Trie.New<int>()
-    
-    // Kelimeler ve değerler ekle
+
+    // Add words and values
     intTrie.Insert("one", 1)
     intTrie.Insert("two", 2)
     intTrie.Insert("three", 3)
     intTrie.Insert("ten", 10)
     intTrie.Insert("twenty", 20)
-    
-    // Değerleri ara
+
+    // Search for values
     value, found := intTrie.Search("two")
     if found {
-        fmt.Println("two:", value) // 2 yazdırır
+        fmt.Println("two:", value) // Prints 2
     }
-    
-    // Struct değerler için bir Trie oluştur
+
+    // Create a Trie for struct values
     type Person struct {
         Name string
         Age  int
     }
-    
+
     personTrie := trie.Trie.New<Person>()
-    
-    // Kişileri ekle
+
+    // Add people
     personTrie.Insert("john", Person{Name: "John Smith", Age: 30})
     personTrie.Insert("jane", Person{Name: "Jane Doe", Age: 25})
-    
-    // Kişileri ara
+
+    // Search for people
     person, found := personTrie.Search("jane")
     if found {
-        fmt.Printf("jane: %+v\n", person) // {Name:Jane Doe Age:25} yazdırır
+        fmt.Printf("jane: %+v\n", person) // Prints {Name:Jane Doe Age:25}
     }
 }
 ```
 
-## Çıktı
+## Output
 
 ```
 two: 2
 jane: {Name:Jane Doe Age:25}
 ```
 
-Bu örnekler, GO-Minus'un Trie veri yapısının nasıl kullanılacağını göstermektedir. Daha fazla bilgi için [Trie Belgelendirmesi](../../stdlib/container/trie/README.md) belgesine bakabilirsiniz.
+These examples demonstrate how to use GO-Minus's Trie data structure. For more information, you can refer to the [Trie Documentation](../../stdlib/container/trie/README.md).

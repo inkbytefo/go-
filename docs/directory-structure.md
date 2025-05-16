@@ -1,156 +1,156 @@
-# GO-Minus Proje Dizin Yapısı
+# GO-Minus Project Directory Structure
 
-Bu belge, GO-Minus projesinin dizin yapısını ve her bir dizinin amacını açıklar.
+This document explains the directory structure of the GO-Minus project and the purpose of each directory.
 
-## Ana Dizinler
+## Main Directories
 
 ```
 go-minus/
-├── cmd/                      # Komut satırı uygulamaları
-│   ├── gominus/              # GO-Minus derleyicisi
-│   ├── gompm/                # GO-Minus paket yöneticisi
-│   ├── gomfmt/               # GO-Minus kod biçimlendirme aracı
-│   ├── gomdoc/               # GO-Minus belgelendirme aracı
-│   ├── gomtest/              # GO-Minus test aracı
-│   └── gomlsp/               # GO-Minus dil sunucusu
-├── docs/                     # Belgelendirme
-│   ├── tutorial/             # Öğreticiler
-│   ├── reference/            # Referans belgeleri
-│   ├── images/               # Belgelendirme görselleri
-│   └── ...                   # Diğer belgelendirme dosyaları
-├── examples/                 # Örnek kodlar
-│   ├── basic/                # Temel örnekler
-│   ├── advanced/             # İleri düzey örnekler
-│   ├── vulkan/               # Vulkan örnekleri
-│   └── memory/               # Bellek yönetimi örnekleri
-├── internal/                 # Dahili paketler
-│   ├── ast/                  # Soyut sözdizimi ağacı
-│   ├── codegen/              # Kod üretimi
-│   ├── irgen/                # IR üretimi
-│   ├── lexer/                # Sözcük analizi
-│   ├── optimizer/            # Optimizasyon
-│   ├── parser/               # Sözdizimi analizi
-│   ├── semantic/             # Semantik analiz
-│   └── token/                # Token tanımları
-├── pkg/                      # Dışa açık paketler
-│   ├── compiler/             # Derleyici API'si
-│   └── runtime/              # Çalışma zamanı API'si
-├── stdlib/                   # Standart kütüphane
-│   ├── async/                # Asenkron işlemler
-│   ├── concurrent/           # Eşzamanlılık
-│   ├── container/            # Veri yapıları
-│   ├── core/                 # Çekirdek işlevler
-│   ├── fmt/                  # Biçimlendirme
-│   ├── io/                   # Giriş/çıkış işlemleri
-│   ├── math/                 # Matematiksel işlemler
-│   ├── memory/               # Bellek yönetimi
-│   ├── net/                  # Ağ işlemleri
-│   ├── regex/                # Düzenli ifadeler
-│   ├── strings/              # Dize işlemleri
-│   ├── time/                 # Zaman işlemleri
-│   └── vulkan/               # Vulkan bağlayıcıları
-├── tests/                    # Testler
-│   ├── compiler/             # Derleyici testleri
-│   ├── basic/                # Temel dil özellikleri testleri
-│   └── ...                   # Diğer test dosyaları
-├── website/                  # Web sitesi
-│   ├── content/              # İçerik
-│   ├── static/               # Statik dosyalar
-│   └── templates/            # Şablonlar
-├── .gitignore                # Git dışlama listesi
-├── go.mod                    # Go modül tanımı
-├── go.sum                    # Go bağımlılık sağlaması
-├── LICENSE                   # Lisans dosyası
-└── README.md                 # Ana README dosyası
+├── cmd/                      # Command-line applications
+│   ├── gominus/              # GO-Minus compiler
+│   ├── gompm/                # GO-Minus package manager
+│   ├── gomfmt/               # GO-Minus code formatting tool
+│   ├── gomdoc/               # GO-Minus documentation tool
+│   ├── gomtest/              # GO-Minus testing tool
+│   └── gomlsp/               # GO-Minus language server
+├── docs/                     # Documentation
+│   ├── tutorial/             # Tutorials
+│   ├── reference/            # Reference documents
+│   ├── images/               # Documentation images
+│   └── ...                   # Other documentation files
+├── examples/                 # Example code
+│   ├── basic/                # Basic examples
+│   ├── advanced/             # Advanced examples
+│   ├── vulkan/               # Vulkan examples
+│   └── memory/               # Memory management examples
+├── internal/                 # Internal packages
+│   ├── ast/                  # Abstract syntax tree
+│   ├── codegen/              # Code generation
+│   ├── irgen/                # IR generation
+│   ├── lexer/                # Lexical analysis
+│   ├── optimizer/            # Optimization
+│   ├── parser/               # Syntax analysis
+│   ├── semantic/             # Semantic analysis
+│   └── token/                # Token definitions
+├── pkg/                      # Public packages
+│   ├── compiler/             # Compiler API
+│   └── runtime/              # Runtime API
+├── stdlib/                   # Standard library
+│   ├── async/                # Asynchronous operations
+│   ├── concurrent/           # Concurrency
+│   ├── container/            # Data structures
+│   ├── core/                 # Core functions
+│   ├── fmt/                  # Formatting
+│   ├── io/                   # Input/output operations
+│   ├── math/                 # Mathematical operations
+│   ├── memory/               # Memory management
+│   ├── net/                  # Network operations
+│   ├── regex/                # Regular expressions
+│   ├── strings/              # String operations
+│   ├── time/                 # Time operations
+│   └── vulkan/               # Vulkan bindings
+├── tests/                    # Tests
+│   ├── compiler/             # Compiler tests
+│   ├── basic/                # Basic language feature tests
+│   └── ...                   # Other test files
+├── website/                  # Website
+│   ├── content/              # Content
+│   ├── static/               # Static files
+│   └── templates/            # Templates
+├── .gitignore                # Git ignore list
+├── go.mod                    # Go module definition
+├── go.sum                    # Go dependency checksum
+├── LICENSE                   # License file
+└── README.md                 # Main README file
 ```
 
-## Dizinlerin Açıklamaları
+## Directory Descriptions
 
 ### cmd/
 
-Bu dizin, GO-Minus projesinin komut satırı uygulamalarını içerir. Her bir alt dizin, ayrı bir uygulamayı temsil eder.
+This directory contains the command-line applications of the GO-Minus project. Each subdirectory represents a separate application.
 
-- **gominus**: GO-Minus derleyicisi
-- **gompm**: GO-Minus paket yöneticisi
-- **gomfmt**: GO-Minus kod biçimlendirme aracı
-- **gomdoc**: GO-Minus belgelendirme aracı
-- **gomtest**: GO-Minus test aracı
-- **gomlsp**: GO-Minus dil sunucusu
+- **gominus**: GO-Minus compiler
+- **gompm**: GO-Minus package manager
+- **gomfmt**: GO-Minus code formatting tool
+- **gomdoc**: GO-Minus documentation tool
+- **gomtest**: GO-Minus testing tool
+- **gomlsp**: GO-Minus language server
 
 ### docs/
 
-Bu dizin, GO-Minus projesinin belgelendirmesini içerir.
+This directory contains the documentation of the GO-Minus project.
 
-- **tutorial/**: Öğreticiler ve başlangıç rehberleri
-- **reference/**: Dil referansı ve API belgeleri
-- **images/**: Belgelendirmede kullanılan görseller
+- **tutorial/**: Tutorials and getting started guides
+- **reference/**: Language reference and API documentation
+- **images/**: Images used in documentation
 
 ### examples/
 
-Bu dizin, GO-Minus dilinde yazılmış örnek kodları içerir.
+This directory contains example code written in the GO-Minus language.
 
-- **basic/**: Temel dil özelliklerini gösteren basit örnekler
-- **advanced/**: İleri düzey dil özelliklerini gösteren karmaşık örnekler
-- **vulkan/**: Vulkan API'sini kullanan örnekler
-- **memory/**: Bellek yönetimi özelliklerini gösteren örnekler
+- **basic/**: Simple examples showing basic language features
+- **advanced/**: Complex examples showing advanced language features
+- **vulkan/**: Examples using the Vulkan API
+- **memory/**: Examples showing memory management features
 
 ### internal/
 
-Bu dizin, GO-Minus derleyicisinin dahili bileşenlerini içerir. Bu paketler, projenin dışından doğrudan kullanılmaz.
+This directory contains the internal components of the GO-Minus compiler. These packages are not directly used from outside the project.
 
-- **ast/**: Soyut sözdizimi ağacı tanımları ve işlemleri
-- **codegen/**: Makine kodu üretimi
-- **irgen/**: LLVM IR üretimi
-- **lexer/**: Sözcük analizi
-- **optimizer/**: Kod optimizasyonu
-- **parser/**: Sözdizimi analizi
-- **semantic/**: Semantik analiz
-- **token/**: Token tanımları
+- **ast/**: Abstract syntax tree definitions and operations
+- **codegen/**: Machine code generation
+- **irgen/**: LLVM IR generation
+- **lexer/**: Lexical analysis
+- **optimizer/**: Code optimization
+- **parser/**: Syntax analysis
+- **semantic/**: Semantic analysis
+- **token/**: Token definitions
 
 ### pkg/
 
-Bu dizin, GO-Minus projesinin dışa açık paketlerini içerir. Bu paketler, diğer projeler tarafından kullanılabilir.
+This directory contains the public packages of the GO-Minus project. These packages can be used by other projects.
 
-- **compiler/**: Derleyici API'si
-- **runtime/**: Çalışma zamanı API'si
+- **compiler/**: Compiler API
+- **runtime/**: Runtime API
 
 ### stdlib/
 
-Bu dizin, GO-Minus dilinin standart kütüphanesini içerir.
+This directory contains the standard library of the GO-Minus language.
 
-- **async/**: Asenkron işlemler için paketler
-- **concurrent/**: Eşzamanlılık için paketler
-- **container/**: Veri yapıları
-- **core/**: Çekirdek işlevler
-- **fmt/**: Biçimlendirme işlemleri
-- **io/**: Giriş/çıkış işlemleri
-- **math/**: Matematiksel işlemler
-- **memory/**: Bellek yönetimi
-- **net/**: Ağ işlemleri
-- **regex/**: Düzenli ifadeler
-- **strings/**: Dize işlemleri
-- **time/**: Zaman işlemleri
-- **vulkan/**: Vulkan API bağlayıcıları
+- **async/**: Packages for asynchronous operations
+- **concurrent/**: Packages for concurrency
+- **container/**: Data structures
+- **core/**: Core functions
+- **fmt/**: Formatting operations
+- **io/**: Input/output operations
+- **math/**: Mathematical operations
+- **memory/**: Memory management
+- **net/**: Network operations
+- **regex/**: Regular expressions
+- **strings/**: String operations
+- **time/**: Time operations
+- **vulkan/**: Vulkan API bindings
 
 ### tests/
 
-Bu dizin, GO-Minus projesinin test dosyalarını içerir.
+This directory contains the test files of the GO-Minus project.
 
-- **compiler/**: Derleyici testleri
-- **basic/**: Temel dil özellikleri testleri
+- **compiler/**: Compiler tests
+- **basic/**: Basic language feature tests
 
 ### website/
 
-Bu dizin, GO-Minus projesinin web sitesi dosyalarını içerir.
+This directory contains the website files of the GO-Minus project.
 
-- **content/**: Web sitesi içeriği
-- **static/**: Statik dosyalar (CSS, JS, görseller)
-- **templates/**: HTML şablonları
+- **content/**: Website content
+- **static/**: Static files (CSS, JS, images)
+- **templates/**: HTML templates
 
-## Dosyalar
+## Files
 
-- **.gitignore**: Git tarafından izlenmeyecek dosyaları belirtir
-- **go.mod**: Go modül tanımı
-- **go.sum**: Go bağımlılık sağlaması
-- **LICENSE**: Lisans dosyası
-- **README.md**: Ana README dosyası
+- **.gitignore**: Specifies files to be ignored by Git
+- **go.mod**: Go module definition
+- **go.sum**: Go dependency checksum
+- **LICENSE**: License file
+- **README.md**: Main README file

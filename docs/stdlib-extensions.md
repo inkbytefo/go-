@@ -1,86 +1,86 @@
-# GO-Minus Standart Kütüphane Genişletmeleri
+# GO-Minus Standard Library Extensions
 
-Bu belge, GO-Minus programlama dilinin standart kütüphanesine eklenen yeni modülleri ve genişletmeleri açıklamaktadır.
+This document describes the new modules and extensions added to the standard library of the GO-Minus programming language.
 
-## Genel Bakış
+## Overview
 
-GO-Minus standart kütüphanesi, Go'nun standart kütüphanesini temel alır ve GO-Minus'un sınıf, şablon ve istisna işleme gibi özelliklerini kullanarak genişletilmiştir. Son güncellemelerle birlikte, aşağıdaki yeni modüller ve genişletmeler eklenmiştir:
+The GO-Minus standard library is based on Go's standard library and has been extended using GO-Minus features such as classes, templates, and exception handling. With recent updates, the following new modules and extensions have been added:
 
-1. **Trie (Önek Ağacı) Implementasyonu**
-2. **Buffered IO Implementasyonu**
-3. **Regex Paketi**
+1. **Trie Implementation**
+2. **Buffered IO Implementation**
+3. **Regex Package**
 
-## 1. Trie (Önek Ağacı) Implementasyonu
+## 1. Trie Implementation
 
-Trie (önek ağacı veya dijital ağaç olarak da bilinir), string anahtarları verimli bir şekilde depolamak ve aramak için kullanılan bir ağaç veri yapısıdır. GO-Minus'un container paketine eklenen Trie implementasyonu, özellikle önek tabanlı arama ve otomatik tamamlama gibi işlemler için idealdir.
+Trie (also known as a prefix tree or digital tree) is a tree data structure used to efficiently store and search for string keys. The Trie implementation added to GO-Minus's container package is ideal for operations such as prefix-based searching and autocomplete.
 
-### Özellikler
+### Features
 
-- **Jenerik Tip Desteği**: Herhangi bir tip için kullanılabilir
-- **Kelime Ekleme, Arama ve Silme**: Temel Trie işlemleri
-- **Önek Araması**: Belirli bir önekle başlayan kelimeleri bulma
-- **Tüm Kelimeleri Listeleme**: Trie'deki tüm kelimeleri listeleme
-- **Boş Kontrol ve Boyut Hesaplama**: Trie'nin boş olup olmadığını kontrol etme ve boyutunu hesaplama
+- **Generic Type Support**: Can be used for any type
+- **Word Insertion, Search, and Deletion**: Basic Trie operations
+- **Prefix Search**: Finding words that start with a specific prefix
+- **Listing All Words**: Listing all words in the Trie
+- **Empty Check and Size Calculation**: Checking if the Trie is empty and calculating its size
 
-### Örnek Kullanım
+### Example Usage
 
 ```go
 import "container/trie"
 
-// String değerler için bir Trie oluştur
+// Create a Trie for string values
 t := trie.Trie.New<string>()
 
-// Kelimeler ekle
-t.Insert("apple", "elma")
-t.Insert("banana", "muz")
-t.Insert("application", "uygulama")
+// Add words
+t.Insert("apple", "apple")
+t.Insert("banana", "banana")
+t.Insert("application", "application")
 
-// Kelime ara
+// Search for a word
 value, found := t.Search("apple")
 if found {
-    fmt.Println("apple:", value) // "elma" yazdırır
+    fmt.Println("apple:", value) // Prints "apple"
 }
 
-// Önek kontrolü
+// Prefix check
 if t.StartsWith("app") {
-    fmt.Println("'app' öneki ile başlayan kelimeler var")
+    fmt.Println("There are words starting with the prefix 'app'")
 }
 
-// Belirli önekle başlayan tüm kelimeleri al
+// Get all words starting with a specific prefix
 appWords := t.GetWordsWithPrefix("app")
 for word, value := range appWords {
     fmt.Printf("%s: %s\n", word, value)
 }
 ```
 
-### Performans
+### Performance
 
-Trie veri yapısı, string anahtarları için aşağıdaki karmaşıklıklara sahiptir:
+The Trie data structure has the following complexities for string keys:
 
-- **Ekleme**: O(m), m = anahtar uzunluğu
-- **Arama**: O(m), m = anahtar uzunluğu
-- **Silme**: O(m), m = anahtar uzunluğu
-- **Önek Araması**: O(m), m = önek uzunluğu
-- **Belirli Önekle Başlayan Tüm Kelimeleri Bulma**: O(n), n = eşleşen kelime sayısı
+- **Insertion**: O(m), m = key length
+- **Search**: O(m), m = key length
+- **Deletion**: O(m), m = key length
+- **Prefix Search**: O(m), m = prefix length
+- **Finding All Words Starting with a Specific Prefix**: O(n), n = number of matching words
 
-### Uygulama Detayları
+### Implementation Details
 
-Trie implementasyonu, `stdlib/container/trie/trie.gom` dosyasında uygulanmıştır. İmplementasyon, aşağıdaki bileşenlerden oluşur:
+The Trie implementation is implemented in the `stdlib/container/trie/trie.gom` file. The implementation consists of the following components:
 
-- **TrieNode<T>**: Trie ağacındaki her bir düğümü temsil eden sınıf
-- **Trie<T>**: Trie veri yapısını temsil eden sınıf
+- **TrieNode<T>**: Class representing each node in the Trie tree
+- **Trie<T>**: Class representing the Trie data structure
 
 ```go
-// TrieNode, bir trie düğümünü temsil eder.
+// TrieNode represents a trie node.
 class TrieNode<T> {
     private:
         map[rune]TrieNode<T> children
         bool isEndOfWord
         T value
         bool hasValue
-    
+
     public:
-        // Yeni bir düğüm oluştur
+        // Create a new node
         static func New<T>() *TrieNode<T> {
             node := new TrieNode<T>()
             node.children = make(map[rune]TrieNode<T>)
@@ -88,41 +88,41 @@ class TrieNode<T> {
             node.hasValue = false
             return node
         }
-        
-        // ... diğer metotlar
+
+        // ... other methods
 }
 
-// Trie, bir önek ağacını temsil eder.
+// Trie represents a prefix tree.
 class Trie<T> {
     private:
         TrieNode<T> root
         int size
-    
+
     public:
-        // Yeni bir Trie oluştur
+        // Create a new Trie
         static func New<T>() *Trie<T> {
             t := new Trie<T>()
             t.root = *TrieNode.New<T>()
             return t
         }
-        
-        // ... diğer metotlar
+
+        // ... other methods
 }
 ```
 
-## 2. Buffered IO Implementasyonu
+## 2. Buffered IO Implementation
 
-Tamponlanmış I/O, disk veya ağ gibi yavaş I/O kaynaklarına erişim sırasında performansı artırmak için kullanılan bir tekniktir. GO-Minus'un io paketine eklenen Buffered IO implementasyonu, küçük okuma/yazma işlemlerini daha büyük bloklarda gruplandırarak, sistem çağrılarının sayısını azaltır ve genel performansı artırır.
+Buffered I/O is a technique used to improve performance when accessing slow I/O sources such as disk or network. The Buffered IO implementation added to GO-Minus's io package groups small read/write operations into larger blocks, reducing the number of system calls and improving overall performance.
 
-### Özellikler
+### Features
 
-- **Tamponlanmış Okuma**: Verimli okuma işlemleri için BufferedReader
-- **Tamponlanmış Yazma**: Verimli yazma işlemleri için BufferedWriter
-- **Özelleştirilebilir Tampon Boyutu**: İhtiyaca göre tampon boyutunu ayarlama
-- **Satır Satır Okuma**: Metin dosyalarını satır satır okuma
-- **Byte ve String Yazma**: Hem byte dizileri hem de string'ler için yazma desteği
+- **Buffered Reading**: BufferedReader for efficient reading operations
+- **Buffered Writing**: BufferedWriter for efficient writing operations
+- **Customizable Buffer Size**: Adjusting buffer size according to needs
+- **Line-by-Line Reading**: Reading text files line by line
+- **Byte and String Writing**: Writing support for both byte arrays and strings
 
-### Örnek Kullanım
+### Example Usage
 
 ```go
 import (
@@ -130,53 +130,53 @@ import (
     "io/buffered"
 )
 
-// BufferedReader örneği
+// BufferedReader example
 file := io.Open("input.txt")
 defer file.Close()
 
 reader := buffered.BufferedReader.New(file, 4096)
 
-// Satır satır okuma
+// Reading line by line
 for {
     line, err := reader.ReadLine()
     if err == io.EOF {
         break
     }
     if err != nil {
-        // Hata işleme
+        // Error handling
         break
     }
-    
+
     fmt.Println(line)
 }
 
-// BufferedWriter örneği
+// BufferedWriter example
 outFile := io.Create("output.txt")
 defer outFile.Close()
 
 writer := buffered.BufferedWriter.New(outFile, 4096)
 
-// Veri yazma
+// Writing data
 writer.WriteString("Hello, World!\n")
 writer.WriteString("This is a test.\n")
 
-// Tamponu boşalt
+// Flush the buffer
 writer.Flush()
 ```
 
-### Performans
+### Performance
 
-Tamponlanmış I/O, özellikle küçük okuma/yazma işlemlerinin sık yapıldığı durumlarda önemli performans artışı sağlar. Örneğin, bir dosyayı satır satır okurken veya küçük parçalar halinde yazarken, tamponlanmış I/O kullanmak, tamponsuz I/O'ya göre çok daha hızlı olabilir.
+Buffered I/O provides significant performance improvements, especially in situations where small read/write operations are performed frequently. For example, when reading a file line by line or writing in small chunks, using buffered I/O can be much faster than unbuffered I/O.
 
-### Uygulama Detayları
+### Implementation Details
 
-Buffered IO implementasyonu, `stdlib/io/buffered/buffered.gom` dosyasında uygulanmıştır. İmplementasyon, aşağıdaki bileşenlerden oluşur:
+The Buffered IO implementation is implemented in the `stdlib/io/buffered/buffered.gom` file. The implementation consists of the following components:
 
-- **BufferedReader**: Tamponlanmış okuma işlemleri için sınıf
-- **BufferedWriter**: Tamponlanmış yazma işlemleri için sınıf
+- **BufferedReader**: Class for buffered reading operations
+- **BufferedWriter**: Class for buffered writing operations
 
 ```go
-// BufferedReader, tamponlanmış okuma işlemleri için kullanılır.
+// BufferedReader is used for buffered reading operations.
 class BufferedReader {
     private:
         io.Reader reader
@@ -185,89 +185,89 @@ class BufferedReader {
         int readPos
         int writePos
         bool eof
-    
+
     public:
-        // Yeni bir BufferedReader oluştur
+        // Create a new BufferedReader
         static func New(reader io.Reader, bufferSize int) *BufferedReader {
-            // ... implementasyon
+            // ... implementation
         }
-        
-        // ... diğer metotlar
+
+        // ... other methods
 }
 
-// BufferedWriter, tamponlanmış yazma işlemleri için kullanılır.
+// BufferedWriter is used for buffered writing operations.
 class BufferedWriter {
     private:
         io.Writer writer
         []byte buffer
         int bufferSize
         int count
-    
+
     public:
-        // Yeni bir BufferedWriter oluştur
+        // Create a new BufferedWriter
         static func New(writer io.Writer, bufferSize int) *BufferedWriter {
-            // ... implementasyon
+            // ... implementation
         }
-        
-        // ... diğer metotlar
+
+        // ... other methods
 }
 ```
 
-## 3. Regex Paketi
+## 3. Regex Package
 
-Düzenli ifadeler (Regular Expressions), metin içinde belirli desenleri aramak, eşleştirmek ve değiştirmek için kullanılan özel bir dil ve sözdizimi sunar. GO-Minus'a eklenen Regex paketi, metin işleme, form doğrulama, veri çıkarma ve dönüştürme gibi birçok senaryoda kullanılabilir.
+Regular Expressions provide a special language and syntax used to search for, match, and replace specific patterns in text. The Regex package added to GO-Minus can be used in many scenarios such as text processing, form validation, data extraction, and transformation.
 
-### Özellikler
+### Features
 
-- **Düzenli İfade Deseni Derleme**: Desenleri derleme ve yeniden kullanma
-- **Metin Eşleştirme**: Bir metnin bir desene uyup uymadığını kontrol etme
-- **Tüm Eşleşmeleri Bulma**: Bir metindeki tüm eşleşmeleri bulma
-- **Metin Değiştirme**: Eşleşen metinleri başka metinlerle değiştirme
-- **Metin Bölme**: Bir metni belirli bir desene göre bölme
-- **Büyük/Küçük Harf Duyarlı ve Duyarsız Modlar**: Büyük/küçük harf duyarlılığını kontrol etme
-- **Çok Satırlı Mod**: Çok satırlı metinlerde satır başı ve sonu eşleştirme
+- **Regular Expression Pattern Compilation**: Compiling and reusing patterns
+- **Text Matching**: Checking if a text matches a pattern
+- **Finding All Matches**: Finding all matches in a text
+- **Text Replacement**: Replacing matched text with other text
+- **Text Splitting**: Splitting a text according to a specific pattern
+- **Case Sensitive and Insensitive Modes**: Controlling case sensitivity
+- **Multiline Mode**: Matching line beginnings and endings in multiline texts
 
-### Örnek Kullanım
+### Example Usage
 
 ```go
 import "regex"
 
-// Düzenli ifade deseni derleme
+// Compile a regular expression pattern
 pattern := regex.Compile("hello")
 
-// Metin eşleştirme
+// Text matching
 if pattern.Match("hello world") {
-    fmt.Println("Eşleşme bulundu!")
+    fmt.Println("Match found!")
 }
 
-// Büyük/küçük harf duyarsız desen
+// Case insensitive pattern
 patternIgnoreCase := regex.CompileIgnoreCase("hello")
 
-// Tüm eşleşmeleri bulma
+// Find all matches
 matches := patternIgnoreCase.FindAll("Hello, hello, HELLO!")
-fmt.Println("Eşleşme sayısı:", len(matches))
+fmt.Println("Number of matches:", len(matches))
 
-// Metin değiştirme
+// Text replacement
 result := patternIgnoreCase.Replace("Hello, hello, HELLO!", "hi")
 fmt.Println(result) // "hi, hi, hi!"
 
-// Metin bölme
+// Text splitting
 parts := regex.Split(",", "apple,banana,orange")
 for _, part := range parts {
     fmt.Println(part)
 }
 ```
 
-### Uygulama Detayları
+### Implementation Details
 
-Regex paketi, `stdlib/regex/regex.gom` dosyasında uygulanmıştır. Paket, aşağıdaki bileşenlerden oluşur:
+The Regex package is implemented in the `stdlib/regex/regex.gom` file. The package consists of the following components:
 
-- **RegexPattern**: Derlenmiş bir düzenli ifade desenini temsil eden sınıf
-- **Compile, CompileIgnoreCase, CompileMultiline**: Desen derleme fonksiyonları
-- **Match, Replace, Split**: Yardımcı fonksiyonlar
+- **RegexPattern**: Class representing a compiled regular expression pattern
+- **Compile, CompileIgnoreCase, CompileMultiline**: Pattern compilation functions
+- **Match, Replace, Split**: Helper functions
 
 ```go
-// RegexPattern, derlenmiş bir düzenli ifade desenini temsil eder.
+// RegexPattern represents a compiled regular expression pattern.
 class RegexPattern {
     private:
         string pattern
@@ -275,35 +275,35 @@ class RegexPattern {
         bool multiline
         bool compiled
         bool hasSpecialChars
-    
+
     public:
-        // Yeni bir RegexPattern oluştur
+        // Create a new RegexPattern
         static func New(pattern string, caseSensitive bool, multiline bool) *RegexPattern {
-            // ... implementasyon
+            // ... implementation
         }
-        
-        // ... diğer metotlar
+
+        // ... other methods
 }
 
-// Compile, bir düzenli ifade desenini derler.
+// Compile compiles a regular expression pattern.
 func Compile(pattern string) *RegexPattern {
     return RegexPattern.New(pattern, true, false)
 }
 
-// CompileIgnoreCase, bir düzenli ifade desenini büyük/küçük harf duyarsız olarak derler.
+// CompileIgnoreCase compiles a regular expression pattern with case insensitivity.
 func CompileIgnoreCase(pattern string) *RegexPattern {
     return RegexPattern.New(pattern, false, false)
 }
 
-// ... diğer fonksiyonlar
+// ... other functions
 ```
 
-## Sonuç
+## Conclusion
 
-GO-Minus standart kütüphanesine eklenen bu yeni modüller ve genişletmeler, GO-Minus programlama dilinin yeteneklerini artırır ve programcılara daha güçlü araçlar sunar. Bu genişletmeler, GO-Minus'un daha geniş bir uygulama yelpazesinde kullanılmasını sağlar.
+These new modules and extensions added to the GO-Minus standard library enhance the capabilities of the GO-Minus programming language and provide developers with more powerful tools. These extensions enable GO-Minus to be used in a wider range of applications.
 
-Daha fazla bilgi ve örnekler için aşağıdaki belgelere bakabilirsiniz:
+For more information and examples, you can refer to the following documents:
 
-- [Trie Örneği](examples/container/trie-example.md)
-- [Buffered IO Örneği](examples/io/buffered-io-example.md)
-- [Regex Örneği](examples/regex/regex-example.md)
+- [Trie Example](examples/container/trie-example.md)
+- [Buffered IO Example](examples/io/buffered-io-example.md)
+- [Regex Example](examples/regex/regex-example.md)

@@ -1,27 +1,27 @@
-# GO-Minus Container Paketi
+# GO-Minus Container Package
 
-Bu dizin, GO-Minus programlama dili için container (kapsayıcı) veri yapılarını içerir. Bu veri yapıları, verileri depolamak, düzenlemek ve işlemek için kullanılır.
+This directory contains container data structures for the GO-Minus programming language. These data structures are used to store, organize, and process data.
 
-## Paketler
+## Packages
 
 ### list
-Çift bağlı liste implementasyonu. Elemanları sıralı bir şekilde depolamak ve her iki yönde de gezinmek için kullanılır.
+Doubly linked list implementation. Used to store elements in a sequential manner and navigate in both directions.
 
 ### vector
-Dinamik dizi implementasyonu. Elemanları sıralı bir şekilde depolamak ve indeks ile hızlı erişim sağlamak için kullanılır.
+Dynamic array implementation. Used to store elements in a sequential manner and provide fast access by index.
 
 ### deque
-Çift uçlu kuyruk implementasyonu. Hem baştan hem de sondan eleman ekleme ve çıkarma işlemlerini destekler.
+Double-ended queue implementation. Supports adding and removing elements from both the front and back.
 
 ### heap
-Öncelik kuyruğu implementasyonu. Elemanları öncelik sırasına göre depolamak ve en yüksek/düşük öncelikli elemana hızlı erişim sağlamak için kullanılır.
+Priority queue implementation. Used to store elements according to priority order and provide fast access to the highest/lowest priority element.
 
 ### trie
-Önek ağacı implementasyonu. String anahtarları verimli bir şekilde depolamak ve aramak için kullanılır. Önek tabanlı arama ve otomatik tamamlama gibi işlemler için idealdir.
+Prefix tree implementation. Used to efficiently store and search for string keys. Ideal for operations such as prefix-based searching and autocomplete.
 
-## Kullanım
+## Usage
 
-GO-Minus container paketlerini kullanmak için, GO-Minus programınızda ilgili paketi import etmeniz yeterlidir:
+To use GO-Minus container packages, simply import the relevant package in your GO-Minus program:
 
 ```go
 import "container/list"
@@ -31,41 +31,41 @@ import "container/heap"
 import "container/trie"
 
 func main() {
-    // list paketi kullanımı
+    // list package usage
     l := list.List.New<int>()
     l.PushBack(10)
     l.PushBack(20)
-    
-    // vector paketi kullanımı
+
+    // vector package usage
     v := vector.Vector.New<string>(10)
     v.Push("hello")
     v.Push("world")
-    
-    // deque paketi kullanımı
+
+    // deque package usage
     d := deque.Deque.New<float>(10)
     d.PushBack(3.14)
     d.PushFront(2.71)
-    
-    // heap paketi kullanımı
+
+    // heap package usage
     h := heap.MinHeap.New<int>()
     h.Push(5)
     h.Push(3)
     h.Push(7)
-    
-    // trie paketi kullanımı
+
+    // trie package usage
     t := trie.Trie.New<string>()
-    t.Insert("apple", "elma")
-    t.Insert("banana", "muz")
+    t.Insert("apple", "apple")
+    t.Insert("banana", "banana")
 }
 ```
 
-## Performans
+## Performance
 
-Her veri yapısı, farklı operasyonlar için farklı performans karakteristiklerine sahiptir. Uygulamanızın ihtiyaçlarına en uygun veri yapısını seçmek için, her bir veri yapısının belgelendirmesine bakın.
+Each data structure has different performance characteristics for different operations. To choose the most suitable data structure for your application's needs, refer to the documentation of each data structure.
 
-## Belgelendirme
+## Documentation
 
-Her bir paket için daha fazla bilgi ve örnek kullanım için, ilgili paketin README.md dosyasına bakın:
+For more information and example usage for each package, refer to the README.md file of the relevant package:
 
 - [list/README.md](list/README.md)
 - [vector/README.md](vector/README.md)

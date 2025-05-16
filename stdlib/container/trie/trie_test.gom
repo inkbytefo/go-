@@ -1,202 +1,202 @@
-// GO-Minus Standart Kütüphane - Trie Paketi Test
+// GO-Minus Standard Library - Trie Package Test
 package trie
 
 import (
     "testing"
 )
 
-// TestTrieBasic, Trie<string> için temel testler içerir.
+// TestTrieBasic contains basic tests for Trie<string>.
 func TestTrieBasic(t *testing.T) {
-    // Yeni bir Trie oluştur
+    // Create a new Trie
     trie := Trie.New<string>()
-    
-    // Başlangıçta boş olmalı
+
+    // Should be empty initially
     if !trie.IsEmpty() {
-        t.Error("Yeni oluşturulan trie boş olmalı")
+        t.Error("Newly created trie should be empty")
     }
-    
-    // Boyut 0 olmalı
+
+    // Size should be 0
     if trie.Size() != 0 {
-        t.Errorf("Beklenen boyut 0, alınan: %d", trie.Size())
+        t.Errorf("Expected size 0, got: %d", trie.Size())
     }
-    
-    // Kelimeler ekle
-    trie.Insert("apple", "elma")
-    trie.Insert("banana", "muz")
-    trie.Insert("application", "uygulama")
-    
-    // Boyut 3 olmalı
+
+    // Add words
+    trie.Insert("apple", "apple")
+    trie.Insert("banana", "banana")
+    trie.Insert("application", "application")
+
+    // Size should be 3
     if trie.Size() != 3 {
-        t.Errorf("Beklenen boyut 3, alınan: %d", trie.Size())
+        t.Errorf("Expected size 3, got: %d", trie.Size())
     }
-    
-    // Artık boş olmamalı
+
+    // Should no longer be empty
     if trie.IsEmpty() {
-        t.Error("Eleman eklendikten sonra trie boş olmamalı")
+        t.Error("Trie should not be empty after adding elements")
     }
-    
-    // Kelimeleri ara
+
+    // Search for words
     value, found := trie.Search("apple")
-    if !found || value != "elma" {
-        t.Errorf("Beklenen değer 'elma', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "apple" {
+        t.Errorf("Expected value 'apple', got: %s, found: %t", value, found)
     }
-    
+
     value, found = trie.Search("banana")
-    if !found || value != "muz" {
-        t.Errorf("Beklenen değer 'muz', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "banana" {
+        t.Errorf("Expected value 'banana', got: %s, found: %t", value, found)
     }
-    
+
     value, found = trie.Search("application")
-    if !found || value != "uygulama" {
-        t.Errorf("Beklenen değer 'uygulama', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "application" {
+        t.Errorf("Expected value 'application', got: %s, found: %t", value, found)
     }
-    
-    // Olmayan kelimeyi ara
+
+    // Search for non-existent word
     _, found = trie.Search("orange")
     if found {
-        t.Error("Olmayan kelime bulunmamalı")
+        t.Error("Non-existent word should not be found")
     }
-    
-    // Önek kontrolü
+
+    // Prefix check
     if !trie.StartsWith("app") {
-        t.Error("'app' öneki bulunmalı")
+        t.Error("Prefix 'app' should be found")
     }
-    
+
     if trie.StartsWith("orange") {
-        t.Error("'orange' öneki bulunmamalı")
+        t.Error("Prefix 'orange' should not be found")
     }
-    
-    // Kelime sil
+
+    // Delete word
     if !trie.Delete("banana") {
-        t.Error("'banana' kelimesi silinmeli")
+        t.Error("Word 'banana' should be deleted")
     }
-    
-    // Boyut 2 olmalı
+
+    // Size should be 2
     if trie.Size() != 2 {
-        t.Errorf("Beklenen boyut 2, alınan: %d", trie.Size())
+        t.Errorf("Expected size 2, got: %d", trie.Size())
     }
-    
-    // Silinen kelimeyi ara
+
+    // Search for deleted word
     _, found = trie.Search("banana")
     if found {
-        t.Error("Silinen kelime bulunmamalı")
+        t.Error("Deleted word should not be found")
     }
-    
-    // Olmayan kelimeyi silmeyi dene
+
+    // Try to delete non-existent word
     if trie.Delete("orange") {
-        t.Error("Olmayan kelime silinemez")
+        t.Error("Non-existent word cannot be deleted")
     }
-    
-    // Tüm kelimeleri al
+
+    // Get all words
     words := trie.GetAllWords()
     if len(words) != 2 {
-        t.Errorf("Beklenen kelime sayısı 2, alınan: %d", len(words))
+        t.Errorf("Expected word count 2, got: %d", len(words))
     }
-    
-    if words["apple"] != "elma" || words["application"] != "uygulama" {
-        t.Error("Tüm kelimeler doğru değil")
+
+    if words["apple"] != "apple" || words["application"] != "application" {
+        t.Error("All words are not correct")
     }
-    
-    // Belirli önekle başlayan kelimeleri al
+
+    // Get words with specific prefix
     appWords := trie.GetWordsWithPrefix("app")
     if len(appWords) != 2 {
-        t.Errorf("Beklenen 'app' önekli kelime sayısı 2, alınan: %d", len(appWords))
+        t.Errorf("Expected word count with prefix 'app' 2, got: %d", len(appWords))
     }
-    
-    if appWords["apple"] != "elma" || appWords["application"] != "uygulama" {
-        t.Error("'app' önekli kelimeler doğru değil")
+
+    if appWords["apple"] != "apple" || appWords["application"] != "application" {
+        t.Error("Words with prefix 'app' are not correct")
     }
-    
-    // Trie'yi temizle
+
+    // Clear the Trie
     trie.Clear()
-    
-    // Boyut 0 olmalı
+
+    // Size should be 0
     if trie.Size() != 0 {
-        t.Errorf("Temizlendikten sonra beklenen boyut 0, alınan: %d", trie.Size())
+        t.Errorf("Expected size 0 after clearing, got: %d", trie.Size())
     }
-    
-    // Boş olmalı
+
+    // Should be empty
     if !trie.IsEmpty() {
-        t.Error("Temizlendikten sonra trie boş olmalı")
+        t.Error("Trie should be empty after clearing")
     }
 }
 
-// TestTrieInt, Trie<int> için testler içerir.
+// TestTrieInt contains tests for Trie<int>.
 func TestTrieInt(t *testing.T) {
-    // Yeni bir Trie oluştur
+    // Create a new Trie
     trie := Trie.New<int>()
-    
-    // Kelimeler ekle
+
+    // Add words
     trie.Insert("one", 1)
     trie.Insert("two", 2)
     trie.Insert("three", 3)
-    
-    // Kelimeleri ara
+
+    // Search for words
     value, found := trie.Search("one")
     if !found || value != 1 {
-        t.Errorf("Beklenen değer 1, alınan: %d, bulundu: %t", value, found)
+        t.Errorf("Expected value 1, got: %d, found: %t", value, found)
     }
-    
+
     value, found = trie.Search("two")
     if !found || value != 2 {
-        t.Errorf("Beklenen değer 2, alınan: %d, bulundu: %t", value, found)
+        t.Errorf("Expected value 2, got: %d, found: %t", value, found)
     }
-    
+
     value, found = trie.Search("three")
     if !found || value != 3 {
-        t.Errorf("Beklenen değer 3, alınan: %d, bulundu: %t", value, found)
+        t.Errorf("Expected value 3, got: %d, found: %t", value, found)
     }
-    
-    // Tüm kelimeleri al
+
+    // Get all words
     words := trie.GetAllWords()
     if len(words) != 3 {
-        t.Errorf("Beklenen kelime sayısı 3, alınan: %d", len(words))
+        t.Errorf("Expected word count 3, got: %d", len(words))
     }
-    
+
     if words["one"] != 1 || words["two"] != 2 || words["three"] != 3 {
-        t.Error("Tüm kelimeler doğru değil")
+        t.Error("All words are not correct")
     }
 }
 
-// TestTrieEdgeCases, Trie için uç durum testleri içerir.
+// TestTrieEdgeCases contains edge case tests for Trie.
 func TestTrieEdgeCases(t *testing.T) {
-    // Yeni bir Trie oluştur
+    // Create a new Trie
     trie := Trie.New<string>()
-    
-    // Boş kelime ekle
-    trie.Insert("", "boş")
-    
-    // Boş kelimeyi ara
+
+    // Add empty word
+    trie.Insert("", "empty")
+
+    // Search for empty word
     value, found := trie.Search("")
-    if !found || value != "boş" {
-        t.Errorf("Beklenen değer 'boş', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "empty" {
+        t.Errorf("Expected value 'empty', got: %s, found: %t", value, found)
     }
-    
-    // Tek karakterli kelime ekle
-    trie.Insert("a", "a harfi")
-    
-    // Tek karakterli kelimeyi ara
+
+    // Add single character word
+    trie.Insert("a", "letter a")
+
+    // Search for single character word
     value, found = trie.Search("a")
-    if !found || value != "a harfi" {
-        t.Errorf("Beklenen değer 'a harfi', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "letter a" {
+        t.Errorf("Expected value 'letter a', got: %s, found: %t", value, found)
     }
-    
-    // Uzun kelime ekle
+
+    // Add long word
     longWord := "abcdefghijklmnopqrstuvwxyz"
-    trie.Insert(longWord, "alfabe")
-    
-    // Uzun kelimeyi ara
+    trie.Insert(longWord, "alphabet")
+
+    // Search for long word
     value, found = trie.Search(longWord)
-    if !found || value != "alfabe" {
-        t.Errorf("Beklenen değer 'alfabe', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "alphabet" {
+        t.Errorf("Expected value 'alphabet', got: %s, found: %t", value, found)
     }
-    
-    // Aynı kelimeyi farklı değerle güncelle
-    trie.Insert("a", "yeni a harfi")
-    
-    // Güncellenen kelimeyi ara
+
+    // Update same word with different value
+    trie.Insert("a", "new letter a")
+
+    // Search for updated word
     value, found = trie.Search("a")
-    if !found || value != "yeni a harfi" {
-        t.Errorf("Beklenen değer 'yeni a harfi', alınan: %s, bulundu: %t", value, found)
+    if !found || value != "new letter a" {
+        t.Errorf("Expected value 'new letter a', got: %s, found: %t", value, found)
     }
 }

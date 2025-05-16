@@ -1,165 +1,162 @@
-// GO+ Standart Kütüphane - Strings Paketi
+// GO+ Standard Library - Strings Package
 package strings
 
 import (
-    "strings" // Go'nun strings paketini kullan
+    "strings" // Use Go's strings package
 )
 
-// Contains, s dizesinin substr alt dizesini içerip içermediğini kontrol eder.
+// Contains checks if the string s contains the substring substr.
 func Contains(s, substr string) bool {
     return strings.Contains(s, substr)
 }
 
-// ContainsAny, s dizesinin chars dizesindeki karakterlerden herhangi birini içerip içermediğini kontrol eder.
+// ContainsAny checks if the string s contains any of the characters in the string chars.
 func ContainsAny(s, chars string) bool {
     return strings.ContainsAny(s, chars)
 }
 
-// Count, s dizesindeki substr alt dizesinin sayısını döndürür.
+// Count returns the number of non-overlapping instances of substr in s.
 func Count(s, substr string) int {
     return strings.Count(s, substr)
 }
 
-// HasPrefix, s dizesinin prefix ile başlayıp başlamadığını kontrol eder.
+// HasPrefix tests whether the string s begins with prefix.
 func HasPrefix(s, prefix string) bool {
     return strings.HasPrefix(s, prefix)
 }
 
-// HasSuffix, s dizesinin suffix ile bitip bitmediğini kontrol eder.
+// HasSuffix tests whether the string s ends with suffix.
 func HasSuffix(s, suffix string) bool {
     return strings.HasSuffix(s, suffix)
 }
 
-// Index, s dizesindeki substr alt dizesinin ilk indeksini döndürür.
-// Eğer substr bulunamazsa, -1 döndürür.
+// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
 func Index(s, substr string) int {
     return strings.Index(s, substr)
 }
 
-// IndexAny, s dizesindeki chars dizesindeki karakterlerden herhangi birinin ilk indeksini döndürür.
-// Eğer hiçbir karakter bulunamazsa, -1 döndürür.
+// IndexAny returns the index of the first instance of any character from chars in s, or -1 if no character from chars is present in s.
 func IndexAny(s, chars string) int {
     return strings.IndexAny(s, chars)
 }
 
-// Join, elems dizisindeki dizeleri sep ayırıcısıyla birleştirir.
+// Join concatenates the elements of elems to create a single string. The separator string sep is placed between elements in the resulting string.
 func Join(elems []string, sep string) string {
     return strings.Join(elems, sep)
 }
 
-// LastIndex, s dizesindeki substr alt dizesinin son indeksini döndürür.
-// Eğer substr bulunamazsa, -1 döndürür.
+// LastIndex returns the index of the last instance of substr in s, or -1 if substr is not present in s.
 func LastIndex(s, substr string) int {
     return strings.LastIndex(s, substr)
 }
 
-// LastIndexAny, s dizesindeki chars dizesindeki karakterlerden herhangi birinin son indeksini döndürür.
-// Eğer hiçbir karakter bulunamazsa, -1 döndürür.
+// LastIndexAny returns the index of the last instance of any character from chars in s, or -1 if no character from chars is present in s.
 func LastIndexAny(s, chars string) int {
     return strings.LastIndexAny(s, chars)
 }
 
-// Repeat, s dizesini count kez tekrarlar.
+// Repeat returns a new string consisting of count copies of the string s.
 func Repeat(s string, count int) string {
     return strings.Repeat(s, count)
 }
 
-// Replace, s dizesindeki old alt dizesini new alt dizesiyle değiştirir.
-// n parametresi, kaç kez değiştirileceğini belirtir. n < 0 ise, tüm eşleşmeler değiştirilir.
+// Replace returns a copy of the string s with the first n non-overlapping instances of old replaced by new.
+// If n < 0, there is no limit on the number of replacements.
 func Replace(s, old, new string, n int) string {
     return strings.Replace(s, old, new, n)
 }
 
-// ReplaceAll, s dizesindeki old alt dizesinin tüm örneklerini new alt dizesiyle değiştirir.
+// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new.
 func ReplaceAll(s, old, new string) string {
     return strings.ReplaceAll(s, old, new)
 }
 
-// Split, s dizesini sep ayırıcısına göre böler.
+// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
 func Split(s, sep string) []string {
     return strings.Split(s, sep)
 }
 
-// SplitN, s dizesini sep ayırıcısına göre en fazla n parçaya böler.
+// SplitN slices s into substrings separated by sep and returns a slice of the substrings between those separators.
+// The count determines the number of substrings to return.
 func SplitN(s, sep string, n int) []string {
     return strings.SplitN(s, sep, n)
 }
 
-// ToLower, s dizesindeki tüm karakterleri küçük harfe dönüştürür.
+// ToLower returns a copy of the string s with all Unicode letters mapped to their lower case.
 func ToLower(s string) string {
     return strings.ToLower(s)
 }
 
-// ToUpper, s dizesindeki tüm karakterleri büyük harfe dönüştürür.
+// ToUpper returns a copy of the string s with all Unicode letters mapped to their upper case.
 func ToUpper(s string) string {
     return strings.ToUpper(s)
 }
 
-// Trim, s dizesinin başındaki ve sonundaki cutset dizesindeki karakterleri kaldırır.
+// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
 func Trim(s, cutset string) string {
     return strings.Trim(s, cutset)
 }
 
-// TrimLeft, s dizesinin başındaki cutset dizesindeki karakterleri kaldırır.
+// TrimLeft returns a slice of the string s with all leading Unicode code points contained in cutset removed.
 func TrimLeft(s, cutset string) string {
     return strings.TrimLeft(s, cutset)
 }
 
-// TrimRight, s dizesinin sonundaki cutset dizesindeki karakterleri kaldırır.
+// TrimRight returns a slice of the string s with all trailing Unicode code points contained in cutset removed.
 func TrimRight(s, cutset string) string {
     return strings.TrimRight(s, cutset)
 }
 
-// TrimSpace, s dizesinin başındaki ve sonundaki boşluk karakterlerini kaldırır.
+// TrimSpace returns a slice of the string s with all leading and trailing white space removed.
 func TrimSpace(s string) string {
     return strings.TrimSpace(s)
 }
 
-// Builder, dize oluşturmak için kullanılır.
+// Builder is used to efficiently build a string using Write methods.
 class Builder {
     private var builder strings.Builder
 
-    // Write, p baytlarını builder'a yazar.
+    // Write appends the contents of p to the builder's buffer.
     func (b *Builder) Write(p []byte) (int, error) {
         return b.builder.Write(p)
     }
 
-    // WriteString, s dizesini builder'a yazar.
+    // WriteString appends the contents of s to the builder's buffer.
     func (b *Builder) WriteString(s string) (int, error) {
         return b.builder.WriteString(s)
     }
 
-    // WriteByte, c baytını builder'a yazar.
+    // WriteByte appends the byte c to the builder's buffer.
     func (b *Builder) WriteByte(c byte) error {
         return b.builder.WriteByte(c)
     }
 
-    // WriteRune, r runesini builder'a yazar.
+    // WriteRune appends the UTF-8 encoding of Unicode code point r to the builder's buffer.
     func (b *Builder) WriteRune(r rune) (int, error) {
         return b.builder.WriteRune(r)
     }
 
-    // String, builder'ın içeriğini dize olarak döndürür.
+    // String returns the accumulated string.
     func (b *Builder) String() string {
         return b.builder.String()
     }
 
-    // Len, builder'ın içeriğinin uzunluğunu döndürür.
+    // Len returns the number of accumulated bytes.
     func (b *Builder) Len() int {
         return b.builder.Len()
     }
 
-    // Cap, builder'ın kapasitesini döndürür.
+    // Cap returns the capacity of the builder's underlying byte slice.
     func (b *Builder) Cap() int {
         return b.builder.Cap()
     }
 
-    // Reset, builder'ı sıfırlar.
+    // Reset resets the Builder to be empty.
     func (b *Builder) Reset() {
         b.builder.Reset()
     }
 
-    // Grow, builder'ın kapasitesini en az n bayt artırır.
+    // Grow grows the builder's capacity by n bytes.
     func (b *Builder) Grow(n int) {
         b.builder.Grow(n)
     }

@@ -1,104 +1,104 @@
-# GO-Minus Örnekleri
+# GO-Minus Examples
 
-Bu dizin, GO-Minus programlama dili ile yazılmış çeşitli örnek projeleri ve kod parçalarını içermektedir. Bu örnekler, GO-Minus'un çeşitli kullanım senaryolarını ve özelliklerini göstermektedir.
+This directory contains various example projects and code snippets written in the GO-Minus programming language. These examples demonstrate various use cases and features of GO-Minus.
 
-## Temel Örnekler
+## Basic Examples
 
-- Merhaba Dünya (Yakında)
-- Değişkenler ve Veri Tipleri (Yakında)
-- Kontrol Yapıları (Yakında)
-- Fonksiyonlar (Yakında)
-- Paketler ve Modüller (Yakında)
+- Hello World (Coming Soon)
+- Variables and Data Types (Coming Soon)
+- Control Structures (Coming Soon)
+- Functions (Coming Soon)
+- Packages and Modules (Coming Soon)
 
-## Semantik Analiz Örnekleri
+## Semantic Analysis Examples
 
-- [Gelişmiş Hata Raporlama](semantic/error-reporting.md) - GO-Minus'un gelişmiş hata raporlama sistemini gösterir
-- [Tip Çıkarımı](semantic/type-inference.md) - GO-Minus'un tip çıkarımı özelliğini gösterir
+- [Advanced Error Reporting](semantic/error-reporting.md) - Shows GO-Minus's advanced error reporting system
+- [Type Inference](semantic/type-inference.md) - Shows GO-Minus's type inference feature
 
-## Nesne Yönelimli Programlama Örnekleri
+## Object-Oriented Programming Examples
 
-- Sınıflar ve Nesneler (Yakında)
-- Kalıtım ve Polimorfizm (Yakında)
-- Arayüzler (Yakında)
-- Erişim Belirleyicileri (Yakında)
-- Soyut Sınıflar ve Metotlar (Yakında)
+- Classes and Objects (Coming Soon)
+- Inheritance and Polymorphism (Coming Soon)
+- Interfaces (Coming Soon)
+- Access Modifiers (Coming Soon)
+- Abstract Classes and Methods (Coming Soon)
 
-## Jenerik Programlama Örnekleri
+## Generic Programming Examples
 
-- Şablon Sınıflar (Yakında)
-- Şablon Fonksiyonlar (Yakında)
-- Şablon Metaprogramlama (Yakında)
+- Template Classes (Coming Soon)
+- Template Functions (Coming Soon)
+- Template Metaprogramming (Coming Soon)
 
-## İstisna İşleme Örnekleri
+## Exception Handling Examples
 
-- Try-Catch-Finally (Yakında)
-- Özel İstisna Sınıfları (Yakında)
-- İstisna Hiyerarşisi (Yakında)
+- Try-Catch-Finally (Coming Soon)
+- Custom Exception Classes (Coming Soon)
+- Exception Hierarchy (Coming Soon)
 
-## Eşzamanlılık Örnekleri
+## Concurrency Examples
 
-- Goroutine'ler (Yakında)
-- Kanallar (Yakında)
-- Mutex ve Senkronizasyon (Yakında)
-- WaitGroup (Yakında)
-- Select (Yakında)
+- Goroutines (Coming Soon)
+- Channels (Coming Soon)
+- Mutex and Synchronization (Coming Soon)
+- WaitGroup (Coming Soon)
+- Select (Coming Soon)
 
-## Bellek Yönetimi Örnekleri
+## Memory Management Examples
 
-- Otomatik Bellek Yönetimi (Yakında)
-- Manuel Bellek Yönetimi (Yakında)
-- Bellek Optimizasyonları (Yakında)
+- Automatic Memory Management (Coming Soon)
+- Manual Memory Management (Coming Soon)
+- Memory Optimizations (Coming Soon)
 
-## Standart Kütüphane Örnekleri
+## Standard Library Examples
 
-- fmt Paketi (Yakında)
-- [Buffered IO](io/buffered-io-example.md) - Tamponlanmış giriş/çıkış işlemleri için Buffered IO paketinin kullanımı
-- [Trie (Önek Ağacı)](container/trie-example.md) - String anahtarları verimli bir şekilde depolamak ve aramak için Trie veri yapısının kullanımı
-- [Regex (Düzenli İfadeler)](regex/regex-example.md) - Metin arama, eşleştirme ve değiştirme işlemleri için Regex paketinin kullanımı
-- concurrent Paketi (Yakında)
-- math Paketi (Yakında)
+- fmt Package (Coming Soon)
+- [Buffered IO](io/buffered-io-example.md) - Using the Buffered IO package for buffered input/output operations
+- [Trie](container/trie-example.md) - Using the Trie data structure to efficiently store and search for string keys
+- [Regex](regex/regex-example.md) - Using the Regex package for text searching, matching, and replacement operations
+- concurrent Package (Coming Soon)
+- math Package (Coming Soon)
 
-## Grafik Programlama Örnekleri
+## Graphics Programming Examples
 
-- [Vulkan Hello Triangle](vulkan/hello-triangle.md) - Vulkan API ile basit bir üçgen çizme örneği
-- OpenGL Örnekleri (Yakında)
-- 2D Grafik (Yakında)
-- 3D Grafik (Yakında)
+- [Vulkan Hello Triangle](vulkan/hello-triangle.md) - Example of drawing a simple triangle with the Vulkan API
+- OpenGL Examples (Coming Soon)
+- 2D Graphics (Coming Soon)
+- 3D Graphics (Coming Soon)
 
-## Web Programlama Örnekleri
+## Web Programming Examples
 
-- HTTP Sunucusu (Yakında)
-- REST API (Yakında)
-- WebSocket (Yakında)
-- HTML Şablonları (Yakında)
+- HTTP Server (Coming Soon)
+- REST API (Coming Soon)
+- WebSocket (Coming Soon)
+- HTML Templates (Coming Soon)
 
-## Veritabanı Programlama Örnekleri
+## Database Programming Examples
 
-- SQL Veritabanı (Yakında)
-- NoSQL Veritabanı (Yakında)
-- ORM (Yakında)
-- Veritabanı Bağlantı Havuzu (Yakında)
+- SQL Database (Coming Soon)
+- NoSQL Database (Coming Soon)
+- ORM (Coming Soon)
+- Database Connection Pool (Coming Soon)
 
-## GUI Programlama Örnekleri
+## GUI Programming Examples
 
-- Basit GUI Uygulaması (Yakında)
-- Gelişmiş GUI Uygulaması (Yakında)
-- Çoklu Platform GUI (Yakında)
+- Simple GUI Application (Coming Soon)
+- Advanced GUI Application (Coming Soon)
+- Multi-Platform GUI (Coming Soon)
 
-## Oyun Geliştirme Örnekleri
+## Game Development Examples
 
-- 2D Oyun (Yakında)
-- 3D Oyun (Yakında)
-- Fizik Motoru (Yakında)
-- Oyun AI (Yakında)
+- 2D Game (Coming Soon)
+- 3D Game (Coming Soon)
+- Physics Engine (Coming Soon)
+- Game AI (Coming Soon)
 
-## Sistem Programlama Örnekleri
+## System Programming Examples
 
-- Dosya İşlemleri (Yakında)
-- Ağ Programlama (Yakında)
-- İşletim Sistemi Arayüzleri (Yakında)
-- Düşük Seviyeli Bellek İşlemleri (Yakında)
+- File Operations (Coming Soon)
+- Network Programming (Coming Soon)
+- Operating System Interfaces (Coming Soon)
+- Low-Level Memory Operations (Coming Soon)
 
-## Katkıda Bulunma
+## Contributing
 
-GO-Minus örneklerine katkıda bulunmak için, lütfen [Katkı Sağlama Rehberi](../../CONTRIBUTING.md) belgesini okuyun. Örneklerde hata bulursanız veya yeni örnek önerileriniz varsa, lütfen [GitHub Issues](https://github.com/gominus/gominus/issues) üzerinden bildirimde bulunun.
+To contribute to GO-Minus examples, please read the [Contribution Guide](../../CONTRIBUTING.md). If you find errors in the examples or have suggestions for new examples, please report them via [GitHub Issues](https://github.com/gominus/gominus/issues).

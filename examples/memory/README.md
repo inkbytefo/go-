@@ -1,140 +1,140 @@
-# GO-Minus Bellek Yönetimi Örnekleri
+# GO-Minus Memory Management Examples
 
-Bu dizin, GO-Minus programlama dili için Hibrit Akıllı Bellek Yönetimi Sistemi'nin kullanımını gösteren örnekleri içerir.
+This directory contains examples demonstrating the use of the Hybrid Smart Memory Management System for the GO-Minus programming language.
 
-## Örnekler
+## Examples
 
-### 1. Hibrit Bellek Yönetimi
+### 1. Hybrid Memory Management
 
-[hybrid_memory_management.gom](hybrid_memory_management.gom) dosyası, GO-Minus'un hibrit bellek yönetimi özelliklerinin kullanımını gösterir:
+The [hybrid_memory_management.gom](hybrid_memory_management.gom) file demonstrates the use of GO-Minus's hybrid memory management features:
 
-- Otomatik bellek yönetimi (garbage collection)
-- Manuel bellek yönetimi
-- Bölgesel bellek yönetimi (region-based memory management)
-- Bellek havuzu şablonları (memory pool templates)
-- Profil tabanlı otomatik optimizasyon
+- Automatic memory management (garbage collection)
+- Manual memory management
+- Region-based memory management
+- Memory pool templates
+- Profile-based automatic optimization
 
 ```bash
 gominus run hybrid_memory_management.gom
 ```
 
-### 2. Yaşam Süresi Analizi
+### 2. Lifetime Analysis
 
-[lifetime_analysis.gom](lifetime_analysis.gom) dosyası, GO-Minus'un yaşam süresi analizi özelliğinin kullanımını gösterir:
+The [lifetime_analysis.gom](lifetime_analysis.gom) file demonstrates the use of GO-Minus's lifetime analysis feature:
 
-- Bellek sızıntısı tespiti
-- Dangling pointer tespiti
-- Güvenli referans yönetimi
-- Yaşam süresi kapsamları
+- Memory leak detection
+- Dangling pointer detection
+- Safe reference management
+- Lifetime scopes
 
 ```bash
 gominus run lifetime_analysis.gom
 ```
 
-## Çıktılar
+## Outputs
 
-### Hibrit Bellek Yönetimi Örneği
+### Hybrid Memory Management Example
 
 ```
-GO-Minus Hibrit Akıllı Bellek Yönetimi Sistemi Örneği
+GO-Minus Hybrid Smart Memory Management System Example
 ====================================================
-Otomatik Bellek Yönetimi Örneği
-Toplam: 523776
+Automatic Memory Management Example
+Total: 523776
 
-Manuel Bellek Yönetimi Örneği
-Toplam: 523776
+Manual Memory Management Example
+Total: 523776
 
-Bölgesel Bellek Yönetimi Örneği
-Toplam: 523776
-Bölge İstatistikleri:
-  Toplam Boyut: 1048576 bayt
-  Kullanılan Boyut: 4096 bayt
-  Blok Sayısı: 1
-  Ayırma İşlemi Sayısı: 1
+Region-Based Memory Management Example
+Total: 523776
+Region Statistics:
+  Total Size: 1048576 bytes
+  Used Size: 4096 bytes
+  Block Count: 1
+  Allocation Count: 1
 
-Bellek Havuzu Örneği
+Memory Pool Example
 Object 0 : 0
 Object 1 : 1
 ...
 Object 99 : 99
-Toplam: 4950
-Havuz İstatistikleri:
-  Kapasite: 1000
-  Kullanılabilir: 100
-  Alınan Nesne Sayısı: 100
-  Geri Döndürülen Nesne Sayısı: 100
+Total: 4950
+Pool Statistics:
+  Capacity: 1000
+  Available: 100
+  Objects Acquired: 100
+  Objects Returned: 100
 
-Profil Tabanlı Otomatik Optimizasyon Örneği
-İterasyon 0 Toplam: 523776
-İterasyon 10 Toplam: 534016
+Profile-Based Automatic Optimization Example
+Iteration 0 Total: 523776
+Iteration 10 Total: 534016
 ...
-İterasyon 90 Toplam: 624896
-Bellek İstatistikleri:
-  Toplam Ayrılan: 419430400 bayt
-  Toplam Serbest Bırakılan: 419430400 bayt
-  Şu Anda Kullanılan: 0 bayt
-  En Yüksek Kullanım: 4096 bayt
-  Ayırma İşlemi Sayısı: 100
-  Serbest Bırakma İşlemi Sayısı: 100
+Iteration 90 Total: 624896
+Memory Statistics:
+  Total Allocated: 419430400 bytes
+  Total Freed: 419430400 bytes
+  Currently Used: 0 bytes
+  Peak Usage: 4096 bytes
+  Allocation Count: 100
+  Free Count: 100
 
-Hibrit Bellek Yönetimi Örneği
-Manuel Bellek Toplamı: 523776
-Otomatik Bellek: Otomatik Bellek : 42
-Bölgesel Bellek Toplamı: 523776
-Havuz Nesneleri Toplamı: 4950
+Hybrid Memory Management Example
+Manual Memory Total: 523776
+Automatic Memory: Automatic Memory : 42
+Region Memory Total: 523776
+Pool Objects Total: 4950
 ```
 
-### Yaşam Süresi Analizi Örneği
+### Lifetime Analysis Example
 
 ```
-GO-Minus Yaşam Süresi Analizi Örneği
+GO-Minus Lifetime Analysis Example
 ====================================
-Bellek Sızıntısı Örneği
-Bellek Sızıntısı Sayısı: 1
-Sızıntı 1: person (Person)
+Memory Leak Example
+Memory Leak Count: 1
+Leak 1: person (Person)
 
-Dangling Pointer Örneği
-Dangling Pointer Sayısı: 1
+Dangling Pointer Example
+Dangling Pointer Count: 1
 Dangling Pointer 1: outerPointer (unsafe.Pointer)
 
-Güvenli Referans Örneği
-Bellek Sızıntısı Sayısı: 0
-Dangling Pointer Sayısı: 0
+Safe Reference Example
+Memory Leak Count: 0
+Dangling Pointer Count: 0
 
-Yaşam Süresi Analizi Örneği
-Bellek Sızıntısı Sayısı: 1
-Sızıntı 1: person1 (Person)
-Dangling Pointer Sayısı: 0
+Lifetime Analysis Example
+Memory Leak Count: 1
+Leak 1: person1 (Person)
+Dangling Pointer Count: 0
 ```
 
-## Bellek Yönetimi Stratejileri
+## Memory Management Strategies
 
-GO-Minus, aşağıdaki bellek yönetimi stratejilerini destekler:
+GO-Minus supports the following memory management strategies:
 
-### 1. Otomatik Bellek Yönetimi (Garbage Collection)
+### 1. Automatic Memory Management (Garbage Collection)
 
-GO-Minus, varsayılan olarak Go'nun garbage collector'ünü kullanır. Bu, bellek yönetimini otomatikleştirerek programcıların bellek sızıntıları ve dangling pointer'lar gibi yaygın sorunlarla uğraşmak zorunda kalmadan kod yazmasına olanak tanır.
+GO-Minus uses Go's garbage collector by default. This automates memory management, allowing programmers to write code without having to deal with common issues like memory leaks and dangling pointers.
 
-### 2. Manuel Bellek Yönetimi
+### 2. Manual Memory Management
 
-Performans kritik bölümler için, GO-Minus manuel bellek yönetimi seçeneği sunar. Bu, `unsafe` bloğu içinde bellek ayırma ve serbest bırakma işlemlerini doğrudan kontrol etmenize olanak tanır.
+For performance-critical sections, GO-Minus offers a manual memory management option. This allows you to directly control memory allocation and deallocation operations within an `unsafe` block.
 
-### 3. Bölgesel Bellek Yönetimi (Region-Based Memory Management)
+### 3. Region-Based Memory Management
 
-GO-Minus'un yeni özelliği olan bölgesel bellek yönetimi, programcılara belirli kod bloklarını "bellek bölgeleri" olarak işaretleme ve bu bölgelerdeki tüm bellek ayırma işlemlerini bölge sonunda otomatik olarak serbest bırakma olanağı sunar.
+GO-Minus's new feature, region-based memory management, allows programmers to mark certain code blocks as "memory regions" and automatically free all memory allocations in that region at the end of the block.
 
-### 4. Yaşam Süresi Analizi (Lifetime Analysis)
+### 4. Lifetime Analysis
 
-GO-Minus, Rust'tan esinlenen, ancak daha az katı bir yaşam süresi analizi sistemi sunar. Derleyici, değişkenlerin yaşam sürelerini analiz eder ve potansiyel bellek sızıntılarını veya dangling pointer'ları tespit eder.
+GO-Minus provides a lifetime analysis system inspired by Rust, but less strict. The compiler analyzes the lifetimes of variables and detects potential memory leaks or dangling pointers.
 
-### 5. Profil Tabanlı Otomatik Optimizasyon
+### 5. Profile-Based Automatic Optimization
 
-GO-Minus, uygulama çalışırken bellek kullanım desenlerini analiz eden ve gelecekteki çalıştırmalarda bellek yönetimini otomatik olarak optimize eden bir sistem sunar.
+GO-Minus provides a system that analyzes memory usage patterns while the application is running and automatically optimizes memory management in future runs.
 
-### 6. Bellek Havuzu Şablonları
+### 6. Memory Pool Templates
 
-GO-Minus, belirli veri yapıları için özelleştirilmiş bellek havuzları oluşturmayı kolaylaştıran şablonlar sunar.
+GO-Minus provides templates that make it easier to create customized memory pools for specific data structures.
 
-## Lisans
+## License
 
-GO-Minus Bellek Yönetimi Örnekleri, GO-Minus projesi ile aynı lisans altında dağıtılmaktadır.
+GO-Minus Memory Management Examples are distributed under the same license as the GO-Minus project.
