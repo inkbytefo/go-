@@ -266,3 +266,35 @@ func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 
 	return list
 }
+
+// parsePostfixExpression, bir postfix ifadesini ayrıştırır (++ ve -- operatörleri için).
+func (p *Parser) parsePostfixExpression(left ast.Expression) ast.Expression {
+	return &ast.PostfixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+		Left:     left,
+	}
+}
+
+// parseExpressionUntil, belirtilen token'a kadar ifadeyi ayrıştırır.
+func (p *Parser) parseExpressionUntil(precedence int, until token.TokenType) ast.Expression {
+	prefix := p.prefixParseFns[p.curToken.Type]
+	if prefix == nil {
+		p.noPrefixParseFnError(p.curToken.Type)
+		return nil
+	}
+	leftExp := prefix()
+
+	for !p.peekTokenIs(until) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+
+		p.nextToken()
+
+		leftExp = infix(leftExp)
+	}
+
+	return leftExp
+}

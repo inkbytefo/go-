@@ -234,6 +234,8 @@ func (g *IRGenerator) generateStatement(stmt ast.Statement) {
 		g.generateBlockStatement(s)
 	case *ast.WhileStatement:
 		g.generateWhileStatement(s)
+	case *ast.ForStatement:
+		g.generateForStatement(s)
 	case *ast.FunctionStatement:
 		g.generateFunctionStatement(s)
 	case *ast.ClassStatement:
@@ -266,6 +268,8 @@ func (g *IRGenerator) generateExpression(expr ast.Expression) value.Value {
 		return g.generatePrefixExpression(e)
 	case *ast.InfixExpression:
 		return g.generateInfixExpression(e)
+	case *ast.PostfixExpression:
+		return g.generatePostfixExpression(e)
 	case *ast.CallExpression:
 		return g.generateCallExpression(e)
 	case *ast.FunctionLiteral:
@@ -426,8 +430,108 @@ func (g *IRGenerator) generatePrefixExpression(expr *ast.PrefixExpression) value
 	return nil
 }
 
+func (g *IRGenerator) generatePostfixExpression(expr *ast.PostfixExpression) value.Value {
+	// Sol ifadeyi değerlendir (değişken olmalı)
+	leftIdent, ok := expr.Left.(*ast.Identifier)
+	if !ok {
+		g.ReportError("Postfix operatörü sadece değişkenler üzerinde kullanılabilir")
+		return nil
+	}
+
+	// Değişkenin adresini bul
+	varName := leftIdent.Value
+	varAddr, exists := g.symbolTable[varName]
+	if !exists {
+		g.ReportError("Tanımlanmamış değişken: %s", varName)
+		return nil
+	}
+
+	if g.currentBB == nil {
+		g.ReportError("Geçerli bir blok yok, postfix ifadesi değerlendirilemiyor")
+		return nil
+	}
+
+	// Mevcut değeri oku
+	currentVal := g.currentBB.NewLoad(varAddr.Type().(*types.PointerType).ElemType, varAddr)
+
+	// Operatöre göre işlem yap
+	var newVal value.Value
+	switch expr.Operator {
+	case "++":
+		// Artırma
+		if types.IsInt(currentVal.Type()) {
+			newVal = g.currentBB.NewAdd(currentVal, constant.NewInt(types.I32, 1))
+		} else {
+			g.ReportError("++ operatörü sadece integer tiplerinde kullanılabilir")
+			return nil
+		}
+	case "--":
+		// Azaltma
+		if types.IsInt(currentVal.Type()) {
+			newVal = g.currentBB.NewSub(currentVal, constant.NewInt(types.I32, 1))
+		} else {
+			g.ReportError("-- operatörü sadece integer tiplerinde kullanılabilir")
+			return nil
+		}
+	default:
+		g.ReportError("Desteklenmeyen postfix operatörü: %s", expr.Operator)
+		return nil
+	}
+
+	// Yeni değeri değişkene ata
+	g.currentBB.NewStore(newVal, varAddr)
+
+	// Postfix operatörler eski değeri döndürür
+	return currentVal
+}
+
 func (g *IRGenerator) generateInfixExpression(expr *ast.InfixExpression) value.Value {
-	// Sol ve sağ ifadeleri değerlendir
+	// ":=" operatörü için özel handling
+	if expr.Operator == ":=" {
+		// Sol taraf bir tanımlayıcı olmalı
+		if ident, ok := expr.Left.(*ast.Identifier); ok {
+			varName := ident.Value
+
+			// Değişken zaten tanımlı mı kontrol et
+			if _, exists := g.symbolTable[varName]; exists {
+				g.ReportError("Değişken zaten tanımlı: %s", varName)
+				return nil
+			}
+
+			// Sağ tarafı değerlendir
+			right := g.generateExpression(expr.Right)
+			if right == nil {
+				return nil
+			}
+
+			// Sağ tarafın tipini belirle
+			rightType := right.Type()
+
+			if g.currentFunc == nil {
+				g.ReportError("Kısa değişken tanımlama sadece fonksiyon içinde kullanılabilir")
+				return nil
+			}
+
+			if g.currentBB == nil {
+				g.ReportError("Geçerli bir blok yok, değişken tanımlanamıyor")
+				return nil
+			}
+
+			// Değişken için bellek ayır
+			alloca := g.currentBB.NewAlloca(rightType)
+			alloca.SetName(varName)
+			g.symbolTable[varName] = alloca
+
+			// Değeri ata
+			g.currentBB.NewStore(right, alloca)
+			return right
+		} else {
+			g.ReportError("Kısa değişken tanımlama operatörünün sol tarafı bir tanımlayıcı olmalıdır")
+			return nil
+		}
+	}
+
+	// Diğer operatörler için normal işlem
 	left := g.generateExpression(expr.Left)
 	right := g.generateExpression(expr.Right)
 
@@ -487,6 +591,7 @@ func (g *IRGenerator) generateInfixExpression(expr *ast.InfixExpression) value.V
 			g.ReportError("Atama operatörünün sol tarafı bir tanımlayıcı olmalıdır")
 			return nil
 		}
+
 	// Karşılaştırma operatörleri
 	case "==":
 		if types.IsInt(leftType) && types.IsInt(rightType) {
@@ -1157,6 +1262,72 @@ func (g *IRGenerator) generateWhileStatement(stmt *ast.WhileStatement) {
 	}
 
 	// Koşul bloğuna geri dön
+	if g.currentBB.Term == nil {
+		g.currentBB.NewBr(condBlock)
+	}
+
+	// Döngü sonrası bloğa geç
+	g.currentBB = endBlock
+}
+
+// generateForStatement, bir for döngüsü için IR üretir.
+func (g *IRGenerator) generateForStatement(stmt *ast.ForStatement) {
+	if g.currentFunc == nil {
+		g.ReportError("Geçerli bir fonksiyon yok, for döngüsü değerlendirilemiyor")
+		return
+	}
+
+	// Unique label'lar oluştur
+	g.labelCounter++
+	labelSuffix := fmt.Sprintf("%d", g.labelCounter)
+
+	// Bloklar oluştur
+	initBlock := g.currentFunc.NewBlock("for.init." + labelSuffix)
+	condBlock := g.currentFunc.NewBlock("for.cond." + labelSuffix)
+	bodyBlock := g.currentFunc.NewBlock("for.body." + labelSuffix)
+	postBlock := g.currentFunc.NewBlock("for.post." + labelSuffix)
+	endBlock := g.currentFunc.NewBlock("for.end." + labelSuffix)
+
+	// Init bloğuna git
+	g.currentBB.NewBr(initBlock)
+
+	// Init bloğunu işle
+	g.currentBB = initBlock
+	if stmt.Init != nil {
+		g.generateStatement(stmt.Init)
+	}
+	g.currentBB.NewBr(condBlock)
+
+	// Koşul bloğunu işle
+	g.currentBB = condBlock
+	if stmt.Condition != nil {
+		condition := g.generateExpression(stmt.Condition)
+		if condition == nil {
+			return
+		}
+		// Koşula göre dallanma
+		g.currentBB.NewCondBr(condition, bodyBlock, endBlock)
+	} else {
+		// Koşul yoksa sonsuz döngü (body'ye git)
+		g.currentBB.NewBr(bodyBlock)
+	}
+
+	// Döngü gövdesini işle
+	g.currentBB = bodyBlock
+	if stmt.Body != nil {
+		g.generateBlockStatement(stmt.Body)
+	}
+	// Body'den post bloğuna git
+	if g.currentBB.Term == nil {
+		g.currentBB.NewBr(postBlock)
+	}
+
+	// Post bloğunu işle
+	g.currentBB = postBlock
+	if stmt.Post != nil {
+		g.generateStatement(stmt.Post)
+	}
+	// Post'tan koşul bloğuna geri dön
 	if g.currentBB.Term == nil {
 		g.currentBB.NewBr(condBlock)
 	}

@@ -74,6 +74,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.ARROW, p.parseMemberExpression)
 	p.registerInfix(token.ASSIGN, p.parseAssignExpression)
 	p.registerInfix(token.DEFINE, p.parseShortVarDeclExpression)
+	p.registerInfix(token.INCREMENT, p.parsePostfixExpression)
+	p.registerInfix(token.DECREMENT, p.parsePostfixExpression)
 
 	// İki token oku, böylece curToken ve peekToken ayarlanır.
 	p.nextToken()

@@ -1,0 +1,62 @@
+package main
+
+import "fmt"
+
+func simpleReturn() int {
+    return 42
+}
+
+func add(x, y) int {
+    return x + y
+}
+
+func multiply(a, b) int {
+    return a * b
+}
+
+func conditionalMax(x, y) int {
+    if x > y {
+        return x
+    }
+    return y
+}
+
+func complexCalculation(n) int {
+    result := n * 2
+    if result > 10 {
+        result = result + 5
+    }
+    return result
+}
+
+func main() {
+    fmt.Println("Testing return statements and functions:")
+
+    // Test simple return
+    result1 := simpleReturn()
+    fmt.Println("Simple return:", result1)
+
+    // Test function with parameters
+    result2 := add(10, 20)
+    fmt.Println("Add result:", result2)
+
+    // Test multiplication
+    result3 := multiply(6, 7)
+    fmt.Println("Multiply result:", result3)
+
+    // Test conditional return
+    result4 := conditionalMax(15, 8)
+    fmt.Println("Max(15, 8):", result4)
+
+    result5 := conditionalMax(3, 12)
+    fmt.Println("Max(3, 12):", result5)
+
+    // Test complex calculation
+    result6 := complexCalculation(8)
+    fmt.Println("Complex calc(8):", result6)
+
+    result7 := complexCalculation(3)
+    fmt.Println("Complex calc(3):", result7)
+
+    fmt.Println("All function and return tests completed!")
+}

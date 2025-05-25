@@ -42,42 +42,47 @@ func (p *Parser) parseIfStatement() ast.Statement {
 }
 
 // parseForStatement, bir for döngüsünü ayrıştırır.
-func (p *Parser) parseForStatement() *ast.ForStatement {
+func (p *Parser) parseForStatement() ast.Statement {
 	stmt := &ast.ForStatement{Token: p.curToken}
 
 	p.nextToken()
 
-	// C tarzı for döngüsü: for i := 0; i < 10; i++ { ... }
+	// For loop türlerini belirle
 	if !p.curTokenIs(token.LBRACE) {
-		// Başlangıç ifadesi
-		if !p.curTokenIs(token.SEMICOLON) {
-			stmt.Init = p.parseStatement()
-		}
+		// İlk ifadeyi parse et
+		firstExpr := p.parseExpressionUntil(LOWEST, token.SEMICOLON)
 
-		if !p.curTokenIs(token.SEMICOLON) {
+		if p.curTokenIs(token.SEMICOLON) {
+			// C-style for loop: for init; condition; post { ... }
+			stmt.Init = &ast.ExpressionStatement{
+				Token:      p.curToken,
+				Expression: firstExpr,
+			}
+
+			p.nextToken() // semicolon'u atla
+
+			// Condition
+			if !p.curTokenIs(token.SEMICOLON) {
+				stmt.Condition = p.parseExpressionUntil(LOWEST, token.SEMICOLON)
+			}
+
 			if !p.expectPeek(token.SEMICOLON) {
 				return nil
 			}
-		}
 
-		p.nextToken()
+			p.nextToken() // semicolon'u atla
 
-		// Koşul
-		if !p.curTokenIs(token.SEMICOLON) {
-			stmt.Condition = p.parseExpression(LOWEST)
-		}
-
-		if !p.curTokenIs(token.SEMICOLON) {
-			if !p.expectPeek(token.SEMICOLON) {
-				return nil
+			// Post
+			if !p.curTokenIs(token.LBRACE) {
+				postExpr := p.parseExpressionUntil(LOWEST, token.LBRACE)
+				stmt.Post = &ast.ExpressionStatement{
+					Token:      p.curToken,
+					Expression: postExpr,
+				}
 			}
-		}
-
-		p.nextToken()
-
-		// Sonrası ifadesi
-		if !p.curTokenIs(token.LBRACE) {
-			stmt.Post = p.parseStatement()
+		} else {
+			// While-style for loop: for condition { ... }
+			stmt.Condition = firstExpr
 		}
 	}
 
@@ -93,7 +98,7 @@ func (p *Parser) parseForStatement() *ast.ForStatement {
 }
 
 // parseWhileStatement, bir while döngüsünü ayrıştırır.
-func (p *Parser) parseWhileStatement() *ast.WhileStatement {
+func (p *Parser) parseWhileStatement() ast.Statement {
 	stmt := &ast.WhileStatement{Token: p.curToken}
 
 	p.nextToken()

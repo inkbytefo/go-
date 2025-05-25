@@ -14,6 +14,7 @@ const (
 	SUM         // +
 	PRODUCT     // *
 	PREFIX      // -X veya !X
+	POSTFIX     // X++ veya X--
 	CALL        // myFunction(X)
 	INDEX       // array[index]
 	MEMBER      // foo.bar
@@ -22,6 +23,7 @@ const (
 // Operatör öncelik tablosu
 var precedences = map[token.TokenType]int{
 	token.ASSIGN:      ASSIGN,
+	token.DEFINE:      ASSIGN,
 	token.EQ:          EQUALS,
 	token.NOT_EQ:      EQUALS,
 	token.LT:          LESSGREATER,
@@ -33,6 +35,8 @@ var precedences = map[token.TokenType]int{
 	token.SLASH:       PRODUCT,
 	token.ASTERISK:    PRODUCT,
 	token.MODULO:      PRODUCT,
+	token.INCREMENT:   POSTFIX,
+	token.DECREMENT:   POSTFIX,
 	token.LPAREN:      CALL,
 	token.LBRACKET:    INDEX,
 	token.DOT:         MEMBER,

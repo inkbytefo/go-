@@ -28,13 +28,15 @@ const (
 	CHAR   TokenType = "CHAR"   // 'a'
 
 	// Operatörler
-	ASSIGN   TokenType = "="
-	PLUS     TokenType = "+"
-	MINUS    TokenType = "-"
-	BANG     TokenType = "!"
-	ASTERISK TokenType = "*"
-	SLASH    TokenType = "/"
-	MODULO   TokenType = "%"
+	ASSIGN    TokenType = "="
+	PLUS      TokenType = "+"
+	MINUS     TokenType = "-"
+	BANG      TokenType = "!"
+	ASTERISK  TokenType = "*"
+	SLASH     TokenType = "/"
+	MODULO    TokenType = "%"
+	INCREMENT TokenType = "++"
+	DECREMENT TokenType = "--"
 
 	LT     TokenType = "<"
 	GT     TokenType = ">"

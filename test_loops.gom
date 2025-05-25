@@ -1,0 +1,43 @@
+package main
+
+import "fmt"
+
+func main() {
+    // Test simple while loop
+    fmt.Println("Testing simple while loop:")
+    var i int = 0
+    while i < 5 {
+        fmt.Println("i =", i)
+        i = i + 1
+    }
+
+    // Test simple for loop (while-style)
+    fmt.Println("Testing simple for loop:")
+    var j int = 0
+    for j < 3 {
+        fmt.Println("j =", j)
+        j = j + 1
+    }
+
+    // Test increment operator
+    fmt.Println("Testing increment operator:")
+    var k int = 10
+    fmt.Println("k before ++:", k)
+    k++
+    fmt.Println("k after ++:", k)
+
+    // Test short variable declaration
+    fmt.Println("Testing short variable declaration:")
+    m := 42
+    fmt.Println("m =", m)
+
+    // Test C-style for loop (manual version)
+    fmt.Println("Testing C-style for loop:")
+    n := 0
+    for n < 3 {
+        fmt.Println("n =", n)
+        n++
+    }
+
+    fmt.Println("Loop tests completed!")
+}

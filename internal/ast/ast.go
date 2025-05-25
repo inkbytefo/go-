@@ -360,6 +360,29 @@ func (ie *InfixExpression) String() string {
 func (ie *InfixExpression) Pos() token.Position { return ie.Left.Pos() }
 func (ie *InfixExpression) End() token.Position { return ie.Right.End() }
 
+// PostfixExpression, bir postfix ifadesini temsil eder.
+// Örnek: i++, j--
+type PostfixExpression struct {
+	Token    token.Token // Operatör token'ı
+	Left     Expression
+	Operator string
+}
+
+func (pe *PostfixExpression) expressionNode()      {}
+func (pe *PostfixExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *PostfixExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(pe.Left.String())
+	out.WriteString(pe.Operator)
+	out.WriteString(")")
+
+	return out.String()
+}
+func (pe *PostfixExpression) Pos() token.Position { return pe.Left.Pos() }
+func (pe *PostfixExpression) End() token.Position { return pe.Token.Position }
+
 // IfExpression, bir if ifadesini temsil eder.
 // Örnek: if (x > y) { x } else { y }
 type IfExpression struct {

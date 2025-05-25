@@ -199,7 +199,7 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.newToken(token.PLUS_ASSIGN, "+=")
 		} else if l.peekChar() == '+' {
 			l.readChar()
-			tok = l.newToken(token.PLUS, "++") // Artırma operatörü
+			tok = l.newToken(token.INCREMENT, "++") // Artırma operatörü
 		} else {
 			tok = l.newToken(token.PLUS, "+")
 		}
@@ -209,7 +209,7 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.newToken(token.MINUS_ASSIGN, "-=")
 		} else if l.peekChar() == '-' {
 			l.readChar()
-			tok = l.newToken(token.MINUS, "--") // Azaltma operatörü
+			tok = l.newToken(token.DECREMENT, "--") // Azaltma operatörü
 		} else if l.peekChar() == '>' {
 			l.readChar()
 			tok = l.newToken(token.ARROW, "->") // Ok operatörü
