@@ -82,6 +82,12 @@ go-minus/
 
 ## 🚀 Getting Started
 
+### Prerequisites
+
+- Go 1.20 or later
+- LLVM 14 or later (for code generation)
+- Git
+
 ### Installation
 
 ```bash
@@ -89,14 +95,30 @@ go-minus/
 git clone https://github.com/inkbytefo/go-minus.git
 cd go-minus
 
-# Build the GO-Minus compiler
-go build -o gominus ./cmd/gominus
+# Download dependencies
+make deps
 
-# Add the compiler to PATH
-# For Windows:
-# copy gominus.exe C:\Windows\System32\
-# For Linux/macOS:
-# sudo cp gominus /usr/local/bin/
+# Build the GO-Minus compiler and tools
+make build-all
+
+# Install binaries (optional)
+make install
+```
+
+### Quick Build
+
+```bash
+# Build just the compiler
+make build
+
+# Build all development tools
+make build-tools
+
+# Run tests
+make test
+
+# Run linter and code quality checks
+make check
 ```
 
 ### Hello World

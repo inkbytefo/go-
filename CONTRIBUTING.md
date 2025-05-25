@@ -17,25 +17,44 @@ GO-Minus projesine çeşitli şekillerde katkıda bulunabilirsiniz:
 
 GO-Minus projesini geliştirmek için aşağıdaki adımları izleyin:
 
+### Gereksinimler
+
+- Go 1.20 veya üzeri
+- LLVM 14 veya üzeri (kod üretimi için)
+- Git
+- Make (isteğe bağlı, ancak önerilen)
+
+### Kurulum
+
 1. Depoyu klonlayın:
    ```bash
-   git clone https://github.com/gominus/gominus.git
-   cd gominus
+   git clone https://github.com/inkbytefo/go-minus.git
+   cd go-minus
    ```
 
-2. Bağımlılıkları yükleyin:
+2. Geliştirme ortamını kurun:
    ```bash
-   go mod download
+   make dev-setup
    ```
 
-3. Derleyiciyi derleyin:
+3. Bağımlılıkları yükleyin:
    ```bash
-   go build -o gominus ./cmd/gominus
+   make deps
    ```
 
-4. Testleri çalıştırın:
+4. Derleyiciyi ve araçları derleyin:
    ```bash
-   go test ./...
+   make build-all
+   ```
+
+5. Testleri çalıştırın:
+   ```bash
+   make test
+   ```
+
+6. Kod kalitesi kontrollerini çalıştırın:
+   ```bash
+   make check
    ```
 
 ## Kod Katkıları
