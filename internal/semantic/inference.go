@@ -109,6 +109,9 @@ func (ti *TypeInference) inferIdentifierType(expr *ast.Identifier) Type {
 			Methods:    make(map[string]*FunctionType),
 			Implements: []*InterfaceType{},
 		}
+	case PACKAGE_TYPE:
+		// Package tipini oluştur
+		return &BasicType{Name: "package", Kind: PACKAGE_TYPE}
 	default:
 		return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
 	}

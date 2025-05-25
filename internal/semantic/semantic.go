@@ -1,6 +1,8 @@
 package semantic
 
 import (
+	"fmt"
+
 	"github.com/inkbytefo/go-minus/internal/ast"
 
 	"github.com/inkbytefo/go-minus/internal/token"
@@ -32,7 +34,139 @@ func New() *Analyzer {
 	}
 
 	a.inferencer = NewTypeInference(a)
+
+	// Built-in functions ve packages'ları ekle
+	a.initializeBuiltins()
+
 	return a
+}
+
+// PrintGlobalScope, global scope'daki sembolleri yazdırır (debug için).
+func (a *Analyzer) PrintGlobalScope() {
+	fmt.Printf("Global scope symbols (%d):\n", len(a.globalScope.Symbols))
+	for name, symbol := range a.globalScope.Symbols {
+		fmt.Printf("  %s: %s\n", name, symbol.Type.String())
+	}
+}
+
+// initializeBuiltins, built-in functions ve packages'ları global scope'a ekler.
+func (a *Analyzer) initializeBuiltins() {
+	// Built-in functions
+	a.addBuiltinFunction("println", []SymbolType{}, VOID_TYPE)
+	a.addBuiltinFunction("print", []SymbolType{}, VOID_TYPE)
+	a.addBuiltinFunction("panic", []SymbolType{UNKNOWN_TYPE}, VOID_TYPE)
+	a.addBuiltinFunction("recover", []SymbolType{}, UNKNOWN_TYPE)
+	a.addBuiltinFunction("len", []SymbolType{UNKNOWN_TYPE}, INTEGER_TYPE)
+	a.addBuiltinFunction("cap", []SymbolType{UNKNOWN_TYPE}, INTEGER_TYPE)
+	a.addBuiltinFunction("make", []SymbolType{UNKNOWN_TYPE}, UNKNOWN_TYPE)
+	a.addBuiltinFunction("new", []SymbolType{UNKNOWN_TYPE}, UNKNOWN_TYPE)
+
+	// Standard library packages
+	a.addStandardPackage("fmt")
+	a.addStandardPackage("os")
+	a.addStandardPackage("io")
+	a.addStandardPackage("strings")
+	a.addStandardPackage("math")
+}
+
+// addBuiltinFunction, bir built-in function'ı global scope'a ekler.
+func (a *Analyzer) addBuiltinFunction(name string, paramTypes []SymbolType, returnType SymbolType) {
+	symbol := a.globalScope.Define(name, FUNCTION_TYPE, token.Token{})
+	symbol.Signature = &FunctionSignature{
+		Parameters: make([]*Symbol, len(paramTypes)),
+		ReturnType: returnType,
+	}
+
+	// Parametre sembollerini oluştur
+	for i, paramType := range paramTypes {
+		symbol.Signature.Parameters[i] = &Symbol{
+			Name: "",
+			Type: paramType,
+		}
+	}
+}
+
+// addStandardPackage, bir standard library package'ını global scope'a ekler.
+func (a *Analyzer) addStandardPackage(name string) {
+	symbol := a.globalScope.Define(name, PACKAGE_TYPE, token.Token{})
+
+	// Package'a özgü fonksiyonları ekle
+	switch name {
+	case "fmt":
+		a.addVariadicPackageFunction(symbol, "Println", []SymbolType{}, VOID_TYPE)              // Variadic function
+		a.addVariadicPackageFunction(symbol, "Printf", []SymbolType{STRING_TYPE}, VOID_TYPE)    // Format string + variadic
+		a.addVariadicPackageFunction(symbol, "Print", []SymbolType{}, VOID_TYPE)                // Variadic function
+		a.addVariadicPackageFunction(symbol, "Sprintf", []SymbolType{STRING_TYPE}, STRING_TYPE) // Format string + variadic
+	case "os":
+		a.addPackageFunction(symbol, "Exit", []SymbolType{INTEGER_TYPE}, VOID_TYPE)
+		a.addPackageFunction(symbol, "Getenv", []SymbolType{STRING_TYPE}, STRING_TYPE)
+		a.addPackageFunction(symbol, "Setenv", []SymbolType{STRING_TYPE, STRING_TYPE}, UNKNOWN_TYPE)
+	case "math":
+		a.addPackageFunction(symbol, "Max", []SymbolType{FLOAT_TYPE, FLOAT_TYPE}, FLOAT_TYPE)
+		a.addPackageFunction(symbol, "Min", []SymbolType{FLOAT_TYPE, FLOAT_TYPE}, FLOAT_TYPE)
+		a.addPackageFunction(symbol, "Abs", []SymbolType{FLOAT_TYPE}, FLOAT_TYPE)
+	}
+}
+
+// addPackageFunction, bir package'a function ekler.
+func (a *Analyzer) addPackageFunction(packageSymbol *Symbol, funcName string, paramTypes []SymbolType, returnType SymbolType) {
+	if packageSymbol.Class == nil {
+		packageSymbol.Class = &ClassInfo{
+			Fields:     make(map[string]*Symbol),
+			Methods:    make(map[string]*Symbol),
+			Implements: []*Symbol{},
+		}
+	}
+
+	funcSymbol := &Symbol{
+		Name: funcName,
+		Type: FUNCTION_TYPE,
+		Signature: &FunctionSignature{
+			Parameters: make([]*Symbol, len(paramTypes)),
+			ReturnType: returnType,
+		},
+	}
+
+	// Parametre sembollerini oluştur
+	for i, paramType := range paramTypes {
+		funcSymbol.Signature.Parameters[i] = &Symbol{
+			Name: "",
+			Type: paramType,
+		}
+	}
+
+	packageSymbol.Class.Methods[funcName] = funcSymbol
+}
+
+// addVariadicPackageFunction, bir package'a variadic function ekler.
+func (a *Analyzer) addVariadicPackageFunction(packageSymbol *Symbol, funcName string, paramTypes []SymbolType, returnType SymbolType) {
+	if packageSymbol.Class == nil {
+		packageSymbol.Class = &ClassInfo{
+			Fields:     make(map[string]*Symbol),
+			Methods:    make(map[string]*Symbol),
+			Implements: []*Symbol{},
+		}
+	}
+
+	funcSymbol := &Symbol{
+		Name: funcName,
+		Type: FUNCTION_TYPE,
+		Signature: &FunctionSignature{
+			Parameters: make([]*Symbol, len(paramTypes)),
+			ReturnType: returnType,
+			IsVariadic: true, // Variadic function flag'i
+		},
+	}
+
+	// Parametre sembollerini oluştur
+	for i, paramType := range paramTypes {
+		funcSymbol.Signature.Parameters[i] = &Symbol{
+			Name: "",
+			Type: paramType,
+		}
+	}
+
+	packageSymbol.Class.Methods[funcName] = funcSymbol
 }
 
 // EnableTypeInference, tip çıkarımını etkinleştirir.
@@ -536,7 +670,26 @@ func (a *Analyzer) analyzePackageStatement(stmt *ast.PackageStatement) Type {
 
 func (a *Analyzer) analyzeImportStatement(stmt *ast.ImportStatement) Type {
 	// Import yolunu kaydet
-	// a.imports = append(a.imports, stmt.Path.Value)
+	importPath := stmt.Path.Value
+	a.imports = append(a.imports, importPath)
+
+	// Standard library package'larını handle et
+	switch importPath {
+	case "fmt":
+		// fmt package'ı zaten initializeBuiltins'de eklendi
+		// Burada ek bir şey yapmaya gerek yok
+	case "os":
+		// os package'ı zaten initializeBuiltins'de eklendi
+	case "io":
+		// io package'ı zaten initializeBuiltins'de eklendi
+	case "strings":
+		// strings package'ı zaten initializeBuiltins'de eklendi
+	case "math":
+		// math package'ı zaten initializeBuiltins'de eklendi
+	default:
+		// Bilinmeyen package için warning verebiliriz
+		// a.reportError(stmt.Token, "Bilinmeyen package: %s", importPath)
+	}
 
 	return &BasicType{Name: "void", Kind: VOID_TYPE}
 }
@@ -898,28 +1051,48 @@ func (a *Analyzer) analyzeHashLiteral(expr *ast.HashLiteral) Type {
 }
 
 func (a *Analyzer) analyzeMemberExpression(expr *ast.MemberExpression) Type {
+	// Member adını al
+	memberIdent, ok := expr.Member.(*ast.Identifier)
+	if !ok {
+		a.reportError(expr.Token, "Üye erişimi için tanımlayıcı bekleniyor")
+		return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
+	}
+	memberName := memberIdent.Value
+
+	// Package erişimi kontrolü
+	if objectIdent, ok := expr.Object.(*ast.Identifier); ok {
+		if packageSymbol := a.currentScope.Resolve(objectIdent.Value); packageSymbol != nil && packageSymbol.Type == PACKAGE_TYPE {
+			// Package.function erişimi
+			if packageSymbol.Class != nil && packageSymbol.Class.Methods != nil {
+				if methodSymbol, exists := packageSymbol.Class.Methods[memberName]; exists {
+					// Function type'ını döndür
+					return &FunctionType{
+						ParameterTypes: make([]Type, len(methodSymbol.Signature.Parameters)),
+						ReturnType:     symbolTypeToType(methodSymbol.Signature.ReturnType),
+					}
+				}
+			}
+			a.reportError(expr.Token, "Package %s'de %s fonksiyonu bulunamadı", objectIdent.Value, memberName)
+			return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
+		}
+	}
+
 	// Nesneyi analiz et
 	objectType := a.analyzeExpression(expr.Object)
 
 	// Nesne tipini kontrol et
 	if classType, ok := objectType.(*ClassType); ok {
-		// Üye adını al
-		if memberIdent, ok := expr.Member.(*ast.Identifier); ok {
-			// Üye tipini bul
-			if fieldType, ok := classType.Fields[memberIdent.Value]; ok {
-				return fieldType
-			} else if methodType, ok := classType.Methods[memberIdent.Value]; ok {
-				return methodType
-			} else {
-				a.reportError(expr.Token, "Sınıfta tanımlanmamış üye: %s", memberIdent.Value)
-				return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
-			}
+		// Üye tipini bul
+		if fieldType, ok := classType.Fields[memberName]; ok {
+			return fieldType
+		} else if methodType, ok := classType.Methods[memberName]; ok {
+			return methodType
 		} else {
-			a.reportError(expr.Token, "Üye erişimi için tanımlayıcı bekleniyor")
+			a.reportError(expr.Token, "Sınıfta tanımlanmamış üye: %s", memberName)
 			return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
 		}
 	} else {
-		a.reportError(expr.Token, "Üye erişimi için sınıf tipinde nesne bekleniyor")
+		a.reportError(expr.Token, "Üye erişimi için sınıf tipinde nesne veya package bekleniyor")
 		return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
 	}
 }

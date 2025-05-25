@@ -26,6 +26,7 @@ const (
 	MAP_TYPE
 	CHAN_TYPE
 	TEMPLATE_TYPE
+	PACKAGE_TYPE
 	VOID_TYPE
 )
 
@@ -62,6 +63,8 @@ func (st SymbolType) String() string {
 		return "chan"
 	case TEMPLATE_TYPE:
 		return "template"
+	case PACKAGE_TYPE:
+		return "package"
 	case VOID_TYPE:
 		return "void"
 	default:
@@ -85,6 +88,7 @@ type Symbol struct {
 type FunctionSignature struct {
 	Parameters []*Symbol
 	ReturnType SymbolType
+	IsVariadic bool // Variadic function flag'i
 }
 
 // ClassInfo, bir sınıfın bilgilerini temsil eder.

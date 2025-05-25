@@ -147,6 +147,13 @@ func (g *IRGenerator) GenerateProgram(program *ast.Program) (string, error) {
 	return g.module.String(), nil
 }
 
+// generateImportStatement, bir import deyimi için IR üretir.
+func (g *IRGenerator) generateImportStatement(stmt *ast.ImportStatement) {
+	// Import statement'ları için özel bir işlem yapmıyoruz
+	// Standard library binding semantic analysis'te yapılıyor
+	// Bu fonksiyon sadece hata vermemek için var
+}
+
 // applyOptimizations, IR koduna optimizasyon geçişleri uygular.
 func (g *IRGenerator) applyOptimizations() {
 	// Şu anda optimizasyon işlemleri optimizer paketi tarafından yapılıyor
@@ -201,6 +208,10 @@ func (g *IRGenerator) generateStatement(stmt ast.Statement) {
 		// Paket bildirimi için özel bir işlem yapmıyoruz
 		// Sadece modül adını ayarlıyoruz
 		g.moduleName = s.Name.Value
+	case *ast.ImportStatement:
+		// Import statement'ları için özel bir işlem yapmıyoruz
+		// Standard library binding semantic analysis'te yapılıyor
+		g.generateImportStatement(s)
 	case *ast.ExpressionStatement:
 		g.generateExpression(s.Expression)
 	case *ast.VarStatement:
@@ -557,23 +568,27 @@ func (g *IRGenerator) generateInfixExpression(expr *ast.InfixExpression) value.V
 }
 
 func (g *IRGenerator) generateCallExpression(expr *ast.CallExpression) value.Value {
-	// Fonksiyon adını al
+	var fn value.Value
 	var funcName string
-	if ident, ok := expr.Function.(*ast.Identifier); ok {
-		funcName = ident.Value
-	} else {
+
+	// Fonksiyon türünü belirle
+	switch f := expr.Function.(type) {
+	case *ast.Identifier:
+		// Normal function call: func()
+		funcName = f.Value
+		if val, exists := g.symbolTable[funcName]; exists {
+			fn = val
+		} else {
+			// Fonksiyon bulunamadıysa, dış fonksiyon olarak tanımla
+			fn = g.module.NewFunc(funcName, types.I32)
+			g.symbolTable[funcName] = fn
+		}
+	case *ast.MemberExpression:
+		// Member function call: package.func() veya object.method()
+		return g.generateMemberFunctionCall(expr, f)
+	default:
 		g.ReportError("Desteklenmeyen fonksiyon çağrısı türü: %T", expr.Function)
 		return nil
-	}
-
-	// Fonksiyonu bul
-	var fn value.Value
-	if val, exists := g.symbolTable[funcName]; exists {
-		fn = val
-	} else {
-		// Fonksiyon bulunamadıysa, dış fonksiyon olarak tanımla
-		fn = g.module.NewFunc(funcName, types.I32)
-		g.symbolTable[funcName] = fn
 	}
 
 	if g.currentBB == nil {
@@ -592,6 +607,159 @@ func (g *IRGenerator) generateCallExpression(expr *ast.CallExpression) value.Val
 
 	// Fonksiyon çağrısı yap
 	return g.currentBB.NewCall(fn, args...)
+}
+
+// generateMemberFunctionCall, bir member function call için IR üretir.
+func (g *IRGenerator) generateMemberFunctionCall(callExpr *ast.CallExpression, memberExpr *ast.MemberExpression) value.Value {
+	if g.currentBB == nil {
+		g.ReportError("Geçerli bir blok yok, member function çağrısı yapılamıyor")
+		return nil
+	}
+
+	// Member adını al
+	var memberName string
+	if memberIdent, ok := memberExpr.Member.(*ast.Identifier); ok {
+		memberName = memberIdent.Value
+	} else {
+		g.ReportError("Member adı bir tanımlayıcı olmalıdır")
+		return nil
+	}
+
+	// Object adını al (package name için)
+	var objectName string
+	if objectIdent, ok := memberExpr.Object.(*ast.Identifier); ok {
+		objectName = objectIdent.Value
+	} else {
+		g.ReportError("Object adı bir tanımlayıcı olmalıdır")
+		return nil
+	}
+
+	// Package.function call olarak handle et (fmt.Println gibi)
+	// Standard library functions için özel handling
+	switch objectName {
+	case "fmt":
+		return g.generateFmtFunctionCall(memberName, callExpr.Arguments)
+	case "os":
+		return g.generateOsFunctionCall(memberName, callExpr.Arguments)
+	default:
+		// Diğer package'lar veya object method calls için
+		// Şimdilik basit bir external function call olarak handle edelim
+		fullFuncName := objectName + "_" + memberName
+
+		// Fonksiyonu bul veya oluştur
+		var fn value.Value
+		if val, exists := g.symbolTable[fullFuncName]; exists {
+			fn = val
+		} else {
+			// External function olarak tanımla
+			fn = g.module.NewFunc(fullFuncName, types.I32)
+			g.symbolTable[fullFuncName] = fn
+		}
+
+		// Argümanları değerlendir
+		args := make([]value.Value, 0, len(callExpr.Arguments))
+		for _, arg := range callExpr.Arguments {
+			argVal := g.generateExpression(arg)
+			if argVal != nil {
+				args = append(args, argVal)
+			}
+		}
+
+		// Fonksiyon çağrısı yap
+		return g.currentBB.NewCall(fn, args...)
+	}
+}
+
+// generateFmtFunctionCall, fmt package function call'ları için IR üretir.
+func (g *IRGenerator) generateFmtFunctionCall(funcName string, args []ast.Expression) value.Value {
+	switch funcName {
+	case "Println", "Print", "Printf":
+		// printf-style function olarak handle et
+		return g.generatePrintfCall(funcName, args)
+	default:
+		g.ReportError("Desteklenmeyen fmt fonksiyonu: %s", funcName)
+		return nil
+	}
+}
+
+// generateOsFunctionCall, os package function call'ları için IR üretir.
+func (g *IRGenerator) generateOsFunctionCall(funcName string, args []ast.Expression) value.Value {
+	switch funcName {
+	case "Exit":
+		// exit function olarak handle et
+		return g.generateExitCall(args)
+	default:
+		g.ReportError("Desteklenmeyen os fonksiyonu: %s", funcName)
+		return nil
+	}
+}
+
+// generatePrintfCall, printf-style function call'ları için IR üretir.
+func (g *IRGenerator) generatePrintfCall(funcName string, args []ast.Expression) value.Value {
+	if g.currentBB == nil {
+		g.ReportError("Geçerli bir blok yok, printf çağrısı yapılamıyor")
+		return nil
+	}
+
+	// printf fonksiyonunu tanımla (eğer yoksa)
+	printfFunc := g.module.NewFunc("printf", types.I32, ir.NewParam("format", types.NewPointer(types.I8)))
+	printfFunc.Sig.Variadic = true
+
+	// Argümanları değerlendir
+	irArgs := make([]value.Value, 0, len(args))
+
+	if len(args) > 0 {
+		// İlk argüman için format string oluştur
+		firstArg := g.generateExpression(args[0])
+		if firstArg != nil {
+			// fmt.Println için newline ekle
+			if funcName == "Println" {
+				// String argümanı için %s\n format'ı kullan
+				formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: "%s\n"})
+				irArgs = append(irArgs, formatStr)
+				irArgs = append(irArgs, firstArg)
+			} else {
+				// fmt.Print için sadece %s format'ı kullan
+				formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: "%s"})
+				irArgs = append(irArgs, formatStr)
+				irArgs = append(irArgs, firstArg)
+			}
+		}
+
+		// Diğer argümanlar (şimdilik sadece ilk argümanı destekliyoruz)
+		// TODO: Multiple arguments support
+	} else {
+		// Argüman yoksa sadece newline yazdır (Println için)
+		if funcName == "Println" {
+			formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: "\n"})
+			irArgs = append(irArgs, formatStr)
+		}
+	}
+
+	// printf çağrısı yap
+	return g.currentBB.NewCall(printfFunc, irArgs...)
+}
+
+// generateExitCall, exit function call'ı için IR üretir.
+func (g *IRGenerator) generateExitCall(args []ast.Expression) value.Value {
+	if g.currentBB == nil {
+		g.ReportError("Geçerli bir blok yok, exit çağrısı yapılamıyor")
+		return nil
+	}
+
+	// exit fonksiyonunu tanımla (eğer yoksa)
+	exitFunc := g.module.NewFunc("exit", types.Void, ir.NewParam("status", types.I32))
+
+	// Argümanı değerlendir
+	var exitCode value.Value
+	if len(args) > 0 {
+		exitCode = g.generateExpression(args[0])
+	} else {
+		exitCode = constant.NewInt(types.I32, 0) // Varsayılan exit code
+	}
+
+	// exit çağrısı yap
+	return g.currentBB.NewCall(exitFunc, exitCode)
 }
 
 func (g *IRGenerator) generateFunctionLiteral(expr *ast.FunctionLiteral) value.Value {

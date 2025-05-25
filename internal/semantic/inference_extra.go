@@ -14,17 +14,17 @@ func (ti *TypeInference) inferIfExpressionType(expr *ast.IfExpression) Type {
 
 	// Consequence ve alternative bloklarının tiplerini çıkar
 	consequenceType := ti.inferBlockStatementType(expr.Consequence)
-	
+
 	// Alternative blok varsa, tipini çıkar
 	if expr.Alternative != nil {
 		alternativeType := ti.inferBlockStatementType(expr.Alternative)
-		
+
 		// Consequence ve alternative bloklarının tipleri aynı olmalıdır
 		if !consequenceType.Equals(alternativeType) {
 			ti.analyzer.reportError(expr.Token, "If ifadesinin consequence ve alternative bloklarının tipleri aynı olmalıdır")
 		}
 	}
-	
+
 	return consequenceType
 }
 
@@ -34,10 +34,10 @@ func (ti *TypeInference) inferBlockStatementType(block *ast.BlockStatement) Type
 	if len(block.Statements) == 0 {
 		return &BasicType{Name: "void", Kind: VOID_TYPE}
 	}
-	
+
 	// Bloktaki son ifadenin tipini döndür
 	lastStmt := block.Statements[len(block.Statements)-1]
-	
+
 	// Son ifade bir return ifadesi ise, döndürülen değerin tipini döndür
 	if returnStmt, ok := lastStmt.(*ast.ReturnStatement); ok {
 		if returnStmt.ReturnValue != nil {
@@ -45,12 +45,12 @@ func (ti *TypeInference) inferBlockStatementType(block *ast.BlockStatement) Type
 		}
 		return &BasicType{Name: "void", Kind: VOID_TYPE}
 	}
-	
+
 	// Son ifade bir expression ifadesi ise, ifadenin tipini döndür
 	if exprStmt, ok := lastStmt.(*ast.ExpressionStatement); ok {
 		return ti.InferType(exprStmt.Expression)
 	}
-	
+
 	// Diğer durumlarda void tipini döndür
 	return &BasicType{Name: "void", Kind: VOID_TYPE}
 }
@@ -62,19 +62,19 @@ func (ti *TypeInference) inferFunctionLiteralType(expr *ast.FunctionLiteral) Typ
 		ParameterTypes: make([]Type, 0),
 		ReturnType:     &BasicType{Name: "void", Kind: VOID_TYPE},
 	}
-	
+
 	// Parametrelerin tiplerini ekle
 	for _, param := range expr.Parameters {
 		// Parametre tipini belirle (varsayılan olarak int)
 		paramType := &BasicType{Name: "int", Kind: INTEGER_TYPE}
-		
+
 		// Parametreyi sembol tablosuna ekle
 		ti.analyzer.currentScope.Define(param.Value, INTEGER_TYPE, param.Token)
-		
+
 		// Parametre tipini fonksiyon tipine ekle
 		funcType.ParameterTypes = append(funcType.ParameterTypes, paramType)
 	}
-	
+
 	// Dönüş tipini belirle
 	if expr.ReturnType != nil {
 		// Dönüş tipi belirtilmişse, bu tipi kullan
@@ -101,7 +101,7 @@ func (ti *TypeInference) inferFunctionLiteralType(expr *ast.FunctionLiteral) Typ
 		// Dönüş tipi belirtilmemişse, gövdeden çıkar
 		funcType.ReturnType = ti.inferBlockStatementType(expr.Body)
 	}
-	
+
 	return funcType
 }
 
@@ -109,24 +109,51 @@ func (ti *TypeInference) inferFunctionLiteralType(expr *ast.FunctionLiteral) Typ
 func (ti *TypeInference) inferCallExpressionType(expr *ast.CallExpression) Type {
 	// Fonksiyonun tipini çıkar
 	funcType := ti.InferType(expr.Function)
-	
+
 	// Fonksiyon tipi kontrolü
 	if ft, ok := funcType.(*FunctionType); ok {
-		// Argüman sayısı kontrolü
-		if len(expr.Arguments) != len(ft.ParameterTypes) {
-			ti.analyzer.reportError(expr.Token, "Fonksiyon çağrısı için yanlış argüman sayısı: %d bekleniyor, %d alındı", len(ft.ParameterTypes), len(expr.Arguments))
+		// Variadic function kontrolü için member expression'ı kontrol et
+		isVariadic := false
+		if memberExpr, ok := expr.Function.(*ast.MemberExpression); ok {
+			if objectIdent, ok := memberExpr.Object.(*ast.Identifier); ok {
+				if packageSymbol := ti.analyzer.currentScope.Resolve(objectIdent.Value); packageSymbol != nil && packageSymbol.Type == PACKAGE_TYPE {
+					if memberIdent, ok := memberExpr.Member.(*ast.Identifier); ok {
+						if packageSymbol.Class != nil && packageSymbol.Class.Methods != nil {
+							if methodSymbol, exists := packageSymbol.Class.Methods[memberIdent.Value]; exists {
+								isVariadic = methodSymbol.Signature.IsVariadic
+							}
+						}
+					}
+				}
+			}
 		}
-		
+
+		// Argüman sayısı kontrolü (variadic functions için farklı)
+		if isVariadic {
+			// Variadic function: minimum parametre sayısını kontrol et
+			if len(expr.Arguments) < len(ft.ParameterTypes) {
+				ti.analyzer.reportError(expr.Token, "Fonksiyon çağrısı için yetersiz argüman sayısı: en az %d bekleniyor, %d alındı", len(ft.ParameterTypes), len(expr.Arguments))
+			}
+		} else {
+			// Normal function: tam parametre sayısını kontrol et
+			if len(expr.Arguments) != len(ft.ParameterTypes) {
+				ti.analyzer.reportError(expr.Token, "Fonksiyon çağrısı için yanlış argüman sayısı: %d bekleniyor, %d alındı", len(ft.ParameterTypes), len(expr.Arguments))
+			}
+		}
+
 		// Argüman tiplerini kontrol et
 		for i, arg := range expr.Arguments {
 			if i < len(ft.ParameterTypes) {
 				argType := ti.InferType(arg)
 				if !argType.Equals(ft.ParameterTypes[i]) {
-					ti.analyzer.reportError(expr.Token, "Fonksiyon çağrısı için yanlış argüman tipi: %s bekleniyor, %s alındı", ft.ParameterTypes[i].String(), argType.String())
+					// UNKNOWN_TYPE parametreler için tip kontrolü yapmayalım (variadic için)
+					if basicType, ok := ft.ParameterTypes[i].(*BasicType); !ok || basicType.Kind != UNKNOWN_TYPE {
+						ti.analyzer.reportError(expr.Token, "Fonksiyon çağrısı için yanlış argüman tipi: %s bekleniyor, %s alındı", ft.ParameterTypes[i].String(), argType.String())
+					}
 				}
 			}
 		}
-		
+
 		// Fonksiyonun dönüş tipini döndür
 		return ft.ReturnType
 	} else {

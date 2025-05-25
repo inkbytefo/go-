@@ -121,7 +121,7 @@ func (l *Lexer) readString(delimiter byte) string {
 	}
 
 	result := l.input[position:l.position]
-	l.readChar() // Bitiş tırnak işaretini atla
+	// Bitiş tırnak işaretini atlama - NextToken'da readChar() çağrılacak
 	return result
 }
 

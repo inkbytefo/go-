@@ -203,25 +203,11 @@ func (p *Parser) parseMemberExpression(object ast.Expression) ast.Expression {
 		Object: object,
 	}
 
-	p.nextToken()
-
-	// Üye adı
-	if p.curTokenIs(token.IDENT) {
-		exp.Member = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	} else if p.curTokenIs(token.THIS) {
-		exp.Member = p.parseThisExpression()
-	} else if p.curTokenIs(token.SUPER) {
-		exp.Member = p.parseSuperExpression()
-	} else {
-		// Diğer ifadeler (örneğin, metot çağrısı)
-		exp.Member = p.parseExpression(MEMBER)
+	if !p.expectPeek(token.IDENT) {
+		return nil
 	}
 
-	// Metot çağrısı
-	if p.peekTokenIs(token.LPAREN) {
-		p.nextToken()
-		exp.Member = p.parseCallExpression(exp.Member)
-	}
+	exp.Member = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	return exp
 }

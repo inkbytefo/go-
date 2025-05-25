@@ -100,9 +100,6 @@ func (ti *TypeInference) inferHashLiteralType(expr *ast.HashLiteral) Type {
 
 // inferMemberExpressionType, bir üye erişim ifadesinin tipini çıkarır.
 func (ti *TypeInference) inferMemberExpressionType(expr *ast.MemberExpression) Type {
-	// Nesnenin tipini çıkar
-	objectType := ti.InferType(expr.Object)
-
 	// Üye adını al
 	var memberName string
 	if memberIdent, ok := expr.Member.(*ast.Identifier); ok {
@@ -111,6 +108,27 @@ func (ti *TypeInference) inferMemberExpressionType(expr *ast.MemberExpression) T
 		ti.analyzer.reportError(expr.Token, "Üye adı bir tanımlayıcı olmalıdır")
 		return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
 	}
+
+	// Package erişimi kontrolü
+	if objectIdent, ok := expr.Object.(*ast.Identifier); ok {
+		if packageSymbol := ti.analyzer.currentScope.Resolve(objectIdent.Value); packageSymbol != nil && packageSymbol.Type == PACKAGE_TYPE {
+			// Package.function erişimi
+			if packageSymbol.Class != nil && packageSymbol.Class.Methods != nil {
+				if methodSymbol, exists := packageSymbol.Class.Methods[memberName]; exists {
+					// Function type'ını döndür
+					return &FunctionType{
+						ParameterTypes: make([]Type, len(methodSymbol.Signature.Parameters)),
+						ReturnType:     symbolTypeToType(methodSymbol.Signature.ReturnType),
+					}
+				}
+			}
+			ti.analyzer.reportError(expr.Token, "Package %s'de %s fonksiyonu bulunamadı", objectIdent.Value, memberName)
+			return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
+		}
+	}
+
+	// Nesnenin tipini çıkar
+	objectType := ti.InferType(expr.Object)
 
 	// Nesne bir sınıf ise, üye tipini döndür
 	if classType, ok := objectType.(*ClassType); ok {
@@ -142,7 +160,7 @@ func (ti *TypeInference) inferMemberExpressionType(expr *ast.MemberExpression) T
 	}
 
 	// Diğer durumlarda hata ver
-	ti.analyzer.reportError(expr.Token, "Üye erişimi için nesne bir sınıf veya arayüz olmalıdır")
+	ti.analyzer.reportError(expr.Token, "Üye erişimi için nesne bir sınıf, arayüz veya package olmalıdır")
 	return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
 }
 
