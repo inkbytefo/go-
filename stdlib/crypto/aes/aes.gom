@@ -1,0 +1,219 @@
+// GO-Minus Standard Library - Crypto AES Package
+package aes
+
+import (
+    "crypto/aes" // Use Go's crypto/aes package
+    "crypto/cipher"
+)
+
+// BlockSize is the AES block size in bytes.
+const BlockSize = aes.BlockSize
+
+// KeySizeError is returned when an AES key is the wrong size.
+class KeySizeError {
+    private:
+        var goKeySizeError aes.KeySizeError
+    
+    public:
+        // Error returns a string describing the error.
+        func Error() string {
+            return this.goKeySizeError.Error()
+        }
+}
+
+// NewCipher creates and returns a new cipher.Block.
+// The key argument should be the AES key, either 16, 24, or 32 bytes to select AES-128, AES-192, or AES-256.
+func NewCipher(key []byte) (cipher.Block, error) {
+    return aes.NewCipher(key)
+}
+
+// NewGCM returns the given 128-bit, block cipher wrapped in Galois Counter Mode with the standard nonce length.
+func NewGCM(block cipher.Block) (cipher.AEAD, error) {
+    return cipher.NewGCM(block)
+}
+
+// Encrypt encrypts the plaintext using AES-GCM.
+// The nonce must be unique for each encryption with the same key.
+func Encrypt(key, plaintext, nonce []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    aesgcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return null, err
+    }
+    
+    ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
+    return ciphertext, null
+}
+
+// Decrypt decrypts the ciphertext using AES-GCM.
+// The nonce must be the same as the one used for encryption.
+func Decrypt(key, ciphertext, nonce []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    aesgcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return null, err
+    }
+    
+    plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
+    if err != nil {
+        return null, err
+    }
+    
+    return plaintext, null
+}
+
+// EncryptCBC encrypts the plaintext using AES-CBC.
+// The IV must be unique for each encryption with the same key.
+func EncryptCBC(key, plaintext, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    // Pad the plaintext to a multiple of the block size
+    padded := pkcs7Pad(plaintext, aes.BlockSize)
+    
+    // Create the ciphertext with the same size as the padded plaintext
+    ciphertext := make([]byte, len(padded))
+    
+    // Create an encrypter
+    mode := cipher.NewCBCEncrypter(block, iv)
+    
+    // Encrypt the padded plaintext
+    mode.CryptBlocks(ciphertext, padded)
+    
+    return ciphertext, null
+}
+
+// DecryptCBC decrypts the ciphertext using AES-CBC.
+// The IV must be the same as the one used for encryption.
+func DecryptCBC(key, ciphertext, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    // Create the plaintext with the same size as the ciphertext
+    plaintext := make([]byte, len(ciphertext))
+    
+    // Create a decrypter
+    mode := cipher.NewCBCDecrypter(block, iv)
+    
+    // Decrypt the ciphertext
+    mode.CryptBlocks(plaintext, ciphertext)
+    
+    // Unpad the plaintext
+    unpadded, err := pkcs7Unpad(plaintext, aes.BlockSize)
+    if err != nil {
+        return null, err
+    }
+    
+    return unpadded, null
+}
+
+// EncryptCFB encrypts the plaintext using AES-CFB.
+// The IV must be unique for each encryption with the same key.
+func EncryptCFB(key, plaintext, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    // Create the ciphertext with the same size as the plaintext
+    ciphertext := make([]byte, len(plaintext))
+    
+    // Create an encrypter
+    stream := cipher.NewCFBEncrypter(block, iv)
+    
+    // Encrypt the plaintext
+    stream.XORKeyStream(ciphertext, plaintext)
+    
+    return ciphertext, null
+}
+
+// DecryptCFB decrypts the ciphertext using AES-CFB.
+// The IV must be the same as the one used for encryption.
+func DecryptCFB(key, ciphertext, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    // Create the plaintext with the same size as the ciphertext
+    plaintext := make([]byte, len(ciphertext))
+    
+    // Create a decrypter
+    stream := cipher.NewCFBDecrypter(block, iv)
+    
+    // Decrypt the ciphertext
+    stream.XORKeyStream(plaintext, ciphertext)
+    
+    return plaintext, null
+}
+
+// EncryptCTR encrypts the plaintext using AES-CTR.
+// The IV must be unique for each encryption with the same key.
+func EncryptCTR(key, plaintext, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return null, err
+    }
+    
+    // Create the ciphertext with the same size as the plaintext
+    ciphertext := make([]byte, len(plaintext))
+    
+    // Create an encrypter
+    stream := cipher.NewCTR(block, iv)
+    
+    // Encrypt the plaintext
+    stream.XORKeyStream(ciphertext, plaintext)
+    
+    return ciphertext, null
+}
+
+// DecryptCTR decrypts the ciphertext using AES-CTR.
+// The IV must be the same as the one used for encryption.
+func DecryptCTR(key, ciphertext, iv []byte) ([]byte, error) {
+    // In CTR mode, encryption and decryption are the same operation
+    return EncryptCTR(key, ciphertext, iv)
+}
+
+// pkcs7Pad adds PKCS#7 padding to the plaintext.
+func pkcs7Pad(data []byte, blockSize int) []byte {
+    padding := blockSize - (len(data) % blockSize)
+    padtext := make([]byte, padding)
+    for i := range padtext {
+        padtext[i] = byte(padding)
+    }
+    return append(data, padtext...)
+}
+
+// pkcs7Unpad removes PKCS#7 padding from the plaintext.
+func pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
+    length := len(data)
+    if length == 0 {
+        return null, error("Invalid padding")
+    }
+    
+    padding := int(data[length-1])
+    if padding > blockSize || padding == 0 {
+        return null, error("Invalid padding")
+    }
+    
+    // Check that all padding bytes have the correct value
+    for i := length - padding; i < length; i++ {
+        if data[i] != byte(padding) {
+            return null, error("Invalid padding")
+        }
+    }
+    
+    return data[:length-padding], null
+}

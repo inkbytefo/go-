@@ -1,0 +1,363 @@
+// GO-Minus Standard Library - Encoding XML Package
+package xml
+
+import (
+    "encoding/xml" // Use Go's encoding/xml package
+    "io"
+)
+
+// Marshal returns the XML encoding of v.
+func Marshal(v interface{}) ([]byte, error) {
+    return xml.Marshal(v)
+}
+
+// Unmarshal parses the XML-encoded data and stores the result in the value pointed to by v.
+func Unmarshal(data []byte, v interface{}) error {
+    return xml.Unmarshal(data, v)
+}
+
+// MarshalIndent is like Marshal but applies Indent to format the output.
+func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+    return xml.MarshalIndent(v, prefix, indent)
+}
+
+// Encoder writes XML values to an output stream.
+class Encoder {
+    private:
+        var goEncoder *xml.Encoder
+    
+    public:
+        // NewEncoder returns a new encoder that writes to w.
+        static func NewEncoder(w io.Writer) *Encoder {
+            return &Encoder{
+                goEncoder: xml.NewEncoder(w),
+            }
+        }
+        
+        // Encode writes the XML encoding of v to the stream.
+        func Encode(v interface{}) error {
+            return this.goEncoder.Encode(v)
+        }
+        
+        // Indent sets the encoder to generate XML in which each element begins on a new indented line.
+        func Indent(prefix, indent string) {
+            this.goEncoder.Indent(prefix, indent)
+        }
+        
+        // Flush flushes any buffered XML to the underlying writer.
+        func Flush() error {
+            return this.goEncoder.Flush()
+        }
+}
+
+// Decoder reads and decodes XML values from an input stream.
+class Decoder {
+    private:
+        var goDecoder *xml.Decoder
+    
+    public:
+        // NewDecoder returns a new decoder that reads from r.
+        static func NewDecoder(r io.Reader) *Decoder {
+            return &Decoder{
+                goDecoder: xml.NewDecoder(r),
+            }
+        }
+        
+        // Decode reads the next XML-encoded value from its input and stores it in the value pointed to by v.
+        func Decode(v interface{}) error {
+            return this.goDecoder.Decode(v)
+        }
+        
+        // DecodeElement reads the next XML-encoded value from its input and stores it in the value pointed to by v.
+        func DecodeElement(v interface{}, start *StartElement) error {
+            goStart := &xml.StartElement{
+                Name: xml.Name{
+                    Space: start.Name.Space,
+                    Local: start.Name.Local,
+                },
+                Attr: make([]xml.Attr, len(start.Attr)),
+            }
+            
+            for i, attr := range start.Attr {
+                goStart.Attr[i] = xml.Attr{
+                    Name: xml.Name{
+                        Space: attr.Name.Space,
+                        Local: attr.Name.Local,
+                    },
+                    Value: attr.Value,
+                }
+            }
+            
+            return this.goDecoder.DecodeElement(v, goStart)
+        }
+        
+        // Token returns the next XML token in the input stream.
+        func Token() (Token, error) {
+            goToken, err := this.goDecoder.Token()
+            if err != nil {
+                return null, err
+            }
+            
+            switch t := goToken.(type) {
+            case xml.StartElement:
+                startElement := &StartElement{
+                    Name: Name{
+                        Space: t.Name.Space,
+                        Local: t.Name.Local,
+                    },
+                    Attr: make([]Attr, len(t.Attr)),
+                }
+                
+                for i, attr := range t.Attr {
+                    startElement.Attr[i] = Attr{
+                        Name: Name{
+                            Space: attr.Name.Space,
+                            Local: attr.Name.Local,
+                        },
+                        Value: attr.Value,
+                    }
+                }
+                
+                return startElement, null
+                
+            case xml.EndElement:
+                return &EndElement{
+                    Name: Name{
+                        Space: t.Name.Space,
+                        Local: t.Name.Local,
+                    },
+                }, null
+                
+            case xml.CharData:
+                return &CharData{Data: []byte(t)}, null
+                
+            case xml.Comment:
+                return &Comment{Data: []byte(t)}, null
+                
+            case xml.ProcInst:
+                return &ProcInst{
+                    Target: t.Target,
+                    Inst: t.Inst,
+                }, null
+                
+            case xml.Directive:
+                return &Directive{Data: []byte(t)}, null
+                
+            default:
+                return null, error("Unknown token type")
+            }
+        }
+}
+
+// Token is an interface for XML tokens.
+interface Token {}
+
+// StartElement represents an XML start element.
+class StartElement {
+    public:
+        var Name Name
+        var Attr []Attr
+}
+
+// EndElement represents an XML end element.
+class EndElement {
+    public:
+        var Name Name
+}
+
+// CharData represents XML character data (raw text).
+class CharData {
+    public:
+        var Data []byte
+        
+        // Copy returns a copy of the character data.
+        func Copy() *CharData {
+            dataCopy := make([]byte, len(this.Data))
+            copy(dataCopy, this.Data)
+            return &CharData{Data: dataCopy}
+        }
+        
+        // String returns the character data as a string.
+        func String() string {
+            return string(this.Data)
+        }
+}
+
+// Comment represents an XML comment.
+class Comment {
+    public:
+        var Data []byte
+        
+        // Copy returns a copy of the comment.
+        func Copy() *Comment {
+            dataCopy := make([]byte, len(this.Data))
+            copy(dataCopy, this.Data)
+            return &Comment{Data: dataCopy}
+        }
+        
+        // String returns the comment as a string.
+        func String() string {
+            return string(this.Data)
+        }
+}
+
+// ProcInst represents an XML processing instruction.
+class ProcInst {
+    public:
+        var Target string
+        var Inst []byte
+        
+        // Copy returns a copy of the processing instruction.
+        func Copy() *ProcInst {
+            instCopy := make([]byte, len(this.Inst))
+            copy(instCopy, this.Inst)
+            return &ProcInst{
+                Target: this.Target,
+                Inst: instCopy,
+            }
+        }
+        
+        // String returns the processing instruction as a string.
+        func String() string {
+            return "<?" + this.Target + " " + string(this.Inst) + "?>"
+        }
+}
+
+// Directive represents an XML directive.
+class Directive {
+    public:
+        var Data []byte
+        
+        // Copy returns a copy of the directive.
+        func Copy() *Directive {
+            dataCopy := make([]byte, len(this.Data))
+            copy(dataCopy, this.Data)
+            return &Directive{Data: dataCopy}
+        }
+        
+        // String returns the directive as a string.
+        func String() string {
+            return "<!" + string(this.Data) + ">"
+        }
+}
+
+// Name represents an XML name (space:local).
+class Name {
+    public:
+        var Space string
+        var Local string
+        
+        // String returns the name as a string.
+        func String() string {
+            if this.Space == "" {
+                return this.Local
+            }
+            return this.Space + ":" + this.Local
+        }
+}
+
+// Attr represents an XML attribute.
+class Attr {
+    public:
+        var Name Name
+        var Value string
+}
+
+// Marshaler is the interface implemented by types that can marshal themselves into valid XML.
+interface Marshaler {
+    func MarshalXML(e *Encoder, start StartElement) error
+}
+
+// Unmarshaler is the interface implemented by types that can unmarshal an XML element description of themselves.
+interface Unmarshaler {
+    func UnmarshalXML(d *Decoder, start StartElement) error
+}
+
+// MarshalerAttr is the interface implemented by types that can marshal themselves into valid XML attributes.
+interface MarshalerAttr {
+    func MarshalXMLAttr(name Name) (Attr, error)
+}
+
+// UnmarshalerAttr is the interface implemented by types that can unmarshal an XML attribute description of themselves.
+interface UnmarshalerAttr {
+    func UnmarshalXMLAttr(attr Attr) error
+}
+
+// SyntaxError represents an XML syntax error.
+class SyntaxError {
+    private:
+        var goSyntaxError *xml.SyntaxError
+    
+    public:
+        // Error returns a string representation of the syntax error.
+        func Error() string {
+            return this.goSyntaxError.Error()
+        }
+        
+        // Line returns the line number where the error occurred.
+        func Line() int {
+            return this.goSyntaxError.Line
+        }
+        
+        // Msg returns the error message.
+        func Msg() string {
+            return this.goSyntaxError.Msg
+        }
+}
+
+// TagPathError represents an XML tag path error.
+class TagPathError {
+    private:
+        var goTagPathError *xml.TagPathError
+    
+    public:
+        // Error returns a string representation of the tag path error.
+        func Error() string {
+            return this.goTagPathError.Error()
+        }
+}
+
+// UnmarshalError represents an XML unmarshal error.
+class UnmarshalError {
+    private:
+        var goUnmarshalError *xml.UnmarshalError
+    
+    public:
+        // Error returns a string representation of the unmarshal error.
+        func Error() string {
+            return this.goUnmarshalError.Error()
+        }
+}
+
+// Header represents an XML header.
+class Header {
+    public:
+        var Version string
+        var Encoding string
+        var Standalone string
+        
+        // String returns the header as a string.
+        func String() string {
+            result := "<?xml version=\"" + this.Version + "\""
+            if this.Encoding != "" {
+                result += " encoding=\"" + this.Encoding + "\""
+            }
+            if this.Standalone != "" {
+                result += " standalone=\"" + this.Standalone + "\""
+            }
+            result += "?>"
+            return result
+        }
+}
+
+// EscapeText writes the XML-escaped text to w.
+func EscapeText(w io.Writer, text []byte) error {
+    return xml.EscapeText(w, text)
+}
+
+// Escape returns the XML-escaped text.
+func Escape(text string) string {
+    var buf strings.Builder
+    xml.EscapeText(&buf, []byte(text))
+    return buf.String()
+}

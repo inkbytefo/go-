@@ -1,0 +1,492 @@
+// GO-Minus Standard Library - HTTP Package
+package http
+
+import (
+    "io"
+    "net/http" // Use Go's http package
+    "time"
+)
+
+// Request represents an HTTP request.
+class Request {
+    private:
+        var goRequest *http.Request
+        var params map[string]string
+    
+    public:
+        // Method is the HTTP method (GET, POST, etc.).
+        var Method string
+        
+        // URL is the URL of the request.
+        var URL *URL
+        
+        // Protocol is the HTTP protocol version.
+        var Protocol string
+        
+        // New creates a new HTTP request.
+        static func New(method, url string, body io.Reader) (*Request, error) {
+            goReq, err := http.NewRequest(method, url, body)
+            if err != nil {
+                return null, err
+            }
+            
+            req := &Request{
+                goRequest: goReq,
+                Method: goReq.Method,
+                Protocol: goReq.Proto,
+                params: make(map[string]string),
+            }
+            
+            // Parse URL
+            req.URL = &URL{
+                Path: goReq.URL.Path,
+                RawQuery: goReq.URL.RawQuery,
+                Scheme: goReq.URL.Scheme,
+                Host: goReq.URL.Host,
+            }
+            
+            return req, null
+        }
+        
+        // Header returns the value of the specified header.
+        func Header(key string) string {
+            return this.goRequest.Header.Get(key)
+        }
+        
+        // SetHeader sets the value of the specified header.
+        func SetHeader(key, value string) {
+            this.goRequest.Header.Set(key, value)
+        }
+        
+        // Param returns the value of the specified URL parameter.
+        func Param(key string) string {
+            return this.params[key]
+        }
+        
+        // SetParam sets the value of the specified URL parameter.
+        func SetParam(key, value string) {
+            this.params[key] = value
+        }
+        
+        // FormValue returns the value of the specified form field.
+        func FormValue(key string) string {
+            return this.goRequest.FormValue(key)
+        }
+        
+        // ParseForm parses the request body as a form.
+        func ParseForm() error {
+            return this.goRequest.ParseForm()
+        }
+        
+        // ParseMultipartForm parses the request body as a multipart form.
+        func ParseMultipartForm(maxMemory int64) error {
+            return this.goRequest.ParseMultipartForm(maxMemory)
+        }
+        
+        // Cookie returns the named cookie provided in the request.
+        func Cookie(name string) (*Cookie, error) {
+            goCookie, err := this.goRequest.Cookie(name)
+            if err != nil {
+                return null, err
+            }
+            
+            cookie := &Cookie{
+                Name: goCookie.Name,
+                Value: goCookie.Value,
+                Path: goCookie.Path,
+                Domain: goCookie.Domain,
+                Expires: goCookie.Expires,
+                MaxAge: goCookie.MaxAge,
+                Secure: goCookie.Secure,
+                HttpOnly: goCookie.HttpOnly,
+            }
+            
+            return cookie, null
+        }
+        
+        // Cookies returns the cookies provided in the request.
+        func Cookies() []*Cookie {
+            goCookies := this.goRequest.Cookies()
+            cookies := make([]*Cookie, len(goCookies))
+            
+            for i, goCookie := range goCookies {
+                cookies[i] = &Cookie{
+                    Name: goCookie.Name,
+                    Value: goCookie.Value,
+                    Path: goCookie.Path,
+                    Domain: goCookie.Domain,
+                    Expires: goCookie.Expires,
+                    MaxAge: goCookie.MaxAge,
+                    Secure: goCookie.Secure,
+                    HttpOnly: goCookie.HttpOnly,
+                }
+            }
+            
+            return cookies
+        }
+        
+        // Body returns the request body.
+        func Body() io.ReadCloser {
+            return this.goRequest.Body
+        }
+        
+        // ContentLength returns the length of the request body.
+        func ContentLength() int64 {
+            return this.goRequest.ContentLength
+        }
+        
+        // Host returns the host of the request.
+        func Host() string {
+            return this.goRequest.Host
+        }
+        
+        // RemoteAddr returns the remote address of the request.
+        func RemoteAddr() string {
+            return this.goRequest.RemoteAddr
+        }
+        
+        // UserAgent returns the user agent of the request.
+        func UserAgent() string {
+            return this.Header("User-Agent")
+        }
+        
+        // Referer returns the referer of the request.
+        func Referer() string {
+            return this.Header("Referer")
+        }
+}
+
+// Response represents an HTTP response.
+class Response {
+    private:
+        var goResponse *http.Response
+        var writer http.ResponseWriter
+    
+    public:
+        // StatusCode is the HTTP status code.
+        var StatusCode int
+        
+        // Status is the HTTP status message.
+        var Status string
+        
+        // New creates a new HTTP response from a Go http.Response.
+        static func NewFromGoResponse(goResp *http.Response) *Response {
+            return &Response{
+                goResponse: goResp,
+                StatusCode: goResp.StatusCode,
+                Status: goResp.Status,
+            }
+        }
+        
+        // NewFromResponseWriter creates a new HTTP response from a ResponseWriter.
+        static func NewFromResponseWriter(w http.ResponseWriter) *Response {
+            return &Response{
+                writer: w,
+            }
+        }
+        
+        // Header returns the value of the specified header.
+        func Header(key string) string {
+            if this.goResponse != null {
+                return this.goResponse.Header.Get(key)
+            }
+            return ""
+        }
+        
+        // SetHeader sets the value of the specified header.
+        func SetHeader(key, value string) {
+            if this.writer != null {
+                this.writer.Header().Set(key, value)
+            }
+        }
+        
+        // WriteHeader writes the HTTP status code.
+        func WriteHeader(statusCode int) {
+            if this.writer != null {
+                this.StatusCode = statusCode
+                this.writer.WriteHeader(statusCode)
+            }
+        }
+        
+        // Write writes the response body.
+        func Write(data []byte) (int, error) {
+            if this.writer != null {
+                return this.writer.Write(data)
+            }
+            return 0, error("No response writer available")
+        }
+        
+        // ReadBody reads the response body.
+        func ReadBody() ([]byte, error) {
+            if this.goResponse != null {
+                defer this.goResponse.Body.Close()
+                return io.ReadAll(this.goResponse.Body)
+            }
+            return null, error("No response body available")
+        }
+        
+        // Close closes the response body.
+        func Close() error {
+            if this.goResponse != null {
+                return this.goResponse.Body.Close()
+            }
+            return null
+        }
+}
+
+// Client is an HTTP client.
+class Client {
+    private:
+        var goClient *http.Client
+    
+    public:
+        // New creates a new HTTP client.
+        static func New() *Client {
+            return &Client{
+                goClient: &http.Client{},
+            }
+        }
+        
+        // NewWithTimeout creates a new HTTP client with a timeout.
+        static func NewWithTimeout(timeout time.Duration) *Client {
+            return &Client{
+                goClient: &http.Client{
+                    Timeout: timeout,
+                },
+            }
+        }
+        
+        // Get makes a GET request.
+        func Get(url string) (*Response, error) {
+            goResp, err := this.goClient.Get(url)
+            if err != nil {
+                return null, err
+            }
+            
+            return Response.NewFromGoResponse(goResp), null
+        }
+        
+        // Post makes a POST request.
+        func Post(url string, contentType string, body io.Reader) (*Response, error) {
+            goResp, err := this.goClient.Post(url, contentType, body)
+            if err != nil {
+                return null, err
+            }
+            
+            return Response.NewFromGoResponse(goResp), null
+        }
+        
+        // Put makes a PUT request.
+        func Put(url string, contentType string, body io.Reader) (*Response, error) {
+            req, err := Request.New("PUT", url, body)
+            if err != nil {
+                return null, err
+            }
+            
+            req.SetHeader("Content-Type", contentType)
+            
+            return this.Do(req)
+        }
+        
+        // Delete makes a DELETE request.
+        func Delete(url string) (*Response, error) {
+            req, err := Request.New("DELETE", url, null)
+            if err != nil {
+                return null, err
+            }
+            
+            return this.Do(req)
+        }
+        
+        // Head makes a HEAD request.
+        func Head(url string) (*Response, error) {
+            goResp, err := this.goClient.Head(url)
+            if err != nil {
+                return null, err
+            }
+            
+            return Response.NewFromGoResponse(goResp), null
+        }
+        
+        // Do makes a custom request.
+        func Do(req *Request) (*Response, error) {
+            goResp, err := this.goClient.Do(req.goRequest)
+            if err != nil {
+                return null, err
+            }
+            
+            return Response.NewFromGoResponse(goResp), null
+        }
+}
+
+// URL represents a URL.
+class URL {
+    public:
+        // Scheme is the URL scheme (http, https, etc.).
+        var Scheme string
+        
+        // Host is the host of the URL.
+        var Host string
+        
+        // Path is the path of the URL.
+        var Path string
+        
+        // RawQuery is the raw query string of the URL.
+        var RawQuery string
+        
+        // Parse parses a URL string.
+        static func Parse(rawURL string) (*URL, error) {
+            goURL, err := http.ParseURL(rawURL)
+            if err != nil {
+                return null, err
+            }
+            
+            return &URL{
+                Scheme: goURL.Scheme,
+                Host: goURL.Host,
+                Path: goURL.Path,
+                RawQuery: goURL.RawQuery,
+            }, null
+        }
+        
+        // String returns the string representation of the URL.
+        func String() string {
+            result := ""
+            
+            if this.Scheme != "" {
+                result += this.Scheme + "://"
+            }
+            
+            result += this.Host
+            
+            if this.Path != "" {
+                result += this.Path
+            }
+            
+            if this.RawQuery != "" {
+                result += "?" + this.RawQuery
+            }
+            
+            return result
+        }
+}
+
+// Cookie represents an HTTP cookie.
+class Cookie {
+    public:
+        // Name is the name of the cookie.
+        var Name string
+        
+        // Value is the value of the cookie.
+        var Value string
+        
+        // Path is the path of the cookie.
+        var Path string
+        
+        // Domain is the domain of the cookie.
+        var Domain string
+        
+        // Expires is the expiration time of the cookie.
+        var Expires time.Time
+        
+        // MaxAge is the max age of the cookie in seconds.
+        var MaxAge int
+        
+        // Secure indicates if the cookie is secure.
+        var Secure bool
+        
+        // HttpOnly indicates if the cookie is HTTP only.
+        var HttpOnly bool
+        
+        // String returns the string representation of the cookie.
+        func String() string {
+            return this.Name + "=" + this.Value
+        }
+}
+
+// HandlerFunc is a function that handles an HTTP request.
+type HandlerFunc func(ResponseWriter, *Request)
+
+// Handler is an interface for handling HTTP requests.
+interface Handler {
+    func ServeHTTP(ResponseWriter, *Request)
+}
+
+// Server is an HTTP server.
+class Server {
+    private:
+        var goServer *http.Server
+        var handlers map[string]HandlerFunc
+    
+    public:
+        // New creates a new HTTP server.
+        static func New() *Server {
+            return &Server{
+                goServer: &http.Server{},
+                handlers: make(map[string]HandlerFunc),
+            }
+        }
+        
+        // HandleFunc registers a handler function for a path.
+        func HandleFunc(pattern string, handler HandlerFunc) {
+            this.handlers[pattern] = handler
+        }
+        
+        // ListenAndServe starts the server on the specified address.
+        func ListenAndServe(addr string) error {
+            this.goServer.Addr = addr
+            return this.goServer.ListenAndServe()
+        }
+        
+        // ListenAndServeTLS starts the server with TLS on the specified address.
+        func ListenAndServeTLS(addr, certFile, keyFile string) error {
+            this.goServer.Addr = addr
+            return this.goServer.ListenAndServeTLS(certFile, keyFile)
+        }
+        
+        // Shutdown shuts down the server gracefully.
+        func Shutdown() error {
+            return this.goServer.Shutdown(context.Background())
+        }
+}
+
+// ResponseWriter is an interface for writing HTTP responses.
+interface ResponseWriter {
+    func Header() map[string][]string
+    func Write([]byte) (int, error)
+    func WriteHeader(int)
+}
+
+// Error returns an error with the given message.
+func Error(w ResponseWriter, error string, code int) {
+    w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+    w.Header().Set("X-Content-Type-Options", "nosniff")
+    w.WriteHeader(code)
+    w.Write([]byte(error))
+}
+
+// NotFound replies to the request with an HTTP 404 not found error.
+func NotFound(w ResponseWriter, r *Request) {
+    Error(w, "404 page not found", 404)
+}
+
+// Redirect replies to the request with a redirect to url.
+func Redirect(w ResponseWriter, r *Request, url string, code int) {
+    w.Header().Set("Location", url)
+    w.WriteHeader(code)
+}
+
+// ServeFile serves a file from the filesystem.
+func ServeFile(w ResponseWriter, r *Request, name string) {
+    http.ServeFile(w, r.goRequest, name)
+}
+
+// StatusText returns a text for the HTTP status code.
+func StatusText(code int) string {
+    return http.StatusText(code)
+}
+
+// CanonicalHeaderKey returns the canonical format of the header key.
+func CanonicalHeaderKey(s string) string {
+    return http.CanonicalHeaderKey(s)
+}

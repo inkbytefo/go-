@@ -1,0 +1,85 @@
+// GO-Minus Standard Library - Crypto SHA256 Package
+package sha256
+
+import (
+    "crypto/sha256" // Use Go's crypto/sha256 package
+    "hash"
+)
+
+// Size is the size of a SHA-256 checksum in bytes.
+const Size = sha256.Size
+
+// BlockSize is the block size of SHA-256 in bytes.
+const BlockSize = sha256.BlockSize
+
+// Sum256 returns the SHA-256 checksum of the data.
+func Sum256(data []byte) [Size]byte {
+    return sha256.Sum256(data)
+}
+
+// New returns a new hash.Hash computing the SHA-256 checksum.
+func New() hash.Hash {
+    return sha256.New()
+}
+
+// Sum returns the SHA-256 checksum of the data.
+func Sum(data []byte) []byte {
+    h := New()
+    h.Write(data)
+    return h.Sum(nil)
+}
+
+// Hash computes the SHA-256 hash of the data and returns it as a hexadecimal string.
+func Hash(data []byte) string {
+    sum := Sum256(data)
+    return hex.EncodeToString(sum[:])
+}
+
+// HashString computes the SHA-256 hash of the string and returns it as a hexadecimal string.
+func HashString(s string) string {
+    return Hash([]byte(s))
+}
+
+// Verify checks if the data matches the expected SHA-256 hash.
+func Verify(data []byte, expectedHash string) bool {
+    actualHash := Hash(data)
+    return actualHash == expectedHash
+}
+
+// VerifyString checks if the string matches the expected SHA-256 hash.
+func VerifyString(s string, expectedHash string) bool {
+    return Verify([]byte(s), expectedHash)
+}
+
+// HMAC returns the HMAC-SHA256 of the data using the given key.
+func HMAC(key, data []byte) []byte {
+    h := hmac.New(New, key)
+    h.Write(data)
+    return h.Sum(nil)
+}
+
+// HMACString returns the HMAC-SHA256 of the string using the given key.
+func HMACString(key []byte, s string) []byte {
+    return HMAC(key, []byte(s))
+}
+
+// HMACHex returns the HMAC-SHA256 of the data using the given key as a hexadecimal string.
+func HMACHex(key, data []byte) string {
+    return hex.EncodeToString(HMAC(key, data))
+}
+
+// HMACStringHex returns the HMAC-SHA256 of the string using the given key as a hexadecimal string.
+func HMACStringHex(key []byte, s string) string {
+    return HMACHex(key, []byte(s))
+}
+
+// VerifyHMAC checks if the data matches the expected HMAC-SHA256 using the given key.
+func VerifyHMAC(key, data []byte, expectedHMAC string) bool {
+    actualHMAC := HMACHex(key, data)
+    return actualHMAC == expectedHMAC
+}
+
+// VerifyHMACString checks if the string matches the expected HMAC-SHA256 using the given key.
+func VerifyHMACString(key []byte, s string, expectedHMAC string) bool {
+    return VerifyHMAC(key, []byte(s), expectedHMAC)
+}

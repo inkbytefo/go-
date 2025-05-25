@@ -10,13 +10,13 @@ import (
 
 // Komut satırı bayrakları
 var (
-	writeFlag    = flag.Bool("w", false, "Değişiklikleri dosyalara yaz")
-	diffFlag     = flag.Bool("d", false, "Değişiklikleri diff formatında göster")
-	listFlag     = flag.Bool("l", false, "Biçimlendirilmesi gereken dosyaları listele")
+	writeFlag     = flag.Bool("w", false, "Değişiklikleri dosyalara yaz")
+	diffFlag      = flag.Bool("d", false, "Değişiklikleri diff formatında göster")
+	listFlag      = flag.Bool("l", false, "Biçimlendirilmesi gereken dosyaları listele")
 	recursiveFlag = flag.Bool("r", false, "Alt dizinlerdeki dosyaları da biçimlendir")
-	simplifyFlag = flag.Bool("s", false, "Kodu basitleştir")
-	versionFlag  = flag.Bool("version", false, "Sürüm bilgisini göster")
-	helpFlag     = flag.Bool("help", false, "Yardım mesajını göster")
+	simplifyFlag  = flag.Bool("s", false, "Kodu basitleştir")
+	versionFlag   = flag.Bool("version", false, "Sürüm bilgisini göster")
+	helpFlag      = flag.Bool("help", false, "Yardım mesajını göster")
 )
 
 // Kod biçimlendirme aracı sürümü
@@ -42,7 +42,7 @@ func main() {
 	var files []string
 	if flag.NArg() == 0 {
 		// Mevcut dizindeki tüm GO-Minus dosyalarını kullan
-		files = findGoPlusFiles(".", *recursiveFlag)
+		files = findGoMinusFiles(".", *recursiveFlag)
 	} else {
 		// Belirtilen dosya veya dizinleri kullan
 		for _, path := range flag.Args() {
@@ -54,11 +54,11 @@ func main() {
 
 			if info.IsDir() {
 				// Dizin içindeki GO-Minus dosyalarını bul
-				dirFiles := findGoPlusFiles(path, *recursiveFlag)
+				dirFiles := findGoMinusFiles(path, *recursiveFlag)
 				files = append(files, dirFiles...)
 			} else {
 				// Dosyayı kontrol et
-				if isGoPlusFile(path) {
+				if isGoMinusFile(path) {
 					files = append(files, path)
 				} else {
 					fmt.Printf("Uyarı: %s bir GO-Minus dosyası değil, atlanıyor\n", path)
@@ -72,7 +72,7 @@ func main() {
 }
 
 // GO-Minus dosyalarını bul
-func findGoPlusFiles(dir string, recursive bool) []string {
+func findGoMinusFiles(dir string, recursive bool) []string {
 	var files []string
 
 	// Dizini kontrol et
@@ -88,14 +88,14 @@ func findGoPlusFiles(dir string, recursive bool) []string {
 		// Alt dizinleri kontrol et
 		if entry.IsDir() {
 			if recursive {
-				subFiles := findGoPlusFiles(path, recursive)
+				subFiles := findGoMinusFiles(path, recursive)
 				files = append(files, subFiles...)
 			}
 			continue
 		}
 
 		// GO-Minus dosyalarını kontrol et
-		if isGoPlusFile(path) {
+		if isGoMinusFile(path) {
 			files = append(files, path)
 		}
 	}
@@ -104,7 +104,7 @@ func findGoPlusFiles(dir string, recursive bool) []string {
 }
 
 // Dosyanın bir GO-Minus dosyası olup olmadığını kontrol et
-func isGoPlusFile(path string) bool {
+func isGoMinusFile(path string) bool {
 	return strings.HasSuffix(path, ".gom")
 }
 
@@ -144,8 +144,8 @@ func formatFiles(files []string) {
 			continue
 		}
 
-		// Dosyayı biçimlendir (gerçek implementasyonda GO+ parser ve formatter kullanılacak)
-		formatted, changed := formatGoPlusCode(string(content), *simplifyFlag)
+		// Dosyayı biçimlendir (gerçek implementasyonda GO-Minus parser ve formatter kullanılacak)
+		formatted, changed := formatGoMinusCode(string(content), *simplifyFlag)
 
 		// Değişiklik yoksa devam et
 		if !changed {
@@ -185,13 +185,13 @@ func formatFiles(files []string) {
 }
 
 // GO-Minus kodunu biçimlendir
-func formatGoPlusCode(content string, simplify bool) (string, bool) {
+func formatGoMinusCode(content string, simplify bool) (string, bool) {
 	// Gerçek implementasyonda GO-Minus parser ve formatter kullanılacak
 	// Şimdilik örnek bir biçimlendirme yapalım
 
 	// Örnek olarak, fazla boşlukları kaldıralım
 	formatted := strings.ReplaceAll(content, "  ", " ")
-	
+
 	// Değişiklik olup olmadığını kontrol et
 	return formatted, formatted != content
 }

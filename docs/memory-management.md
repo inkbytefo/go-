@@ -1,130 +1,173 @@
-# GO-Minus Hibrit Akıllı Bellek Yönetimi Sistemi
+# GO-Minus Hybrid Smart Memory Management System
 
-GO-Minus, programcılara maksimum esneklik ve performans sağlayan bir "Hibrit Akıllı Bellek Yönetimi Sistemi" sunar. Bu sistem, Go'nun garbage collector'ünün sağladığı kolaylığı korurken, performans kritik bölümler için daha fazla kontrol ve optimizasyon seçeneği sunar.
+GO-Minus provides a "Hybrid Smart Memory Management System" that offers maximum flexibility and performance to programmers. This system maintains the ease of use provided by Go's garbage collector while offering more control and optimization options for performance-critical sections.
 
-## Bellek Yönetimi Stratejileri
+## Memory Management Strategies
 
-GO-Minus, aşağıdaki bellek yönetimi stratejilerini destekler:
+GO-Minus supports the following memory management strategies:
 
-### 1. Otomatik Bellek Yönetimi (Garbage Collection)
+### 1. Automatic Memory Management (Garbage Collection)
 
-GO-Minus, varsayılan olarak Go'nun garbage collector'ünü kullanır. Bu, bellek yönetimini otomatikleştirerek programcıların bellek sızıntıları ve dangling pointer'lar gibi yaygın sorunlarla uğraşmak zorunda kalmadan kod yazmasına olanak tanır.
+GO-Minus uses Go's garbage collector by default. This automates memory management, allowing programmers to write code without having to deal with common issues like memory leaks and dangling pointers.
 
 ```go
 func processData() {
-    // Otomatik bellek yönetimi
+    // Automatic memory management
     data := createLargeData()
     processData(data)
-    // data otomatik olarak temizlenir
+    // data is automatically cleaned up
 }
 ```
 
-### 2. Manuel Bellek Yönetimi
+### 2. Manual Memory Management
 
-Performans kritik bölümler için, GO-Minus manuel bellek yönetimi seçeneği sunar. Bu, `unsafe` bloğu içinde bellek ayırma ve serbest bırakma işlemlerini doğrudan kontrol etmenize olanak tanır.
+For performance-critical sections, GO-Minus offers manual memory management. This allows you to directly control memory allocation and deallocation within an `unsafe` block.
 
 ```go
 func processImage(Image image) {
     unsafe {
-        // Manuel bellek ayırma
+        // Manual memory allocation
         buffer := allocate<byte>(image.width * image.height * 4)
-        defer free(buffer) // İşlev sonunda belleği serbest bırak
-        
-        // Performans kritik işlemler
+        defer free(buffer) // Free memory at the end of the function
+
+        // Performance-critical operations
         // ...
     }
 }
 ```
 
-### 3. Bölgesel Bellek Yönetimi (Region-Based Memory Management)
+### 3. Region-Based Memory Management
 
-GO-Minus'un yeni özelliği olan bölgesel bellek yönetimi, programcılara belirli kod bloklarını "bellek bölgeleri" olarak işaretleme ve bu bölgelerdeki tüm bellek ayırma işlemlerini bölge sonunda otomatik olarak serbest bırakma olanağı sunar.
+GO-Minus's new feature, region-based memory management, allows programmers to mark specific code blocks as "memory regions" and automatically free all memory allocations in the region at the end of the block.
 
 ```go
 func processLargeData(data []byte) {
-    // Bellek bölgesi tanımlama
+    // Define a memory region
     region := memory.NewRegion()
     defer region.Free()
-    
-    // Bu bölgedeki tüm bellek ayırmaları bölge ile birlikte serbest bırakılır
+
+    // All memory allocations in this region are freed with the region
     buffer := region.Allocate[byte](1024 * 1024)
-    
-    // Performans kritik işlemler...
+
+    // Performance-critical operations...
 }
 ```
 
-### 4. Yaşam Süresi Analizi (Lifetime Analysis)
+### 4. Lifetime Analysis
 
-GO-Minus, Rust'tan esinlenen, ancak daha az katı bir yaşam süresi analizi sistemi sunar. Derleyici, değişkenlerin yaşam sürelerini analiz eder ve potansiyel bellek sızıntılarını veya dangling pointer'ları tespit eder.
+GO-Minus provides a lifetime analysis system inspired by Rust, but less strict. The compiler analyzes the lifetimes of variables and detects potential memory leaks or dangling pointers.
 
 ```go
 func processData() {
-    // Yaşam süresi analizi
+    // Lifetime analysis
     data := createLargeData()
     processData(data)
-    // Derleyici, data'nın artık kullanılmadığını tespit eder
-    // ve belleği serbest bırakma için uygun kodu ekler
+    // The compiler detects that data is no longer used
+    // and adds appropriate code to free the memory
 }
 ```
 
-### 5. Profil Tabanlı Otomatik Optimizasyon
+### 5. Profile-Based Automatic Optimization
 
-GO-Minus, uygulama çalışırken bellek kullanım desenlerini analiz eden ve gelecekteki çalıştırmalarda bellek yönetimini otomatik olarak optimize eden bir sistem sunar.
+GO-Minus provides a system that analyzes memory usage patterns while the application is running and automatically optimizes memory management in future runs.
 
 ```go
 func main() {
-    // Profil tabanlı otomatik optimizasyon
-    memory.EnableProfiling()
-    
-    // Uygulama kodu
+    // Profile-based automatic optimization
+    memory.EnableProfiling(time.Minute, "memory_profile.json")
+
+    // Application code
     // ...
-    
-    // Profil verilerini kaydet
+
+    // Save profile data
     memory.SaveProfile("memory_profile.json")
 }
 ```
 
-### 6. Bellek Havuzu Şablonları
+### 6. Memory Pool Templates
 
-GO-Minus, belirli veri yapıları için özelleştirilmiş bellek havuzları oluşturmayı kolaylaştıran şablonlar sunar.
+GO-Minus provides templates that make it easy to create customized memory pools for specific data structures.
 
 ```go
-// Özelleştirilmiş bellek havuzu şablonu
+// Customized memory pool template
 pool := memory.NewPool[MyStruct](1000)
 
-// Havuzdan nesne alma
+// Get an object from the pool
 obj := pool.Get()
 
-// İşlemler...
+// Operations...
 
-// Havuza geri döndürme
+// Return to the pool
 pool.Return(obj)
 ```
 
-## Hibrit Yaklaşımın Avantajları
+## Advantages of the Hybrid Approach
 
-GO-Minus'un hibrit bellek yönetimi yaklaşımı, aşağıdaki avantajları sunar:
+GO-Minus's hybrid memory management approach offers the following advantages:
 
-1. **Esneklik**: Programcılar, uygulamanın farklı bölümleri için farklı bellek yönetimi stratejileri kullanabilir.
-2. **Performans**: Performans kritik bölümler için manuel veya bölgesel bellek yönetimi kullanarak, garbage collection duraklamalarını önleyebilirsiniz.
-3. **Güvenlik**: Yaşam süresi analizi, bellek sızıntılarını ve dangling pointer'ları tespit etmeye yardımcı olur.
-4. **Verimlilik**: Bellek havuzları, bellek ayırma ve serbest bırakma işlemlerinin maliyetini azaltır.
-5. **Otomatik Optimizasyon**: Profil tabanlı otomatik optimizasyon, bellek kullanımını otomatik olarak iyileştirir.
+1. **Flexibility**: Programmers can use different memory management strategies for different parts of the application.
+2. **Performance**: By using manual or region-based memory management for performance-critical sections, you can avoid garbage collection pauses.
+3. **Safety**: Lifetime analysis helps detect memory leaks and dangling pointers.
+4. **Efficiency**: Memory pools reduce the cost of memory allocation and deallocation operations.
+5. **Automatic Optimization**: Profile-based automatic optimization automatically improves memory usage.
 
-## Kullanım Senaryoları
+## Usage Scenarios
 
-### Gerçek Zamanlı Sistemler
+### Real-Time Systems
 
-Gerçek zamanlı sistemlerde, garbage collection duraklamaları kabul edilemez olabilir. GO-Minus'un bölgesel bellek yönetimi ve bellek havuzları, bu tür sistemlerde bellek yönetimini öngörülebilir hale getirir.
+In real-time systems, garbage collection pauses may be unacceptable. GO-Minus's region-based memory management and memory pools make memory management predictable in such systems.
 
-### Yüksek Performanslı Uygulamalar
+### High-Performance Applications
 
-Yüksek performanslı uygulamalarda, bellek yönetimi performansı önemlidir. GO-Minus'un manuel bellek yönetimi ve bellek havuzları, bellek yönetimi performansını optimize etmenize olanak tanır.
+In high-performance applications, memory management performance is important. GO-Minus's manual memory management and memory pools allow you to optimize memory management performance.
 
-### Kaynak Kısıtlı Ortamlar
+### Resource-Constrained Environments
 
-Kaynak kısıtlı ortamlarda, bellek kullanımını minimize etmek önemlidir. GO-Minus'un yaşam süresi analizi ve profil tabanlı otomatik optimizasyon, bellek kullanımını minimize etmenize yardımcı olur.
+In resource-constrained environments, minimizing memory usage is important. GO-Minus's lifetime analysis and profile-based automatic optimization help you minimize memory usage.
 
-## Sonuç
+## Integration with the Hybrid Memory Manager
 
-GO-Minus'un Hibrit Akıllı Bellek Yönetimi Sistemi, programcılara bellek yönetimi stratejilerini uygulamanın farklı bölümleri için özelleştirebilme esnekliği sunar. Bu, hem performans hem de geliştirme verimliliği açısından en iyi sonuçları elde etmenize olanak tanır.
+GO-Minus provides a `HybridMemoryManager` class that integrates all memory management strategies into a single interface. This allows you to use different memory management strategies in different parts of your application while maintaining a consistent API.
+
+```go
+// Initialize the memory system with the desired options
+memory.InitializeMemorySystem(memory.HybridMemoryManagerOptions{
+    EnableProfiling: true,
+    ProfileSaveInterval: time.Minute,
+    ProfileFilePath: "memory_profile.json",
+    EnableLifetimeAnalysis: true,
+    EnableRegionBasedManagement: true,
+    EnablePooling: true,
+    OptimizationStrategy: memory.OptimizationStrategy.Adaptive,
+})
+
+// Use automatic memory management
+data := createLargeData()
+
+// Use region-based memory management
+region := memory.NewRegion()
+defer region.Free()
+buffer := memory.AllocateInRegion(region, 1024 * 1024)
+
+// Use memory pooling
+pool := memory.NewPool[MyStruct](1000)
+obj := memory.GetFromPool(pool)
+// ...
+memory.ReturnToPool(pool, obj)
+```
+
+## Optimization Strategies
+
+GO-Minus's hybrid memory management system supports different optimization strategies:
+
+1. **None**: No optimization is performed.
+2. **MinimizeMemoryUsage**: Prioritizes minimizing memory usage.
+3. **MaximizePerformance**: Prioritizes maximizing performance.
+4. **Balanced**: Balances memory usage and performance.
+5. **Adaptive**: Adapts the strategy based on runtime profiling.
+
+You can select the optimization strategy that best suits your application's needs.
+
+## Conclusion
+
+GO-Minus's Hybrid Smart Memory Management System provides programmers with the flexibility to customize memory management strategies for different parts of the application. This allows you to achieve the best results in terms of both performance and development efficiency.

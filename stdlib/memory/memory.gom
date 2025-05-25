@@ -1,5 +1,5 @@
-// GO-Minus Standart Kütüphane - Memory Paketi
-// Bu paket, GO-Minus programlama dili için Hibrit Akıllı Bellek Yönetimi Sistemi'ni sağlar.
+// GO-Minus Standard Library - Memory Package
+// This package provides the Hybrid Smart Memory Management System for the GO-Minus programming language.
 package memory
 
 import (
@@ -8,135 +8,135 @@ import (
     "unsafe"
 )
 
-// MemoryManager, bellek yönetimi için temel arayüzdür.
-// Bu arayüz, farklı bellek yönetimi stratejileri için ortak bir arayüz sağlar.
+// MemoryManager is the basic interface for memory management.
+// This interface provides a common interface for different memory management strategies.
 interface MemoryManager {
-    // Allocate, belirtilen boyutta bellek ayırır ve başlangıç adresini döndürür.
+    // Allocate allocates memory of the specified size and returns the starting address.
     func Allocate(size uint64) unsafe.Pointer
-    
-    // Free, belirtilen adresten başlayan belleği serbest bırakır.
+
+    // Free frees the memory starting at the specified address.
     func Free(ptr unsafe.Pointer)
-    
-    // GetStats, bellek yöneticisinin istatistiklerini döndürür.
+
+    // GetStats returns the memory manager's statistics.
     func GetStats() MemoryStats
 }
 
-// MemoryStats, bellek yöneticisinin istatistiklerini içerir.
+// MemoryStats contains the memory manager's statistics.
 struct MemoryStats {
-    // TotalAllocated, toplam ayrılan bellek miktarı (bayt cinsinden).
+    // TotalAllocated is the total amount of allocated memory (in bytes).
     TotalAllocated uint64
-    
-    // TotalFreed, toplam serbest bırakılan bellek miktarı (bayt cinsinden).
+
+    // TotalFreed is the total amount of freed memory (in bytes).
     TotalFreed uint64
-    
-    // CurrentUsage, şu anda kullanılan bellek miktarı (bayt cinsinden).
+
+    // CurrentUsage is the current memory usage (in bytes).
     CurrentUsage uint64
-    
-    // PeakUsage, en yüksek bellek kullanımı (bayt cinsinden).
+
+    // PeakUsage is the peak memory usage (in bytes).
     PeakUsage uint64
-    
-    // AllocationCount, bellek ayırma işlemi sayısı.
+
+    // AllocationCount is the number of memory allocation operations.
     AllocationCount uint64
-    
-    // FreeCount, bellek serbest bırakma işlemi sayısı.
+
+    // FreeCount is the number of memory free operations.
     FreeCount uint64
 }
 
-// MemoryManagerOptions, bellek yöneticisi için yapılandırma seçeneklerini içerir.
+// MemoryManagerOptions contains configuration options for the memory manager.
 struct MemoryManagerOptions {
-    // EnableProfiling, profil oluşturmanın etkinleştirilip etkinleştirilmeyeceğini belirtir.
+    // EnableProfiling specifies whether profiling is enabled.
     EnableProfiling bool
-    
-    // ProfileSaveInterval, profil verilerinin kaydedilme aralığı.
+
+    // ProfileSaveInterval is the interval at which profile data is saved.
     ProfileSaveInterval time.Duration
-    
-    // ProfileFilePath, profil verilerinin kaydedileceği dosya yolu.
+
+    // ProfileFilePath is the path to the file where profile data is saved.
     ProfileFilePath string
-    
-    // EnableLifetimeAnalysis, yaşam süresi analizinin etkinleştirilip etkinleştirilmeyeceğini belirtir.
+
+    // EnableLifetimeAnalysis specifies whether lifetime analysis is enabled.
     EnableLifetimeAnalysis bool
-    
-    // EnableRegionBasedManagement, bölgesel bellek yönetiminin etkinleştirilip etkinleştirilmeyeceğini belirtir.
+
+    // EnableRegionBasedManagement specifies whether region-based memory management is enabled.
     EnableRegionBasedManagement bool
-    
-    // EnablePooling, bellek havuzlarının etkinleştirilip etkinleştirilmeyeceğini belirtir.
+
+    // EnablePooling specifies whether memory pooling is enabled.
     EnablePooling bool
 }
 
-// DefaultMemoryManager, varsayılan bellek yöneticisidir.
-// Bu sınıf, Go'nun garbage collector'ünü kullanır ve manuel bellek yönetimi için bir arayüz sağlar.
+// DefaultMemoryManager is the default memory manager.
+// This class uses Go's garbage collector and provides an interface for manual memory management.
 class DefaultMemoryManager {
     private:
         var stats MemoryStats
         var options MemoryManagerOptions
         var mutex sync.Mutex
         var profiler *MemoryProfiler
-    
+
     public:
-        // New, yeni bir DefaultMemoryManager örneği oluşturur.
+        // New creates a new DefaultMemoryManager instance.
         static func New(options MemoryManagerOptions) *DefaultMemoryManager {
             manager := &DefaultMemoryManager{
                 options: options,
                 stats: MemoryStats{},
             }
-            
+
             if options.EnableProfiling {
                 manager.profiler = MemoryProfiler.New(options.ProfileSaveInterval, options.ProfileFilePath)
             }
-            
+
             return manager
         }
-        
-        // Allocate, belirtilen boyutta bellek ayırır ve başlangıç adresini döndürür.
+
+        // Allocate allocates memory of the specified size and returns the starting address.
         func Allocate(size uint64) unsafe.Pointer {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
+
             ptr := unsafe.Pointer(new(byte[size]))
-            
+
             this.stats.TotalAllocated += size
             this.stats.AllocationCount++
             this.stats.CurrentUsage += size
-            
+
             if this.stats.CurrentUsage > this.stats.PeakUsage {
                 this.stats.PeakUsage = this.stats.CurrentUsage
             }
-            
+
             if this.options.EnableProfiling && this.profiler != null {
                 this.profiler.RecordAllocation(ptr, size)
             }
-            
+
             return ptr
         }
-        
-        // Free, belirtilen adresten başlayan belleği serbest bırakır.
+
+        // Free frees the memory starting at the specified address.
         func Free(ptr unsafe.Pointer) {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
-            // Go'nun garbage collector'ü belleği otomatik olarak temizleyecektir.
-            // Bu fonksiyon, manuel bellek yönetimi için bir arayüz sağlar.
-            
+
+            // Go's garbage collector will automatically clean up the memory.
+            // This function provides an interface for manual memory management.
+
             if this.options.EnableProfiling && this.profiler != null {
                 size := this.profiler.GetAllocationSize(ptr)
                 this.stats.TotalFreed += size
                 this.stats.FreeCount++
                 this.stats.CurrentUsage -= size
-                
+
                 this.profiler.RecordFree(ptr)
             }
         }
-        
-        // GetStats, bellek yöneticisinin istatistiklerini döndürür.
+
+        // GetStats returns the memory manager's statistics.
         func GetStats() MemoryStats {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
+
             return this.stats
         }
 }
 
-// MemoryProfiler, bellek kullanımını profilleme için kullanılır.
+// MemoryProfiler is used for profiling memory usage.
 class MemoryProfiler {
     private:
         var saveInterval time.Duration
@@ -144,9 +144,9 @@ class MemoryProfiler {
         var allocations map[unsafe.Pointer]uint64
         var mutex sync.Mutex
         var lastSaveTime time.Time
-    
+
     public:
-        // New, yeni bir MemoryProfiler örneği oluşturur.
+        // New creates a new MemoryProfiler instance.
         static func New(saveInterval time.Duration, filePath string) *MemoryProfiler {
             profiler := &MemoryProfiler{
                 saveInterval: saveInterval,
@@ -154,54 +154,54 @@ class MemoryProfiler {
                 allocations: make(map[unsafe.Pointer]uint64),
                 lastSaveTime: time.Now(),
             }
-            
-            // Profil verilerini periyodik olarak kaydetmek için bir goroutine başlat
+
+            // Start a goroutine to periodically save profile data
             go profiler.periodicSave()
-            
+
             return profiler
         }
-        
-        // RecordAllocation, bir bellek ayırma işlemini kaydeder.
+
+        // RecordAllocation records a memory allocation.
         func RecordAllocation(ptr unsafe.Pointer, size uint64) {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
+
             this.allocations[ptr] = size
         }
-        
-        // RecordFree, bir bellek serbest bırakma işlemini kaydeder.
+
+        // RecordFree records a memory free.
         func RecordFree(ptr unsafe.Pointer) {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
+
             delete(this.allocations, ptr)
         }
-        
-        // GetAllocationSize, belirtilen adresin ayırma boyutunu döndürür.
+
+        // GetAllocationSize returns the allocation size of the specified address.
         func GetAllocationSize(ptr unsafe.Pointer) uint64 {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
+
             return this.allocations[ptr]
         }
-        
-        // SaveProfile, profil verilerini dosyaya kaydeder.
+
+        // SaveProfile saves profile data to a file.
         func SaveProfile() error {
             this.mutex.Lock()
             defer this.mutex.Unlock()
-            
-            // Profil verilerini JSON formatında dosyaya kaydet
+
+            // Save profile data to a file in JSON format
             // ...
-            
+
             this.lastSaveTime = time.Now()
             return null
         }
-        
-        // periodicSave, profil verilerini periyodik olarak kaydeder.
+
+        // periodicSave periodically saves profile data.
         private func periodicSave() {
             for {
                 time.Sleep(this.saveInterval)
-                
+
                 if time.Since(this.lastSaveTime) >= this.saveInterval {
                     this.SaveProfile()
                 }
@@ -209,7 +209,7 @@ class MemoryProfiler {
         }
 }
 
-// GlobalMemoryManager, global bellek yöneticisidir.
+// GlobalMemoryManager is the global memory manager.
 var GlobalMemoryManager MemoryManager = DefaultMemoryManager.New(MemoryManagerOptions{
     EnableProfiling: false,
     EnableLifetimeAnalysis: false,
@@ -217,7 +217,7 @@ var GlobalMemoryManager MemoryManager = DefaultMemoryManager.New(MemoryManagerOp
     EnablePooling: false,
 })
 
-// EnableProfiling, bellek profillemeyi etkinleştirir.
+// EnableProfiling enables memory profiling.
 func EnableProfiling(saveInterval time.Duration, filePath string) {
     options := MemoryManagerOptions{
         EnableProfiling: true,
@@ -227,30 +227,45 @@ func EnableProfiling(saveInterval time.Duration, filePath string) {
         EnableRegionBasedManagement: false,
         EnablePooling: false,
     }
-    
+
     GlobalMemoryManager = DefaultMemoryManager.New(options)
 }
 
-// SaveProfile, profil verilerini dosyaya kaydeder.
+// SaveProfile saves profile data to a file.
 func SaveProfile(filePath string) error {
     if profiler, ok := GlobalMemoryManager.(*DefaultMemoryManager).profiler; ok {
         return profiler.SaveProfile()
     }
-    
-    return error("Profilleme etkin değil")
+
+    return error("Profiling is not enabled")
 }
 
-// GetStats, global bellek yöneticisinin istatistiklerini döndürür.
+// GetStats returns the global memory manager's statistics.
 func GetStats() MemoryStats {
     return GlobalMemoryManager.GetStats()
 }
 
-// Allocate, belirtilen boyutta bellek ayırır ve başlangıç adresini döndürür.
+// Allocate allocates memory of the specified size and returns the starting address.
 func Allocate(size uint64) unsafe.Pointer {
     return GlobalMemoryManager.Allocate(size)
 }
 
-// Free, belirtilen adresten başlayan belleği serbest bırakır.
+// Free frees the memory starting at the specified address.
 func Free(ptr unsafe.Pointer) {
     GlobalMemoryManager.Free(ptr)
+}
+
+// InitializeMemorySystem initializes the memory system with the specified options.
+// This function should be called at the beginning of the program to configure the memory system.
+func InitializeMemorySystem(options HybridMemoryManagerOptions) {
+    // Initialize the global hybrid memory manager
+    GlobalHybridMemoryManager = HybridMemoryManager.New(options)
+
+    // Replace the global memory manager with the hybrid memory manager
+    GlobalMemoryManager = GlobalHybridMemoryManager
+
+    // Enable lifetime analysis if specified
+    if options.EnableLifetimeAnalysis {
+        EnableLifetimeAnalysis()
+    }
 }

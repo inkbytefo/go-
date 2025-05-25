@@ -1,0 +1,267 @@
+// GO-Minus Standard Library - Encoding JSON Package
+package json
+
+import (
+    "encoding/json" // Use Go's encoding/json package
+    "io"
+)
+
+// Marshal returns the JSON encoding of v.
+func Marshal(v interface{}) ([]byte, error) {
+    return json.Marshal(v)
+}
+
+// Unmarshal parses the JSON-encoded data and stores the result in the value pointed to by v.
+func Unmarshal(data []byte, v interface{}) error {
+    return json.Unmarshal(data, v)
+}
+
+// MarshalIndent is like Marshal but applies Indent to format the output.
+func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+    return json.MarshalIndent(v, prefix, indent)
+}
+
+// Valid reports whether data is a valid JSON encoding.
+func Valid(data []byte) bool {
+    return json.Valid(data)
+}
+
+// Encoder writes JSON values to an output stream.
+class Encoder {
+    private:
+        var goEncoder *json.Encoder
+    
+    public:
+        // NewEncoder returns a new encoder that writes to w.
+        static func NewEncoder(w io.Writer) *Encoder {
+            return &Encoder{
+                goEncoder: json.NewEncoder(w),
+            }
+        }
+        
+        // Encode writes the JSON encoding of v to the stream.
+        func Encode(v interface{}) error {
+            return this.goEncoder.Encode(v)
+        }
+        
+        // SetIndent sets the indentation parameters for formatting.
+        func SetIndent(prefix, indent string) {
+            this.goEncoder.SetIndent(prefix, indent)
+        }
+        
+        // SetEscapeHTML specifies whether problematic HTML characters should be escaped.
+        func SetEscapeHTML(on bool) {
+            this.goEncoder.SetEscapeHTML(on)
+        }
+}
+
+// Decoder reads and decodes JSON values from an input stream.
+class Decoder {
+    private:
+        var goDecoder *json.Decoder
+    
+    public:
+        // NewDecoder returns a new decoder that reads from r.
+        static func NewDecoder(r io.Reader) *Decoder {
+            return &Decoder{
+                goDecoder: json.NewDecoder(r),
+            }
+        }
+        
+        // Decode reads the next JSON-encoded value from its input and stores it in the value pointed to by v.
+        func Decode(v interface{}) error {
+            return this.goDecoder.Decode(v)
+        }
+        
+        // DisallowUnknownFields causes the Decoder to return an error when the destination is a struct and the input contains object keys which do not match any non-ignored, exported fields in the destination.
+        func DisallowUnknownFields() {
+            this.goDecoder.DisallowUnknownFields()
+        }
+        
+        // UseNumber causes the Decoder to unmarshal a number into an interface{} as a Number instead of as a float64.
+        func UseNumber() {
+            this.goDecoder.UseNumber()
+        }
+        
+        // More reports whether there is another element in the current array or object being parsed.
+        func More() bool {
+            return this.goDecoder.More()
+        }
+        
+        // Token returns the next JSON token in the input stream.
+        func Token() (interface{}, error) {
+            return this.goDecoder.Token()
+        }
+}
+
+// RawMessage is a raw encoded JSON value.
+// It implements Marshaler and Unmarshaler and can be used to delay JSON decoding or precompute a JSON encoding.
+class RawMessage {
+    private:
+        var goRawMessage json.RawMessage
+    
+    public:
+        // MarshalJSON returns m as the JSON encoding of m.
+        func MarshalJSON() ([]byte, error) {
+            return this.goRawMessage.MarshalJSON()
+        }
+        
+        // UnmarshalJSON sets *m to a copy of data.
+        func UnmarshalJSON(data []byte) error {
+            return this.goRawMessage.UnmarshalJSON(data)
+        }
+        
+        // String returns the JSON encoding of m as a string.
+        func String() string {
+            return string(this.goRawMessage)
+        }
+}
+
+// Number represents a JSON number literal.
+class Number {
+    private:
+        var goNumber json.Number
+    
+    public:
+        // String returns the literal text of the number.
+        func String() string {
+            return this.goNumber.String()
+        }
+        
+        // Float64 returns the number as a float64.
+        func Float64() (float64, error) {
+            return this.goNumber.Float64()
+        }
+        
+        // Int64 returns the number as an int64.
+        func Int64() (int64, error) {
+            return this.goNumber.Int64()
+        }
+}
+
+// Marshaler is the interface implemented by types that can marshal themselves into valid JSON.
+interface Marshaler {
+    func MarshalJSON() ([]byte, error)
+}
+
+// Unmarshaler is the interface implemented by types that can unmarshal a JSON description of themselves.
+interface Unmarshaler {
+    func UnmarshalJSON([]byte) error
+}
+
+// SyntaxError is a description of a JSON syntax error.
+class SyntaxError {
+    private:
+        var goSyntaxError *json.SyntaxError
+    
+    public:
+        // Error returns a string representation of the syntax error.
+        func Error() string {
+            return this.goSyntaxError.Error()
+        }
+        
+        // Offset returns the byte offset in the input where the error was detected.
+        func Offset() int64 {
+            return this.goSyntaxError.Offset
+        }
+}
+
+// UnmarshalTypeError describes a JSON value that was not appropriate for a value of a specific Go type.
+class UnmarshalTypeError {
+    private:
+        var goUnmarshalTypeError *json.UnmarshalTypeError
+    
+    public:
+        // Error returns a string representation of the type error.
+        func Error() string {
+            return this.goUnmarshalTypeError.Error()
+        }
+        
+        // Field returns the name of the field being unmarshaled.
+        func Field() string {
+            return this.goUnmarshalTypeError.Field
+        }
+        
+        // Type returns the type of the Go value that could not be assigned to.
+        func Type() string {
+            return this.goUnmarshalTypeError.Type.String()
+        }
+        
+        // Offset returns the byte offset in the input where the error was detected.
+        func Offset() int64 {
+            return this.goUnmarshalTypeError.Offset
+        }
+}
+
+// InvalidUnmarshalError describes an invalid argument passed to Unmarshal.
+class InvalidUnmarshalError {
+    private:
+        var goInvalidUnmarshalError *json.InvalidUnmarshalError
+    
+    public:
+        // Error returns a string representation of the invalid unmarshal error.
+        func Error() string {
+            return this.goInvalidUnmarshalError.Error()
+        }
+        
+        // Type returns the type of the invalid argument passed to Unmarshal.
+        func Type() string {
+            return this.goInvalidUnmarshalError.Type.String()
+        }
+}
+
+// MarshalerError describes an error from calling a MarshalJSON method.
+class MarshalerError {
+    private:
+        var goMarshalerError *json.MarshalerError
+    
+    public:
+        // Error returns a string representation of the marshaler error.
+        func Error() string {
+            return this.goMarshalerError.Error()
+        }
+        
+        // Type returns the type of the marshaler that failed.
+        func Type() string {
+            return this.goMarshalerError.Type.String()
+        }
+}
+
+// UnsupportedTypeError is returned by Marshal when attempting to encode an unsupported value type.
+class UnsupportedTypeError {
+    private:
+        var goUnsupportedTypeError *json.UnsupportedTypeError
+    
+    public:
+        // Error returns a string representation of the unsupported type error.
+        func Error() string {
+            return this.goUnsupportedTypeError.Error()
+        }
+        
+        // Type returns the type of the unsupported value.
+        func Type() string {
+            return this.goUnsupportedTypeError.Type.String()
+        }
+}
+
+// UnsupportedValueError is returned by Marshal when attempting to encode an unsupported value.
+class UnsupportedValueError {
+    private:
+        var goUnsupportedValueError *json.UnsupportedValueError
+    
+    public:
+        // Error returns a string representation of the unsupported value error.
+        func Error() string {
+            return this.goUnsupportedValueError.Error()
+        }
+        
+        // Value returns the unsupported value.
+        func Value() interface{} {
+            return this.goUnsupportedValueError.Value
+        }
+        
+        // Str returns a string representation of the unsupported value.
+        func Str() string {
+            return this.goUnsupportedValueError.Str
+        }
+}

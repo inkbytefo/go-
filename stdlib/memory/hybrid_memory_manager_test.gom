@@ -1,0 +1,297 @@
+// GO-Minus Standard Library - Memory Package - Hybrid Memory Manager Tests
+// This file contains tests for the Hybrid Smart Memory Management System.
+package memory_test
+
+import (
+    "memory"
+    "testing"
+    "time"
+    "unsafe"
+)
+
+// TestHybridMemoryManagerBasic tests basic functionality of the hybrid memory manager.
+func TestHybridMemoryManagerBasic(t *testing.T) {
+    // Create a hybrid memory manager with default options
+    options := memory.HybridMemoryManagerOptions{
+        EnableProfiling: false,
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: false,
+        EnablePooling: false,
+        OptimizationStrategy: memory.OptimizationStrategy.Balanced,
+    }
+    
+    manager := memory.HybridMemoryManager.New(options)
+    
+    // Allocate memory
+    size := uint64(1024)
+    ptr := manager.Allocate(size)
+    
+    // Check that the memory address is not null
+    if ptr == null {
+        t.Error("Memory allocation failed")
+    }
+    
+    // Check statistics
+    stats := manager.GetStats()
+    
+    if stats.TotalAllocated != size {
+        t.Errorf("Total allocated memory is incorrect. Expected: %d, Got: %d", size, stats.TotalAllocated)
+    }
+    
+    if stats.CurrentUsage != size {
+        t.Errorf("Current memory usage is incorrect. Expected: %d, Got: %d", size, stats.CurrentUsage)
+    }
+    
+    if stats.AllocationCount != 1 {
+        t.Errorf("Allocation count is incorrect. Expected: 1, Got: %d", stats.AllocationCount)
+    }
+    
+    // Free memory
+    manager.Free(ptr)
+    
+    // Check statistics after freeing
+    stats = manager.GetStats()
+    
+    if stats.TotalFreed != size {
+        t.Errorf("Total freed memory is incorrect. Expected: %d, Got: %d", size, stats.TotalFreed)
+    }
+    
+    if stats.CurrentUsage != 0 {
+        t.Errorf("Current memory usage is incorrect after freeing. Expected: 0, Got: %d", stats.CurrentUsage)
+    }
+    
+    if stats.FreeCount != 1 {
+        t.Errorf("Free count is incorrect. Expected: 1, Got: %d", stats.FreeCount)
+    }
+}
+
+// TestHybridMemoryManagerRegion tests region-based memory management.
+func TestHybridMemoryManagerRegion(t *testing.T) {
+    // Create a hybrid memory manager with region-based management enabled
+    options := memory.HybridMemoryManagerOptions{
+        EnableProfiling: false,
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: true,
+        EnablePooling: false,
+        DefaultRegionBlockSize: 1024 * 1024, // 1 MB
+        OptimizationStrategy: memory.OptimizationStrategy.Balanced,
+    }
+    
+    manager := memory.HybridMemoryManager.New(options)
+    
+    // Allocate memory in the default region
+    size := uint64(1024)
+    ptr := manager.AllocateInDefaultRegion(size)
+    
+    // Check that the memory address is not null
+    if ptr == null {
+        t.Error("Memory allocation in default region failed")
+    }
+    
+    // Check statistics
+    stats := manager.GetStats()
+    
+    if stats.TotalAllocated != size {
+        t.Errorf("Total allocated memory is incorrect. Expected: %d, Got: %d", size, stats.TotalAllocated)
+    }
+    
+    // Create a custom region
+    region := memory.Region.NewWithBlockSize(2048) // 2 KB
+    
+    // Allocate memory in the custom region
+    regionSize := uint64(512)
+    regionPtr := manager.AllocateInRegion(region, regionSize)
+    
+    // Check that the memory address is not null
+    if regionPtr == null {
+        t.Error("Memory allocation in custom region failed")
+    }
+    
+    // Check statistics
+    stats = manager.GetStats()
+    
+    if stats.TotalAllocated != size + regionSize {
+        t.Errorf("Total allocated memory is incorrect. Expected: %d, Got: %d", size + regionSize, stats.TotalAllocated)
+    }
+    
+    // Free the custom region
+    region.Free()
+    
+    // The memory allocated in the custom region is automatically freed when the region is freed,
+    // but the hybrid memory manager still tracks it for statistics purposes.
+    // We need to manually update the statistics by calling Free on the pointer.
+    manager.Free(regionPtr)
+    
+    // Check statistics
+    stats = manager.GetStats()
+    
+    if stats.TotalFreed != regionSize {
+        t.Errorf("Total freed memory is incorrect. Expected: %d, Got: %d", regionSize, stats.TotalFreed)
+    }
+}
+
+// TestHybridMemoryManagerPool tests memory pooling.
+func TestHybridMemoryManagerPool(t *testing.T) {
+    // Create a hybrid memory manager with pooling enabled
+    options := memory.HybridMemoryManagerOptions{
+        EnableProfiling: false,
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: false,
+        EnablePooling: true,
+        DefaultPoolCapacity: 1000,
+        OptimizationStrategy: memory.OptimizationStrategy.Balanced,
+    }
+    
+    manager := memory.HybridMemoryManager.New(options)
+    
+    // Create a memory pool
+    pool := memory.Pool<int>.New(100)
+    
+    // Get an object from the pool
+    obj := manager.GetFromPool(pool)
+    
+    // Check that the object is not null
+    if obj == null {
+        t.Error("Getting object from pool failed")
+    }
+    
+    // Set a value
+    *obj = 42
+    
+    // Check statistics
+    stats := manager.GetStats()
+    poolStats := pool.GetStats()
+    
+    if stats.TotalAllocated != poolStats.ItemSize {
+        t.Errorf("Total allocated memory is incorrect. Expected: %d, Got: %d", poolStats.ItemSize, stats.TotalAllocated)
+    }
+    
+    // Return the object to the pool
+    manager.ReturnToPool(pool, obj)
+    
+    // Check statistics
+    stats = manager.GetStats()
+    
+    if stats.TotalFreed != poolStats.ItemSize {
+        t.Errorf("Total freed memory is incorrect. Expected: %d, Got: %d", poolStats.ItemSize, stats.TotalFreed)
+    }
+    
+    // Get the object from the pool again
+    obj2 := manager.GetFromPool(pool)
+    
+    // Check that the object is not null
+    if obj2 == null {
+        t.Error("Getting object from pool again failed")
+    }
+    
+    // Check that the value is preserved (pooled objects are reused)
+    if *obj2 != 42 {
+        t.Errorf("Pooled object value is incorrect. Expected: 42, Got: %d", *obj2)
+    }
+}
+
+// TestHybridMemoryManagerProfiling tests memory profiling.
+func TestHybridMemoryManagerProfiling(t *testing.T) {
+    // Create a hybrid memory manager with profiling enabled
+    options := memory.HybridMemoryManagerOptions{
+        EnableProfiling: true,
+        ProfileSaveInterval: time.Minute,
+        ProfileFilePath: "memory_profile_test.json",
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: false,
+        EnablePooling: false,
+        OptimizationStrategy: memory.OptimizationStrategy.Balanced,
+    }
+    
+    manager := memory.HybridMemoryManager.New(options)
+    
+    // Allocate memory
+    size := uint64(1024)
+    ptr := manager.Allocate(size)
+    
+    // Check that the memory address is not null
+    if ptr == null {
+        t.Error("Memory allocation failed")
+    }
+    
+    // Free memory
+    manager.Free(ptr)
+    
+    // The profiler should have recorded the allocation and free operations
+    // We can't directly test the profiler's internal state, but we can check that the manager's
+    // statistics are correct, which indirectly verifies that the profiler is working.
+    stats := manager.GetStats()
+    
+    if stats.TotalAllocated != size {
+        t.Errorf("Total allocated memory is incorrect. Expected: %d, Got: %d", size, stats.TotalAllocated)
+    }
+    
+    if stats.TotalFreed != size {
+        t.Errorf("Total freed memory is incorrect. Expected: %d, Got: %d", size, stats.TotalFreed)
+    }
+}
+
+// TestGlobalHybridMemoryManager tests the global hybrid memory manager.
+func TestGlobalHybridMemoryManager(t *testing.T) {
+    // Initialize the global hybrid memory manager
+    options := memory.HybridMemoryManagerOptions{
+        EnableProfiling: false,
+        EnableLifetimeAnalysis: false,
+        EnableRegionBasedManagement: true,
+        EnablePooling: true,
+        DefaultRegionBlockSize: 1024 * 1024, // 1 MB
+        DefaultPoolCapacity: 1000,
+        OptimizationStrategy: memory.OptimizationStrategy.Balanced,
+    }
+    
+    memory.InitializeHybridMemoryManager(options)
+    
+    // Allocate memory
+    size := uint64(1024)
+    ptr := memory.Allocate(size)
+    
+    // Check that the memory address is not null
+    if ptr == null {
+        t.Error("Memory allocation failed")
+    }
+    
+    // Allocate memory in the default region
+    regionSize := uint64(512)
+    regionPtr := memory.AllocateInDefaultRegion(regionSize)
+    
+    // Check that the memory address is not null
+    if regionPtr == null {
+        t.Error("Memory allocation in default region failed")
+    }
+    
+    // Create a memory pool
+    pool := memory.NewPool<int>(100)
+    
+    // Get an object from the pool
+    obj := memory.GetFromPool(pool)
+    
+    // Check that the object is not null
+    if obj == null {
+        t.Error("Getting object from pool failed")
+    }
+    
+    // Set a value
+    *obj = 42
+    
+    // Return the object to the pool
+    memory.ReturnToPool(pool, obj)
+    
+    // Free memory
+    memory.Free(ptr)
+    
+    // Check statistics
+    stats := memory.GetStats()
+    
+    if stats.TotalAllocated < size + regionSize {
+        t.Errorf("Total allocated memory is incorrect. Expected at least: %d, Got: %d", size + regionSize, stats.TotalAllocated)
+    }
+    
+    if stats.TotalFreed < size {
+        t.Errorf("Total freed memory is incorrect. Expected at least: %d, Got: %d", size, stats.TotalFreed)
+    }
+}

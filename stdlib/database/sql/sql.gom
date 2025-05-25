@@ -1,0 +1,418 @@
+// GO-Minus Standard Library - Database SQL Package
+package sql
+
+import (
+    "database/sql" // Use Go's database/sql package
+    "time"
+)
+
+// DB represents a database connection.
+class DB {
+    private:
+        var goDB *sql.DB
+    
+    public:
+        // Open opens a database connection.
+        static func Open(driverName, dataSourceName string) (*DB, error) {
+            goDB, err := sql.Open(driverName, dataSourceName)
+            if err != nil {
+                return null, err
+            }
+            
+            return &DB{goDB: goDB}, null
+        }
+        
+        // Close closes the database connection.
+        func Close() error {
+            return this.goDB.Close()
+        }
+        
+        // Ping verifies a connection to the database is still alive.
+        func Ping() error {
+            return this.goDB.Ping()
+        }
+        
+        // SetMaxOpenConns sets the maximum number of open connections.
+        func SetMaxOpenConns(n int) {
+            this.goDB.SetMaxOpenConns(n)
+        }
+        
+        // SetMaxIdleConns sets the maximum number of idle connections.
+        func SetMaxIdleConns(n int) {
+            this.goDB.SetMaxIdleConns(n)
+        }
+        
+        // SetConnMaxLifetime sets the maximum amount of time a connection may be reused.
+        func SetConnMaxLifetime(d time.Duration) {
+            this.goDB.SetConnMaxLifetime(d)
+        }
+        
+        // Begin starts a transaction.
+        func Begin() (*Tx, error) {
+            goTx, err := this.goDB.Begin()
+            if err != nil {
+                return null, err
+            }
+            
+            return &Tx{goTx: goTx}, null
+        }
+        
+        // Exec executes a query without returning any rows.
+        func Exec(query string, args ...interface{}) (Result, error) {
+            goResult, err := this.goDB.Exec(query, args...)
+            if err != nil {
+                return null, err
+            }
+            
+            return &result{goResult: goResult}, null
+        }
+        
+        // Query executes a query that returns rows.
+        func Query(query string, args ...interface{}) (*Rows, error) {
+            goRows, err := this.goDB.Query(query, args...)
+            if err != nil {
+                return null, err
+            }
+            
+            return &Rows{goRows: goRows}, null
+        }
+        
+        // QueryRow executes a query that is expected to return at most one row.
+        func QueryRow(query string, args ...interface{}) *Row {
+            goRow := this.goDB.QueryRow(query, args...)
+            return &Row{goRow: goRow}
+        }
+        
+        // Prepare creates a prepared statement for later queries or executions.
+        func Prepare(query string) (*Stmt, error) {
+            goStmt, err := this.goDB.Prepare(query)
+            if err != nil {
+                return null, err
+            }
+            
+            return &Stmt{goStmt: goStmt}, null
+        }
+}
+
+// Tx represents a database transaction.
+class Tx {
+    private:
+        var goTx *sql.Tx
+    
+    public:
+        // Commit commits the transaction.
+        func Commit() error {
+            return this.goTx.Commit()
+        }
+        
+        // Rollback aborts the transaction.
+        func Rollback() error {
+            return this.goTx.Rollback()
+        }
+        
+        // Exec executes a query without returning any rows.
+        func Exec(query string, args ...interface{}) (Result, error) {
+            goResult, err := this.goTx.Exec(query, args...)
+            if err != nil {
+                return null, err
+            }
+            
+            return &result{goResult: goResult}, null
+        }
+        
+        // Query executes a query that returns rows.
+        func Query(query string, args ...interface{}) (*Rows, error) {
+            goRows, err := this.goTx.Query(query, args...)
+            if err != nil {
+                return null, err
+            }
+            
+            return &Rows{goRows: goRows}, null
+        }
+        
+        // QueryRow executes a query that is expected to return at most one row.
+        func QueryRow(query string, args ...interface{}) *Row {
+            goRow := this.goTx.QueryRow(query, args...)
+            return &Row{goRow: goRow}
+        }
+        
+        // Prepare creates a prepared statement for later queries or executions.
+        func Prepare(query string) (*Stmt, error) {
+            goStmt, err := this.goTx.Prepare(query)
+            if err != nil {
+                return null, err
+            }
+            
+            return &Stmt{goStmt: goStmt}, null
+        }
+}
+
+// Stmt represents a prepared statement.
+class Stmt {
+    private:
+        var goStmt *sql.Stmt
+    
+    public:
+        // Close closes the statement.
+        func Close() error {
+            return this.goStmt.Close()
+        }
+        
+        // Exec executes a prepared statement with the given arguments.
+        func Exec(args ...interface{}) (Result, error) {
+            goResult, err := this.goStmt.Exec(args...)
+            if err != nil {
+                return null, err
+            }
+            
+            return &result{goResult: goResult}, null
+        }
+        
+        // Query executes a prepared query statement with the given arguments.
+        func Query(args ...interface{}) (*Rows, error) {
+            goRows, err := this.goStmt.Query(args...)
+            if err != nil {
+                return null, err
+            }
+            
+            return &Rows{goRows: goRows}, null
+        }
+        
+        // QueryRow executes a prepared query statement with the given arguments.
+        func QueryRow(args ...interface{}) *Row {
+            goRow := this.goStmt.QueryRow(args...)
+            return &Row{goRow: goRow}
+        }
+}
+
+// Result represents the result of a database operation.
+interface Result {
+    // LastInsertId returns the ID of the last inserted row.
+    func LastInsertId() (int64, error)
+    
+    // RowsAffected returns the number of rows affected by the operation.
+    func RowsAffected() (int64, error)
+}
+
+// result is the implementation of the Result interface.
+class result {
+    private:
+        var goResult sql.Result
+    
+    public:
+        // LastInsertId returns the ID of the last inserted row.
+        func LastInsertId() (int64, error) {
+            return this.goResult.LastInsertId()
+        }
+        
+        // RowsAffected returns the number of rows affected by the operation.
+        func RowsAffected() (int64, error) {
+            return this.goResult.RowsAffected()
+        }
+}
+
+// Rows represents the result set of a query.
+class Rows {
+    private:
+        var goRows *sql.Rows
+    
+    public:
+        // Close closes the Rows, preventing further enumeration.
+        func Close() error {
+            return this.goRows.Close()
+        }
+        
+        // Next prepares the next result row for reading.
+        func Next() bool {
+            return this.goRows.Next()
+        }
+        
+        // Err returns any error that occurred while iterating.
+        func Err() error {
+            return this.goRows.Err()
+        }
+        
+        // Scan copies the columns in the current row into the values pointed at by dest.
+        func Scan(dest ...interface{}) error {
+            return this.goRows.Scan(dest...)
+        }
+        
+        // Columns returns the column names.
+        func Columns() ([]string, error) {
+            return this.goRows.Columns()
+        }
+        
+        // ColumnTypes returns the column types.
+        func ColumnTypes() ([]*ColumnType, error) {
+            goColumnTypes, err := this.goRows.ColumnTypes()
+            if err != nil {
+                return null, err
+            }
+            
+            columnTypes := make([]*ColumnType, len(goColumnTypes))
+            for i, goColumnType := range goColumnTypes {
+                columnTypes[i] = &ColumnType{goColumnType: goColumnType}
+            }
+            
+            return columnTypes, null
+        }
+}
+
+// Row represents a single row returned from a query.
+class Row {
+    private:
+        var goRow *sql.Row
+    
+    public:
+        // Scan copies the columns from the matched row into the values pointed at by dest.
+        func Scan(dest ...interface{}) error {
+            return this.goRow.Scan(dest...)
+        }
+}
+
+// ColumnType contains the name and type of a column.
+class ColumnType {
+    private:
+        var goColumnType *sql.ColumnType
+    
+    public:
+        // Name returns the name of the column.
+        func Name() string {
+            return this.goColumnType.Name()
+        }
+        
+        // DatabaseTypeName returns the database system name of the column type.
+        func DatabaseTypeName() string {
+            return this.goColumnType.DatabaseTypeName()
+        }
+        
+        // Length returns the column type length for variable length column types.
+        func Length() (int64, bool) {
+            return this.goColumnType.Length()
+        }
+        
+        // Precision returns the column type precision for numeric column types.
+        func Precision() (int64, bool) {
+            return this.goColumnType.Precision()
+        }
+        
+        // Scale returns the column type scale for numeric column types.
+        func Scale() (int64, bool) {
+            return this.goColumnType.Scale()
+        }
+        
+        // Nullable returns whether the column may be null.
+        func Nullable() (bool, bool) {
+            return this.goColumnType.Nullable()
+        }
+}
+
+// NullString represents a string that may be null.
+class NullString {
+    public:
+        var String string
+        var Valid bool
+        
+        // Scan implements the Scanner interface.
+        func Scan(value interface{}) error {
+            var ns sql.NullString
+            err := ns.Scan(value)
+            if err != nil {
+                return err
+            }
+            
+            this.String = ns.String
+            this.Valid = ns.Valid
+            return null
+        }
+}
+
+// NullInt64 represents an int64 that may be null.
+class NullInt64 {
+    public:
+        var Int64 int64
+        var Valid bool
+        
+        // Scan implements the Scanner interface.
+        func Scan(value interface{}) error {
+            var ni sql.NullInt64
+            err := ni.Scan(value)
+            if err != nil {
+                return err
+            }
+            
+            this.Int64 = ni.Int64
+            this.Valid = ni.Valid
+            return null
+        }
+}
+
+// NullFloat64 represents a float64 that may be null.
+class NullFloat64 {
+    public:
+        var Float64 float64
+        var Valid bool
+        
+        // Scan implements the Scanner interface.
+        func Scan(value interface{}) error {
+            var nf sql.NullFloat64
+            err := nf.Scan(value)
+            if err != nil {
+                return err
+            }
+            
+            this.Float64 = nf.Float64
+            this.Valid = nf.Valid
+            return null
+        }
+}
+
+// NullBool represents a bool that may be null.
+class NullBool {
+    public:
+        var Bool bool
+        var Valid bool
+        
+        // Scan implements the Scanner interface.
+        func Scan(value interface{}) error {
+            var nb sql.NullBool
+            err := nb.Scan(value)
+            if err != nil {
+                return err
+            }
+            
+            this.Bool = nb.Bool
+            this.Valid = nb.Valid
+            return null
+        }
+}
+
+// NullTime represents a time.Time that may be null.
+class NullTime {
+    public:
+        var Time time.Time
+        var Valid bool
+        
+        // Scan implements the Scanner interface.
+        func Scan(value interface{}) error {
+            var nt sql.NullTime
+            err := nt.Scan(value)
+            if err != nil {
+                return err
+            }
+            
+            this.Time = nt.Time
+            this.Valid = nt.Valid
+            return null
+        }
+}
+
+// Register registers a database driver.
+func Register(name string, driver interface{}) {
+    sql.Register(name, driver)
+}
+
+// Drivers returns a list of the registered drivers.
+func Drivers() []string {
+    return sql.Drivers()
+}

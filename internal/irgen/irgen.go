@@ -14,32 +14,32 @@ import (
 	"github.com/llir/llvm/ir/value"
 )
 
-// IRGenerator, AST'yi LLVM IR'ına veya benzer bir ara koda dönüştürür.
+// IRGenerator converts AST to LLVM IR or similar intermediate code.
 type IRGenerator struct {
 	errors         []string
 	moduleName     string
 	module         *ir.Module
 	currentFunc    *ir.Func
 	currentBB      *ir.Block
-	symbolTable    map[string]value.Value   // Sembol tablosu
-	typeTable      map[string]types.Type    // Tip tablosu
-	classTable     map[string]*ClassInfo    // Sınıf tablosu
-	templateTable  map[string]*TemplateInfo // Şablon tablosu
-	exceptionStack []*ExceptionInfo         // İstisna yığını
-	analyzer       *semantic.Analyzer       // Semantik analizci
-	debugInfo      *DebugInfo               // Hata ayıklama bilgisi
-	generateDebug  bool                     // Hata ayıklama bilgisi üretilecek mi?
-	sourceFile     string                   // Kaynak dosya adı
-	sourceDir      string                   // Kaynak dosya dizini
+	symbolTable    map[string]value.Value   // Symbol table
+	typeTable      map[string]types.Type    // Type table
+	classTable     map[string]*ClassInfo    // Class table
+	templateTable  map[string]*TemplateInfo // Template table
+	exceptionStack []*ExceptionInfo         // Exception stack
+	analyzer       *semantic.Analyzer       // Semantic analyzer
+	debugInfo      *DebugInfo               // Debug information
+	generateDebug  bool                     // Generate debug information?
+	sourceFile     string                   // Source file name
+	sourceDir      string                   // Source file directory
 }
 
-// New, yeni bir IRGenerator oluşturur.
+// New creates a new IRGenerator.
 func New() *IRGenerator {
 	module := ir.NewModule()
 	return &IRGenerator{
 		errors:         []string{},
 		module:         module,
-		moduleName:     "goplus_module",
+		moduleName:     "gominus_module",
 		symbolTable:    make(map[string]value.Value),
 		typeTable:      make(map[string]types.Type),
 		classTable:     make(map[string]*ClassInfo),
@@ -51,13 +51,13 @@ func New() *IRGenerator {
 	}
 }
 
-// NewWithAnalyzer, semantik analizci ile yeni bir IRGenerator oluşturur.
+// NewWithAnalyzer creates a new IRGenerator with a semantic analyzer.
 func NewWithAnalyzer(analyzer *semantic.Analyzer) *IRGenerator {
 	module := ir.NewModule()
 	return &IRGenerator{
 		errors:         []string{},
 		module:         module,
-		moduleName:     "goplus_module",
+		moduleName:     "gominus_module",
 		symbolTable:    make(map[string]value.Value),
 		typeTable:      make(map[string]types.Type),
 		classTable:     make(map[string]*ClassInfo),
@@ -70,6 +70,17 @@ func NewWithAnalyzer(analyzer *semantic.Analyzer) *IRGenerator {
 	}
 }
 
+// SetSourceFile sets the source file and directory for debug information.
+func (g *IRGenerator) SetSourceFile(filename, directory string) {
+	g.sourceFile = filename
+	g.sourceDir = directory
+}
+
+// EnableDebugInfo enables or disables debug information generation.
+func (g *IRGenerator) EnableDebugInfo(enable bool) {
+	g.generateDebug = enable
+}
+
 // Errors, IR üretimi sırasında karşılaşılan hataları döndürür.
 func (g *IRGenerator) Errors() []string {
 	return g.errors
@@ -80,12 +91,13 @@ func (g *IRGenerator) ReportError(format string, args ...any) {
 	g.errors = append(g.errors, fmt.Sprintf(format, args...))
 }
 
-// EnableDebugInfo, hata ayıklama bilgisi üretimini etkinleştirir.
-func (g *IRGenerator) EnableDebugInfo(sourceFile, sourceDir string) {
+// InitDebugInfo initializes debug information with source file and directory.
+func (g *IRGenerator) InitDebugInfo(sourceFile, sourceDir string) {
 	g.generateDebug = true
 	g.sourceFile = sourceFile
 	g.sourceDir = sourceDir
 	g.debugInfo = NewDebugInfo(g.module)
+	g.debugInfo.InitCompileUnit(sourceFile, sourceDir, "GO-Minus Compiler", false, "", 0)
 }
 
 // GenerateProgram, programın AST'sinden IR üretir.

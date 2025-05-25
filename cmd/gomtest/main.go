@@ -11,14 +11,14 @@ import (
 
 // Komut satırı bayrakları
 var (
-	verboseFlag  = flag.Bool("v", false, "Ayrıntılı çıktı")
+	verboseFlag   = flag.Bool("v", false, "Ayrıntılı çıktı")
 	recursiveFlag = flag.Bool("r", false, "Alt dizinlerdeki testleri de çalıştır")
-	patternFlag  = flag.String("pattern", "", "Test adı deseni (örn: TestAdd*)")
-	timeoutFlag  = flag.Duration("timeout", 10*time.Minute, "Test zaman aşımı süresi")
-	benchFlag    = flag.Bool("bench", false, "Benchmark testlerini çalıştır")
-	coverFlag    = flag.Bool("cover", false, "Kod kapsama analizi yap")
-	versionFlag  = flag.Bool("version", false, "Sürüm bilgisini göster")
-	helpFlag     = flag.Bool("help", false, "Yardım mesajını göster")
+	patternFlag   = flag.String("pattern", "", "Test adı deseni (örn: TestAdd*)")
+	timeoutFlag   = flag.Duration("timeout", 10*time.Minute, "Test zaman aşımı süresi")
+	benchFlag     = flag.Bool("bench", false, "Benchmark testlerini çalıştır")
+	coverFlag     = flag.Bool("cover", false, "Kod kapsama analizi yap")
+	versionFlag   = flag.Bool("version", false, "Sürüm bilgisini göster")
+	helpFlag      = flag.Bool("help", false, "Yardım mesajını göster")
 )
 
 // Test aracı sürümü
@@ -87,7 +87,7 @@ func runTests(dirs []string) {
 
 	for _, dir := range dirs {
 		fmt.Printf("\nDizin: %s\n", dir)
-		
+
 		// Test dosyalarını bul
 		testFiles, err := findTestFiles(dir)
 		if err != nil {
@@ -103,7 +103,7 @@ func runTests(dirs []string) {
 		// Her test dosyası için testleri çalıştır
 		for _, file := range testFiles {
 			fmt.Printf("Test dosyası: %s\n", file)
-			
+
 			// Örnek test sonuçları (gerçek implementasyonda bu kısım GO-Minus testlerini çalıştıracak)
 			fileTests := 5
 			filePassed := 4
@@ -203,7 +203,7 @@ func findTestFiles(dir string) ([]string, error) {
 func isTestFile(path string) bool {
 	// Dosya adını kontrol et
 	base := filepath.Base(path)
-	if !strings.HasSuffix(base, "_test.gop") {
+	if !strings.HasSuffix(base, "_test.gom") {
 		return false
 	}
 
