@@ -2,6 +2,7 @@ package irgen
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/inkbytefo/go-minus/internal/ast"
 	"github.com/inkbytefo/go-minus/internal/semantic"
@@ -30,6 +31,7 @@ type IRGenerator struct {
 	generateDebug  bool                     // Generate debug information?
 	sourceFile     string                   // Source file name
 	sourceDir      string                   // Source file directory
+	labelCounter   int                      // Counter for unique labels
 }
 
 // New creates a new IRGenerator.
@@ -173,12 +175,22 @@ func (g *IRGenerator) defineBasicTypes() {
 	g.typeTable["uint16"] = types.I16
 	g.typeTable["uint32"] = types.I32
 	g.typeTable["uint64"] = types.I64
+	g.typeTable["float"] = types.Double // Varsayılan float tipi (float64 olarak)
 	g.typeTable["float32"] = types.Float
 	g.typeTable["float64"] = types.Double
 	g.typeTable["bool"] = types.I1
 	g.typeTable["byte"] = types.I8
 	g.typeTable["rune"] = types.I32
 	g.typeTable["string"] = types.NewPointer(types.I8) // Basitleştirilmiş string temsili
+}
+
+// getTypeTableKeys, debug için typeTable'daki anahtarları döndürür.
+func (g *IRGenerator) getTypeTableKeys() []string {
+	keys := make([]string, 0, len(g.typeTable))
+	for k := range g.typeTable {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // getFunction, belirtilen isimde bir fonksiyonu döndürür.
@@ -701,43 +713,117 @@ func (g *IRGenerator) generatePrintfCall(funcName string, args []ast.Expression)
 		return nil
 	}
 
-	// printf fonksiyonunu tanımla (eğer yoksa)
-	printfFunc := g.module.NewFunc("printf", types.I32, ir.NewParam("format", types.NewPointer(types.I8)))
-	printfFunc.Sig.Variadic = true
-
-	// Argümanları değerlendir
-	irArgs := make([]value.Value, 0, len(args))
+	// Platform-specific print function kullan
+	// Windows için puts, Linux/macOS için printf
+	var printFunc *ir.Func
+	var irArgs []value.Value
 
 	if len(args) > 0 {
-		// İlk argüman için format string oluştur
-		firstArg := g.generateExpression(args[0])
-		if firstArg != nil {
-			// fmt.Println için newline ekle
-			if funcName == "Println" {
-				// String argümanı için %s\n format'ı kullan
-				formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: "%s\n"})
-				irArgs = append(irArgs, formatStr)
-				irArgs = append(irArgs, firstArg)
-			} else {
-				// fmt.Print için sadece %s format'ı kullan
-				formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: "%s"})
-				irArgs = append(irArgs, formatStr)
-				irArgs = append(irArgs, firstArg)
+		// Multiple arguments için printf kullan
+		if funcName == "Println" {
+			// printf fonksiyonunu bul veya tanımla
+			printFunc = g.getFunction("printf")
+			if printFunc == nil {
+				printFunc = g.module.NewFunc("printf", types.I32, ir.NewParam("format", types.NewPointer(types.I8)))
+				printFunc.Sig.Variadic = true
+				g.symbolTable["printf"] = printFunc
 			}
-		}
 
-		// Diğer argümanlar (şimdilik sadece ilk argümanı destekliyoruz)
-		// TODO: Multiple arguments support
+			// Format string oluştur
+			formatParts := make([]string, 0, len(args))
+			for _, arg := range args {
+				argVal := g.generateExpression(arg)
+				if argVal != nil {
+					// Argument tipine göre format belirle
+					switch argVal.Type() {
+					case types.I32, types.I64:
+						formatParts = append(formatParts, "%d")
+					case types.Float, types.Double:
+						formatParts = append(formatParts, "%f")
+					case types.I1:
+						// Boolean değeri i32'ye extend et
+						extendedVal := g.currentBB.NewZExt(argVal, types.I32)
+						formatParts = append(formatParts, "%d")
+						argVal = extendedVal
+					default:
+						formatParts = append(formatParts, "%s")
+					}
+					irArgs = append(irArgs, argVal)
+				}
+			}
+
+			// Format string'i oluştur ve newline ekle
+			formatString := strings.Join(formatParts, " ") + "\n"
+			formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: formatString})
+
+			// Format string'i ilk argüman olarak ekle
+			finalArgs := make([]value.Value, 0, len(irArgs)+1)
+			finalArgs = append(finalArgs, formatStr)
+			finalArgs = append(finalArgs, irArgs...)
+			irArgs = finalArgs
+		} else {
+			// fmt.Print için - newline yok
+			printFunc = g.getFunction("printf")
+			if printFunc == nil {
+				printFunc = g.module.NewFunc("printf", types.I32, ir.NewParam("format", types.NewPointer(types.I8)))
+				printFunc.Sig.Variadic = true
+				g.symbolTable["printf"] = printFunc
+			}
+
+			// Format string oluştur (newline olmadan)
+			formatParts := make([]string, 0, len(args))
+			for _, arg := range args {
+				argVal := g.generateExpression(arg)
+				if argVal != nil {
+					// Argument tipine göre format belirle
+					switch argVal.Type() {
+					case types.I32, types.I64:
+						formatParts = append(formatParts, "%d")
+					case types.Float, types.Double:
+						formatParts = append(formatParts, "%f")
+					case types.I1:
+						// Boolean değeri i32'ye extend et
+						extendedVal := g.currentBB.NewZExt(argVal, types.I32)
+						formatParts = append(formatParts, "%d")
+						argVal = extendedVal
+					default:
+						formatParts = append(formatParts, "%s")
+					}
+					irArgs = append(irArgs, argVal)
+				}
+			}
+
+			// Format string'i oluştur
+			formatString := strings.Join(formatParts, " ")
+			formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: formatString})
+
+			// Format string'i ilk argüman olarak ekle
+			finalArgs := make([]value.Value, 0, len(irArgs)+1)
+			finalArgs = append(finalArgs, formatStr)
+			finalArgs = append(finalArgs, irArgs...)
+			irArgs = finalArgs
+		}
 	} else {
 		// Argüman yoksa sadece newline yazdır (Println için)
 		if funcName == "Println" {
-			formatStr := g.generateStringLiteral(&ast.StringLiteral{Value: "\n"})
-			irArgs = append(irArgs, formatStr)
+			printFunc = g.getFunction("puts")
+			if printFunc == nil {
+				printFunc = g.module.NewFunc("puts", types.I32, ir.NewParam("str", types.NewPointer(types.I8)))
+				g.symbolTable["puts"] = printFunc
+			}
+			// Boş string için newline
+			emptyStr := g.generateStringLiteral(&ast.StringLiteral{Value: ""})
+			irArgs = append(irArgs, emptyStr)
 		}
 	}
 
-	// printf çağrısı yap
-	return g.currentBB.NewCall(printfFunc, irArgs...)
+	if printFunc == nil {
+		g.ReportError("Print fonksiyonu oluşturulamadı")
+		return nil
+	}
+
+	// Print fonksiyonu çağrısı yap
+	return g.currentBB.NewCall(printFunc, irArgs...)
 }
 
 // generateExitCall, exit function call'ı için IR üretir.
@@ -996,10 +1082,14 @@ func (g *IRGenerator) generateIfExpression(expr *ast.IfExpression) value.Value {
 		return nil
 	}
 
+	// Unique label'lar oluştur
+	g.labelCounter++
+	labelSuffix := fmt.Sprintf("%d", g.labelCounter)
+
 	// Bloklar oluştur
-	thenBlock := g.currentFunc.NewBlock("if.then")
-	elseBlock := g.currentFunc.NewBlock("if.else")
-	mergeBlock := g.currentFunc.NewBlock("if.end")
+	thenBlock := g.currentFunc.NewBlock("if.then." + labelSuffix)
+	elseBlock := g.currentFunc.NewBlock("if.else." + labelSuffix)
+	mergeBlock := g.currentFunc.NewBlock("if.end." + labelSuffix)
 
 	// Koşula göre dallanma
 	g.currentBB.NewCondBr(condition, thenBlock, elseBlock)

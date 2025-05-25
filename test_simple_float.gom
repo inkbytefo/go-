@@ -1,0 +1,5 @@
+package main
+
+func main() {
+    var pi float = 3.14159
+}

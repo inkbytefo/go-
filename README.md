@@ -1,6 +1,27 @@
 # GO-Minus Programming Language
 
+🎉 **BÜYÜK HABER: İlk Çalışan Versiyon Tamamlandı!** 🎉
+
 GO-Minus is a programming language that includes all features of the Go programming language and extends it with C++-like features (classes, templates, exception handling, etc.). GO-Minus files use the `.gom` extension.
+
+## 📊 Proje Durumu (Son Güncelleme)
+
+**Tamamlanma Oranı**: %25-30 🚀
+**Durum**: ✅ Temel Go syntax'ı başarıyla çalışıyor!
+**Son Başarı**: `fmt.Println("Hello, World!")` tam olarak parse ediliyor ve LLVM IR üretiyor
+
+### ✅ Çalışan Özellikler:
+- ✅ **Parser**: Function calls, member access, string literals
+- ✅ **Semantic Analysis**: Built-in functions, package resolution, type checking
+- ✅ **IR Generation**: LLVM IR üretimi, function calls, string literals
+- ✅ **Standard Library**: fmt, os, io, strings, math packages
+- ✅ **Package System**: Import statements, package.function calls
+
+### 🎯 Sonraki Hedefler:
+- 🔄 Executable generation (LLVM toolchain setup)
+- 🔄 Variables ve data types (int, float, bool)
+- 🔄 Arithmetic operations (+, -, *, /)
+- 🔄 Control flow (if/else, loops)
 
 ## 🎯 Purpose
 
@@ -121,7 +142,7 @@ make test
 make check
 ```
 
-### Hello World
+### Hello World (✅ ÇALIŞIYOR!)
 
 ```go
 // main.gom
@@ -135,9 +156,14 @@ func main() {
 ```
 
 ```bash
-# Compile and run the program
-gominus run main.gom
+# Şu anda çalışan komutlar:
+gominus main.gom                    # ✅ LLVM IR üretir (main.ll)
+
+# Yakında gelecek:
+# gominus run main.gom              # 🔄 Executable generation (LLVM araçları gerekli)
 ```
+
+**Mevcut Çıktı**: `main.ll` dosyası başarıyla oluşturuluyor ve geçerli LLVM IR içeriyor!
 
 ### Class Example
 

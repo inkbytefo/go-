@@ -3,15 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/inkbytefo/go-minus/internal/codegen"
 	"github.com/inkbytefo/go-minus/internal/irgen"
 	"github.com/inkbytefo/go-minus/internal/lexer"
 	"github.com/inkbytefo/go-minus/internal/optimizer"
 	"github.com/inkbytefo/go-minus/internal/parser"
 	"github.com/inkbytefo/go-minus/internal/semantic"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func main() {
@@ -201,6 +202,9 @@ func main() {
 		} else {
 			cg = codegen.NewWithCurrentPlatform(format)
 		}
+
+		// Optimizasyon seviyesini ayarla
+		cg.SetOptimizationLevel(*optimizationLevel)
 
 		err = cg.GenerateMachineCode(optimizedIR, outputPath)
 		if err != nil {

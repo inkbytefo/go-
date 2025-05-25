@@ -1,0 +1,27 @@
+package main
+
+import "fmt"
+
+func main() {
+    // Test 1: Multiple arguments in fmt.Println
+    var x int = 42
+    var y int = 10
+    fmt.Println("x =", x, "y =", y)
+    
+    // Test 2: Float literals
+    var pi float = 3.14159
+    fmt.Println("Pi:", pi)
+    
+    // Test 3: Boolean literals
+    var isTrue bool = true
+    fmt.Println("Boolean:", isTrue)
+    
+    // Test 4: More arithmetic operations
+    var result int = x * y - 5
+    fmt.Println("Complex result:", result)
+    
+    // Test 5: If statement
+    if x > y {
+        fmt.Println("x is greater than y")
+    }
+}

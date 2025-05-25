@@ -1,0 +1,57 @@
+package main
+
+import "fmt"
+
+func main() {
+    // Test 1: Basic data types
+    fmt.Println("=== Basic Data Types ===")
+    var intVal int = 42
+    var floatVal float = 3.14159
+    var boolVal bool = true
+    var stringVal string = "Hello, GO-Minus!"
+    
+    fmt.Println("Integer:", intVal)
+    fmt.Println("Float:", floatVal)
+    fmt.Println("Boolean:", boolVal)
+    fmt.Println("String:", stringVal)
+    
+    // Test 2: Arithmetic operations
+    fmt.Println("\n=== Arithmetic Operations ===")
+    var a int = 10
+    var b int = 3
+    
+    fmt.Println("Addition:", a + b)
+    fmt.Println("Subtraction:", a - b)
+    fmt.Println("Multiplication:", a * b)
+    fmt.Println("Division:", a / b)
+    
+    // Test 3: Complex expressions
+    fmt.Println("\n=== Complex Expressions ===")
+    var result int = (a + b) * 2 - 5
+    fmt.Println("Complex result:", result)
+    
+    // Test 4: Comparison operations
+    fmt.Println("\n=== Comparison Operations ===")
+    fmt.Println("a > b:", a > b)
+    fmt.Println("a == b:", a == b)
+    fmt.Println("a != b:", a != b)
+    
+    // Test 5: Control flow
+    fmt.Println("\n=== Control Flow ===")
+    if a > b {
+        fmt.Println("a is greater than b")
+    }
+    
+    if floatVal > 3.0 {
+        fmt.Println("Pi is greater than 3")
+    }
+    
+    // Test 6: Multiple variable declarations
+    fmt.Println("\n=== Multiple Variables ===")
+    var x int = 1
+    var y int = 2
+    var z int = 3
+    fmt.Println("x, y, z:", x, y, z)
+    
+    fmt.Println("\n=== Test Completed Successfully! ===")
+}

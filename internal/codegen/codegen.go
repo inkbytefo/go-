@@ -38,19 +38,23 @@ const (
 
 // CodeGenerator, optimize edilmiş LLVM IR'ını hedef platform için makine koduna dönüştürür.
 type CodeGenerator struct {
-	errors     []string     // Kod üretimi sırasında oluşan hatalar
-	targetArch TargetArch   // Hedef mimari
-	targetOS   TargetOS     // Hedef işletim sistemi
-	format     OutputFormat // Çıktı formatı
+	errors            []string     // Kod üretimi sırasında oluşan hatalar
+	targetArch        TargetArch   // Hedef mimari
+	targetOS          TargetOS     // Hedef işletim sistemi
+	format            OutputFormat // Çıktı formatı
+	optimizationLevel int          // Optimizasyon seviyesi (0-3)
+	generateDebug     bool         // Debug bilgisi üret
 }
 
 // New, yeni bir CodeGenerator oluşturur.
 func New(targetArch TargetArch, targetOS TargetOS, format OutputFormat) *CodeGenerator {
 	return &CodeGenerator{
-		errors:     []string{},
-		targetArch: targetArch,
-		targetOS:   targetOS,
-		format:     format,
+		errors:            []string{},
+		targetArch:        targetArch,
+		targetOS:          targetOS,
+		format:            format,
+		optimizationLevel: 2, // Varsayılan optimizasyon seviyesi
+		generateDebug:     false,
 	}
 }
 
@@ -97,6 +101,21 @@ func (cg *CodeGenerator) ReportError(format string, args ...any) {
 // GetTargetTriple, hedef üçlüsünü (target triple) döndürür.
 func (cg *CodeGenerator) GetTargetTriple() string {
 	return fmt.Sprintf("%s-%s", cg.targetArch, cg.targetOS)
+}
+
+// SetOptimizationLevel, optimizasyon seviyesini ayarlar (0-3).
+func (cg *CodeGenerator) SetOptimizationLevel(level int) {
+	if level < 0 {
+		level = 0
+	} else if level > 3 {
+		level = 3
+	}
+	cg.optimizationLevel = level
+}
+
+// SetDebugInfo, debug bilgisi üretimini etkinleştirir/devre dışı bırakır.
+func (cg *CodeGenerator) SetDebugInfo(enable bool) {
+	cg.generateDebug = enable
 }
 
 // GenerateMachineCode, LLVM IR'ından hedef platform için makine kodu üretir.
@@ -163,6 +182,15 @@ func (cg *CodeGenerator) generateAssembly(inputFile, outputPath, targetTriple st
 
 // generateObjectFile, LLVM IR'ından nesne dosyası üretir.
 func (cg *CodeGenerator) generateObjectFile(inputFile, outputPath, targetTriple string) error {
+	// LLC path'ini belirle
+	llcPath := "llc"
+	if cg.targetOS == Windows {
+		windowsLlcPath := "C:\\Program Files\\LLVM\\bin\\llc.exe"
+		if _, err := os.Stat(windowsLlcPath); err == nil {
+			llcPath = windowsLlcPath
+		}
+	}
+
 	// LLVM llc aracını çağır
 	args := []string{
 		"-march=" + string(cg.targetArch),
@@ -172,7 +200,10 @@ func (cg *CodeGenerator) generateObjectFile(inputFile, outputPath, targetTriple 
 		inputFile,
 	}
 
-	cmd := exec.Command("llc", args...)
+	// Debug: LLC komutunu yazdır
+	// fmt.Printf("Debug: LLC komutu: %s %v\n", llcPath, args)
+
+	cmd := exec.Command(llcPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		cg.ReportError("LLVM llc çalıştırılamadı: %v\nÇıktı: %s", err, string(output))
@@ -190,40 +221,84 @@ func (cg *CodeGenerator) generateObjectFile(inputFile, outputPath, targetTriple 
 
 // generateExecutable, LLVM IR'ından çalıştırılabilir dosya üretir.
 func (cg *CodeGenerator) generateExecutable(inputFile, outputPath, targetTriple string) error {
-	// Önce nesne dosyası oluştur
-	objFile := filepath.Join(filepath.Dir(inputFile), "output.o")
-	err := cg.generateObjectFile(inputFile, objFile, targetTriple)
-	if err != nil {
-		return err
+	// Clang kullanarak doğrudan LLVM IR'dan executable oluştur
+	// Bu LLC'ye ihtiyaç duymaz ve daha basittir
+
+	// Windows'ta .exe uzantısı ekle
+	if cg.targetOS == Windows && !strings.HasSuffix(outputPath, ".exe") {
+		outputPath += ".exe"
 	}
 
-	// İşletim sistemine göre bağlayıcı (linker) seç
-	var linker string
+	// Clang path'ini belirle
+	clangPath := "clang"
+	if cg.targetOS == Windows {
+		windowsClangPath := "C:\\Program Files\\LLVM\\bin\\clang.exe"
+		if _, err := os.Stat(windowsClangPath); err == nil {
+			clangPath = windowsClangPath
+		}
+	}
+
 	var args []string
 
+	// Temel clang argumentları
+	args = append(args, inputFile)
+	args = append(args, "-o", outputPath)
+
+	// Target triple belirt (eğer varsa)
+	if targetTriple != "" {
+		args = append(args, "-target", targetTriple)
+	}
+
+	// İşletim sistemine göre özel ayarlar
 	switch cg.targetOS {
 	case Windows:
-		linker = "gcc" // MinGW veya benzeri bir GCC kurulumu gerektirir
-		args = []string{objFile, "-o", outputPath}
-	case Linux, MacOS:
-		linker = "gcc"
-		args = []string{objFile, "-o", outputPath}
+		// Windows için C runtime linking - daha basit yaklaşım
+		// MSVC runtime library'yi link et
+		args = append(args, "-lmsvcrt")
+		// Legacy stdio functions için
+		args = append(args, "-llegacy_stdio_definitions")
+	case Linux:
+		// Linux için C runtime library
+		args = append(args, "-lc")
+	case MacOS:
+		// macOS için system libraries
+		args = append(args, "-lSystem")
 	default:
-		cg.ReportError("Desteklenmeyen işletim sistemi: %s", cg.targetOS)
 		return fmt.Errorf("desteklenmeyen işletim sistemi: %s", cg.targetOS)
 	}
 
-	cmd := exec.Command(linker, args...)
+	// Optimizasyon seviyesi ekle
+	switch cg.optimizationLevel {
+	case 0:
+		args = append(args, "-O0")
+	case 1:
+		args = append(args, "-O1")
+	case 2:
+		args = append(args, "-O2")
+	case 3:
+		args = append(args, "-O3")
+	}
+
+	// Debug bilgisi ekle (gerekirse)
+	if cg.generateDebug {
+		args = append(args, "-g")
+	}
+
+	// Debug: Clang komutunu yazdır
+	// fmt.Printf("Debug: Clang komutu: %s %v\n", clangPath, args)
+
+	cmd := exec.Command(clangPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		cg.ReportError("Bağlayıcı çalıştırılamadı: %v\nÇıktı: %s", err, string(output))
+		cg.ReportError("Clang çalıştırılamadı: %v\nÇıktı: %s", err, string(output))
 
-		// Bağlayıcı bulunamadıysa
+		// Clang bulunamadıysa
 		if strings.Contains(err.Error(), "executable file not found") {
-			cg.ReportError("Bağlayıcı (%s) bulunamadı", linker)
+			cg.ReportError("Clang bulunamadı. LLVM kurulumunu kontrol edin.")
+			cg.ReportError("Kurulum rehberi: docs/llvm-setup.md")
 		}
 
-		return fmt.Errorf("bağlayıcı çalıştırılamadı: %v", err)
+		return fmt.Errorf("clang çalıştırılamadı: %v", err)
 	}
 
 	return nil

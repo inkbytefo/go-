@@ -63,48 +63,38 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 
 // parseFunctionStatement, bir fonksiyon tanımını ayrıştırır.
 func (p *Parser) parseFunctionStatement() ast.Statement {
-	stmt := &ast.ExpressionStatement{
+	funcStmt := &ast.FunctionStatement{
 		Token: p.curToken,
 	}
 
 	// Fonksiyon adı
-	if p.peekTokenIs(token.IDENT) {
-		p.nextToken()
-
-		// Eğer bir sonraki token parantez ise, bu bir fonksiyon tanımıdır
-		if p.peekTokenIs(token.LPAREN) {
-			funcLit := &ast.FunctionLiteral{Token: stmt.Token}
-			// Fonksiyon adı için bir alan eklenebilir
-			// funcLit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-			p.nextToken() // '(' token'ını al
-
-			funcLit.Parameters = p.parseFunctionParameters()
-
-			// Opsiyonel dönüş tipi
-			if p.peekTokenIs(token.IDENT) {
-				p.nextToken()
-				funcLit.ReturnType = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-			}
-
-			if !p.expectPeek(token.LBRACE) {
-				return nil
-			}
-
-			funcLit.Body = p.parseBlockStatement()
-
-			stmt.Expression = funcLit
-		} else {
-			// Değişken tanımı veya başka bir ifade
-			p.nextToken()
-			stmt.Expression = p.parseExpression(LOWEST)
-		}
-	} else {
-		// Anonim fonksiyon
-		stmt.Expression = p.parseFunctionLiteral()
+	if !p.expectPeek(token.IDENT) {
+		return nil
 	}
 
-	return stmt
+	funcStmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	// Parametreler
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	funcStmt.Parameters = p.parseFunctionParameters()
+
+	// Opsiyonel dönüş tipi
+	if p.peekTokenIs(token.IDENT) {
+		p.nextToken()
+		funcStmt.ReturnType = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	}
+
+	// Fonksiyon gövdesi
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	funcStmt.Body = p.parseBlockStatement()
+
+	return funcStmt
 }
 
 // parseFunctionParameters, bir fonksiyonun parametrelerini ayrıştırır.
