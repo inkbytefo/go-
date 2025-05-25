@@ -4,11 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/inkbytefo/go-minus/internal/ast"
 	"github.com/inkbytefo/go-minus/internal/lexer"
 	"github.com/inkbytefo/go-minus/internal/parser"
 	"github.com/inkbytefo/go-minus/internal/semantic"
-	"github.com/inkbytefo/go-minus/internal/token"
 )
 
 // TestGenerateProgram tests the GenerateProgram function.
@@ -120,7 +118,7 @@ func main() {
 package main
 
 func main() {
-    var x int = 
+    var x int =
 }
 `,
 			wantErr: true,
@@ -133,32 +131,32 @@ func main() {
 			l := lexer.New(tt.input)
 			p := parser.New(l)
 			program := p.ParseProgram()
-			
+
 			if len(p.Errors()) > 0 && !tt.wantErr {
 				t.Fatalf("Parser errors: %v", p.Errors())
 			}
-			
+
 			// Perform semantic analysis
 			analyzer := semantic.New()
 			analyzer.Analyze(program)
-			
+
 			if len(analyzer.Errors()) > 0 && !tt.wantErr {
 				t.Fatalf("Semantic errors: %v", analyzer.Errors())
 			}
-			
+
 			// Generate IR
 			generator := NewWithAnalyzer(analyzer)
 			ir, err := generator.GenerateProgram(program)
-			
+
 			// Check for errors
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("GenerateProgram() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil {
 				return
 			}
-			
+
 			// Check that the IR contains the expected strings
 			for _, s := range tt.contains {
 				if !strings.Contains(ir, s) {
@@ -180,35 +178,35 @@ func main() {
     println(x)
 }
 `
-	
+
 	// Parse the input
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
-	
+
 	if len(p.Errors()) > 0 {
 		t.Fatalf("Parser errors: %v", p.Errors())
 	}
-	
+
 	// Perform semantic analysis
 	analyzer := semantic.New()
 	analyzer.Analyze(program)
-	
+
 	if len(analyzer.Errors()) > 0 {
 		t.Fatalf("Semantic errors: %v", analyzer.Errors())
 	}
-	
+
 	// Create an IR generator with debug info enabled
 	generator := NewWithAnalyzer(analyzer)
 	generator.SetSourceFile("test.gom", "/tmp")
 	generator.EnableDebugInfo(true)
-	
+
 	// Generate IR
 	ir, err := generator.GenerateProgram(program)
 	if err != nil {
 		t.Fatalf("GenerateProgram() error = %v", err)
 	}
-	
+
 	// In a real implementation, we would check that the IR contains debug info
 	// For now, we just check that the IR is not empty
 	if ir == "" {
@@ -220,11 +218,11 @@ func main() {
 func TestSetSourceFile(t *testing.T) {
 	generator := New()
 	generator.SetSourceFile("test.gom", "/tmp")
-	
+
 	if generator.sourceFile != "test.gom" {
 		t.Errorf("sourceFile = %q, want %q", generator.sourceFile, "test.gom")
 	}
-	
+
 	if generator.sourceDir != "/tmp" {
 		t.Errorf("sourceDir = %q, want %q", generator.sourceDir, "/tmp")
 	}
@@ -234,13 +232,13 @@ func TestSetSourceFile(t *testing.T) {
 func TestEnableDebugInfo(t *testing.T) {
 	generator := New()
 	generator.EnableDebugInfo(true)
-	
+
 	if !generator.generateDebug {
 		t.Error("generateDebug = false, want true")
 	}
-	
+
 	generator.EnableDebugInfo(false)
-	
+
 	if generator.generateDebug {
 		t.Error("generateDebug = true, want false")
 	}

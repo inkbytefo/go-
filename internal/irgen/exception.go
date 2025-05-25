@@ -102,27 +102,23 @@ func (g *IRGenerator) generateTryCatchStatement(stmt *ast.TryCatchStatement) {
 	// Landing pad bloğunu işle
 	g.currentBB = landingPad
 
-	// Personality fonksiyonunu al
-	personalityFunc := g.getPersonalityFunction()
+	// TODO: LLVM API değişikliği nedeniyle geçici olarak devre dışı
+	// personalityFunc := g.getPersonalityFunction()
+	// catchType := types.NewStruct(types.I8Ptr, types.I32)
+	// landingPadInst := g.currentBB.NewLandingPad(catchType, personalityFunc)
+	// landingPadInst.Cleanup = true
 
-	// Landing pad oluştur
-	// Not: LLVM IR'da landing pad, istisna yakalama mekanizmasıdır
-	// Burada basitleştirilmiş bir yaklaşım kullanıyoruz
-	catchType := types.NewStruct(types.I8Ptr, types.I32) // {i8*, i32} tipinde
-	landingPadInst := g.currentBB.NewLandingPad(catchType, personalityFunc, 0)
-
-	// Catch tipleri için cleanup ve catch filtreleri ekle
-	landingPadInst.Cleanup = true
-
-	for _, catch := range catchBlocks {
+	for range catchBlocks {
 		// Catch tipi için bir filtre ekle
-		typeInfo := g.getTypeInfo(catch.ExceptionType)
-		landingPadInst.Clauses = append(landingPadInst.Clauses, ir.NewCatch(typeInfo))
+		// TODO: LLVM API değişikliği nedeniyle geçici olarak devre dışı
+		// typeInfo := g.getTypeInfo(catch.ExceptionType)
+		// landingPadInst.Clauses = append(landingPadInst.Clauses, ir.NewCatch(typeInfo))
 	}
 
 	// İstisna tipine göre uygun catch bloğuna git
 	// Not: Basitleştirilmiş yaklaşım, gerçek implementasyonda daha karmaşık olabilir
-	exceptionPtr := g.currentBB.NewExtractValue(landingPadInst, 0) // {i8*, i32} tipinden i8* al
+	// TODO: LLVM API değişikliği nedeniyle geçici olarak devre dışı
+	// exceptionPtr := g.currentBB.NewExtractValue(landingPadInst, 0)
 
 	// Catch bloklarını işle
 	for i, catch := range catchBlocks {
@@ -134,9 +130,10 @@ func (g *IRGenerator) generateTryCatchStatement(stmt *ast.TryCatchStatement) {
 		exceptionVar.SetName(catch.Variable)
 
 		// İstisna değerini değişkene ata
-		typedExceptionPtr := g.currentBB.NewBitCast(exceptionPtr, types.NewPointer(catch.ExceptionType))
-		exceptionVal := g.currentBB.NewLoad(catch.ExceptionType, typedExceptionPtr)
-		g.currentBB.NewStore(exceptionVal, exceptionVar)
+		// TODO: LLVM API değişikliği nedeniyle geçici olarak devre dışı
+		// typedExceptionPtr := g.currentBB.NewBitCast(exceptionPtr, types.NewPointer(catch.ExceptionType))
+		// exceptionVal := g.currentBB.NewLoad(catch.ExceptionType, typedExceptionPtr)
+		// g.currentBB.NewStore(exceptionVal, exceptionVar)
 
 		// Değişkeni sembol tablosuna ekle
 		g.symbolTable[catch.Variable] = exceptionVar
@@ -167,7 +164,8 @@ func (g *IRGenerator) generateTryCatchStatement(stmt *ast.TryCatchStatement) {
 
 	// Resume bloğunu işle
 	g.currentBB = resumeBlock
-	g.currentBB.NewResume(landingPadInst)
+	// TODO: LLVM API değişikliği nedeniyle geçici olarak devre dışı
+	// g.currentBB.NewResume(landingPadInst)
 
 	// End bloğuna geç
 	g.currentBB = endBlock

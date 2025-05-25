@@ -166,7 +166,7 @@ func TestNextTokenWithComments(t *testing.T) {
 		testutil.CreateTestToken(token.ASSIGN, "=", 6, 8),
 		testutil.CreateTestToken(token.INT, "10", 6, 10),
 		testutil.CreateTestToken(token.SEMICOLON, ";", 6, 12),
-		testutil.CreateTestToken(token.EOF, "", 6, 13),
+		testutil.CreateTestToken(token.EOF, "", 7, 1),
 	}
 
 	l := New(input)

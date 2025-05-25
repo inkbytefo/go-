@@ -143,7 +143,7 @@ func (g *IRGenerator) generateClassStatement(stmt *ast.ClassStatement) {
 				paramTypes := make([]types.Type, 0)
 				paramTypes = append(paramTypes, types.NewPointer(types.Void)) // this işaretçisi
 
-				for _, param := range funcStmt.Parameters {
+				for range funcStmt.Parameters {
 					paramType := types.I32 // Varsayılan olarak int32
 					// TODO: Parametre tiplerini belirle
 					paramTypes = append(paramTypes, paramType)

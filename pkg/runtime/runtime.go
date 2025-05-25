@@ -1,10 +1,6 @@
 // Package runtime provides a public API for the GO-Minus runtime.
 package runtime
 
-import (
-	"github.com/inkbytefo/go-minus/internal/codegen"
-)
-
 // RuntimeOptions represents options for the runtime.
 type RuntimeOptions struct {
 	DebugMode bool

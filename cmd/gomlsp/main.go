@@ -8,8 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/sourcegraph/jsonrpc2"
 )
 
 // Dil sunucusu sürümü

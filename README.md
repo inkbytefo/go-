@@ -186,6 +186,34 @@ func main() {
 gominus run person.gom
 ```
 
+## 🧪 Testing
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run specific package tests
+go test ./internal/lexer -v
+go test ./internal/parser -v
+go test ./internal/semantic -v
+
+# Run integration tests
+go test ./test -v
+
+# Run benchmarks
+go test -bench=. ./...
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Run linter and code quality checks
+make check
+```
+
 ## 🛠️ Development Tools
 
 The GO-Minus language provides the following development tools:

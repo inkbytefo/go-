@@ -9,7 +9,6 @@ import (
 	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/enum"
-	"github.com/llir/llvm/ir/metadata"
 	"github.com/llir/llvm/ir/types"
 	"github.com/llir/llvm/ir/value"
 )
@@ -729,17 +728,10 @@ func (g *IRGenerator) generateVarStatement(stmt *ast.VarStatement) {
 
 		// Hata ayıklama bilgisi ekle
 		if g.generateDebug {
-			pos := stmt.Pos()
-			localVar := g.debugInfo.CreateLocalVariable(
-				varName,
-				g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
-				pos.Line,
-				pos.Column,
-				varType,
-				0, // Parametre değil
-				0, // Hizalama
-			)
-			g.debugInfo.InsertDeclare(g.currentBB, alloca, localVar, &metadata.DIExpression{}, pos.Line, pos.Column)
+			// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+			// pos := stmt.Pos()
+			// localVar := g.debugInfo.CreateLocalVariable(...)
+			// g.debugInfo.InsertDeclare(...)
 		}
 
 		// Değer atanmışsa, değeri ata
@@ -792,12 +784,9 @@ func (g *IRGenerator) generateReturnStatement(stmt *ast.ReturnStatement) {
 func (g *IRGenerator) generateBlockStatement(stmt *ast.BlockStatement) {
 	// Hata ayıklama bilgisi için sözcüksel blok oluştur
 	if g.generateDebug && stmt.Pos().IsValid() {
-		pos := stmt.Pos()
-		g.debugInfo.CreateLexicalBlock(
-			g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
-			pos.Line,
-			pos.Column,
-		)
+		// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+		// pos := stmt.Pos()
+		// g.debugInfo.CreateLexicalBlock(...)
 	}
 
 	// Blok içindeki tüm deyimleri değerlendir
@@ -818,7 +807,8 @@ func (g *IRGenerator) generateBlockStatement(stmt *ast.BlockStatement) {
 
 	// Sözcüksel bloğu kapat
 	if g.generateDebug {
-		g.debugInfo.FinishLexicalBlock()
+		// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+		// g.debugInfo.FinishLexicalBlock()
 	}
 }
 
@@ -924,23 +914,9 @@ func (g *IRGenerator) generateFunctionStatement(stmt *ast.FunctionStatement) {
 
 	// Parametre tiplerini belirle
 	paramTypes := make([]types.Type, len(stmt.Parameters))
-	for i, param := range stmt.Parameters {
-		// Parametre tipini belirle
-		if param.Type != nil {
-			if typeIdent, ok := param.Type.(*ast.Identifier); ok {
-				if t, exists := g.typeTable[typeIdent.Value]; exists {
-					paramTypes[i] = t
-				} else {
-					g.ReportError("Bilinmeyen tip: %s", typeIdent.Value)
-					paramTypes[i] = types.I32 // Varsayılan olarak int32
-				}
-			} else {
-				g.ReportError("Desteklenmeyen tip ifadesi: %T", param.Type)
-				paramTypes[i] = types.I32 // Varsayılan olarak int32
-			}
-		} else {
-			paramTypes[i] = types.I32 // Varsayılan olarak int32
-		}
+	for i := range stmt.Parameters {
+		// TODO: Parametre tip sistemi implement edilecek
+		paramTypes[i] = types.I32 // Varsayılan olarak int32
 	}
 
 	// Dönüş tipini belirle
@@ -1006,17 +982,10 @@ func (g *IRGenerator) generateFunctionStatement(stmt *ast.FunctionStatement) {
 
 		// Hata ayıklama bilgisi ekle
 		if g.generateDebug {
-			pos := param.Pos()
-			localVar := g.debugInfo.CreateLocalVariable(
-				paramName,
-				g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
-				pos.Line,
-				pos.Column,
-				paramTypes[i],
-				i+1, // Parametre indeksi (1-tabanlı)
-				0,   // Hizalama
-			)
-			g.debugInfo.InsertDeclare(entryBlock, alloca, localVar, &metadata.DIExpression{}, pos.Line, pos.Column)
+			// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+			// pos := param.Pos()
+			// localVar := g.debugInfo.CreateLocalVariable(...)
+			// g.debugInfo.InsertDeclare(...)
 		}
 
 		g.symbolTable[paramName] = alloca
@@ -1026,19 +995,17 @@ func (g *IRGenerator) generateFunctionStatement(stmt *ast.FunctionStatement) {
 	if stmt.Body != nil {
 		// Hata ayıklama bilgisi için sözcüksel blok oluştur
 		if g.generateDebug {
-			pos := stmt.Body.Pos()
-			g.debugInfo.CreateLexicalBlock(
-				g.debugInfo.getOrCreateFileMetadata(g.sourceFile, g.sourceDir),
-				pos.Line,
-				pos.Column,
-			)
+			// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+			// pos := stmt.Body.Pos()
+			// g.debugInfo.CreateLexicalBlock(...)
 		}
 
 		g.generateBlockStatement(stmt.Body)
 
 		// Sözcüksel bloğu kapat
 		if g.generateDebug {
-			g.debugInfo.FinishLexicalBlock()
+			// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+			// g.debugInfo.FinishLexicalBlock()
 		}
 	}
 
@@ -1054,7 +1021,8 @@ func (g *IRGenerator) generateFunctionStatement(stmt *ast.FunctionStatement) {
 
 	// Fonksiyon hata ayıklama bilgisini tamamla
 	if g.generateDebug {
-		g.debugInfo.FinishFunction()
+		// TODO: Debug API değişikliği nedeniyle geçici olarak devre dışı
+		// g.debugInfo.FinishFunction()
 	}
 
 	// Önceki durumu geri yükle

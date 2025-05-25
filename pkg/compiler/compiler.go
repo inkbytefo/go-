@@ -1,14 +1,13 @@
 // Package compiler provides a public API for the GO-Minus compiler.
 package compiler
 
-import (
-	"github.com/inkbytefo/go-minus/internal/codegen"
-	"github.com/inkbytefo/go-minus/internal/irgen"
-	"github.com/inkbytefo/go-minus/internal/lexer"
-	"github.com/inkbytefo/go-minus/internal/optimizer"
-	"github.com/inkbytefo/go-minus/internal/parser"
-	"github.com/inkbytefo/go-minus/internal/semantic"
-)
+// TODO: Import packages as needed
+// "github.com/inkbytefo/go-minus/internal/codegen"
+// "github.com/inkbytefo/go-minus/internal/irgen"
+// "github.com/inkbytefo/go-minus/internal/lexer"
+// "github.com/inkbytefo/go-minus/internal/optimizer"
+// "github.com/inkbytefo/go-minus/internal/parser"
+// "github.com/inkbytefo/go-minus/internal/semantic"
 
 // CompilationOptions represents options for the compilation process.
 type CompilationOptions struct {
