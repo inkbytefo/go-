@@ -32,17 +32,21 @@ func (bt *BasicType) Equals(other Type) bool {
 // ArrayType, bir dizi tipini temsil eder.
 type ArrayType struct {
 	ElementType Type
+	Size        int64 // -1 for slices (dynamic arrays)
 }
 
 // String, dizi tipinin string temsilini döndürür.
 func (at *ArrayType) String() string {
-	return fmt.Sprintf("[]%s", at.ElementType.String())
+	if at.Size == -1 {
+		return fmt.Sprintf("[]%s", at.ElementType.String())
+	}
+	return fmt.Sprintf("[%d]%s", at.Size, at.ElementType.String())
 }
 
 // Equals, iki dizi tipinin eşit olup olmadığını kontrol eder.
 func (at *ArrayType) Equals(other Type) bool {
 	if otherArray, ok := other.(*ArrayType); ok {
-		return at.ElementType.Equals(otherArray.ElementType)
+		return at.ElementType.Equals(otherArray.ElementType) && at.Size == otherArray.Size
 	}
 	return false
 }

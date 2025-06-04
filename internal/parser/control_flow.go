@@ -113,6 +113,78 @@ func (p *Parser) parseWhileStatement() ast.Statement {
 	return stmt
 }
 
+// parseSwitchStatement, bir switch ifadesini ayrıştırır.
+func (p *Parser) parseSwitchStatement() ast.Statement {
+	stmt := &ast.SwitchStatement{Token: p.curToken}
+
+	p.nextToken()
+
+	// Opsiyonel switch tag (ifade)
+	if !p.curTokenIs(token.LBRACE) {
+		stmt.Tag = p.parseExpression(LOWEST)
+		p.nextToken()
+	}
+
+	if !p.curTokenIs(token.LBRACE) {
+		p.reportUnexpectedTokenWithMessage("{ bekleniyor")
+		return nil
+	}
+
+	// Case clause'ları parse et
+	for p.peekTokenIs(token.CASE) || p.peekTokenIs(token.DEFAULT) {
+		p.nextToken()
+
+		caseClause := p.parseCaseClause()
+		if caseClause != nil {
+			stmt.Cases = append(stmt.Cases, caseClause)
+		}
+	}
+
+	if !p.expectPeek(token.RBRACE) {
+		return nil
+	}
+
+	return stmt
+}
+
+// parseCaseClause, bir case veya default clause'unu ayrıştırır.
+func (p *Parser) parseCaseClause() *ast.CaseClause {
+	clause := &ast.CaseClause{Token: p.curToken}
+
+	if p.curTokenIs(token.CASE) {
+		p.nextToken()
+
+		// Case değerlerini parse et (virgülle ayrılmış)
+		clause.Values = append(clause.Values, p.parseExpression(LOWEST))
+
+		for p.peekTokenIs(token.COMMA) {
+			p.nextToken() // comma'yı atla
+			p.nextToken()
+			clause.Values = append(clause.Values, p.parseExpression(LOWEST))
+		}
+	}
+	// DEFAULT için Values nil kalır
+
+	if !p.expectPeek(token.COLON) {
+		return nil
+	}
+
+	// Case body'sini parse et - statement'ları topla
+	for p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.RETURN) ||
+		p.peekTokenIs(token.IF) || p.peekTokenIs(token.FOR) ||
+		p.peekTokenIs(token.WHILE) || p.peekTokenIs(token.VAR) ||
+		p.peekTokenIs(token.CONST) || p.peekTokenIs(token.FUNC) {
+
+		p.nextToken()
+		stmt := p.parseStatement()
+		if stmt != nil {
+			clause.Body = append(clause.Body, stmt)
+		}
+	}
+
+	return clause
+}
+
 // parseTryCatchStatement, bir try-catch ifadesini ayrıştırır.
 func (p *Parser) parseTryCatchStatement() *ast.TryCatchStatement {
 	stmt := &ast.TryCatchStatement{Token: p.curToken}

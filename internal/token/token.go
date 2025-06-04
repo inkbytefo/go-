@@ -109,6 +109,9 @@ const (
 	GO          TokenType = "GO"
 	DEFER       TokenType = "DEFER"
 	SELECT      TokenType = "SELECT"
+	SWITCH      TokenType = "SWITCH"
+	CASE        TokenType = "CASE"
+	DEFAULT     TokenType = "DEFAULT"
 	TYPE        TokenType = "TYPE"
 	FALLTHROUGH TokenType = "FALLTHROUGH"
 	RANGE       TokenType = "RANGE"
@@ -170,6 +173,9 @@ var keywords = map[string]TokenType{
 	"go":          GO,
 	"defer":       DEFER,
 	"select":      SELECT,
+	"switch":      SWITCH,
+	"case":        CASE,
+	"default":     DEFAULT,
 	"type":        TYPE,
 	"fallthrough": FALLTHROUGH,
 	"range":       RANGE,

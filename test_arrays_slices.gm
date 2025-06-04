@@ -1,0 +1,25 @@
+// Test file for arrays and slices - Stage 3 features
+package main
+
+import "fmt"
+
+func main() {
+    // Test 1: Simple array literal
+    fmt.Println("=== Array Tests ===")
+    arr := [1, 2, 3, 4, 5]
+    fmt.Println("Array element 0:", arr[0])
+    fmt.Println("Array element 2:", arr[2])
+
+    // Test 2: len() and cap() for arrays
+    fmt.Println("Array length:", len(arr))
+    fmt.Println("Array capacity:", cap(arr))
+
+    // Test 3: String operations
+    fmt.Println("=== String Tests ===")
+    str1 := "Hello"
+    str2 := " World"
+    result := str1 + str2
+    fmt.Println("String concatenation:", result)
+
+    fmt.Println("=== All tests completed successfully! ===")
+}

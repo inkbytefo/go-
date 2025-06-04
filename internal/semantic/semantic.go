@@ -330,6 +330,8 @@ func (a *Analyzer) analyzeStatement(stmt ast.Statement) Type {
 		return a.analyzeThrowStatement(s)
 	case *ast.ScopeStatement:
 		return a.analyzeScopeStatement(s)
+	case *ast.SwitchStatement:
+		return a.analyzeSwitchStatement(s)
 	case *ast.PackageStatement:
 		return a.analyzePackageStatement(s)
 	case *ast.ImportStatement:
@@ -384,9 +386,57 @@ func (a *Analyzer) analyzeExpression(expr ast.Expression) Type {
 		return a.analyzeNewExpression(e)
 	case *ast.TemplateExpression:
 		return a.analyzeTemplateExpression(e)
+	case *ast.ArrayType:
+		return a.analyzeArrayType(e)
 	default:
 		return &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
 	}
+}
+
+// analyzeSwitchStatement, bir switch ifadesini analiz eder.
+func (a *Analyzer) analyzeSwitchStatement(stmt *ast.SwitchStatement) Type {
+	// Switch tag'ini analiz et (varsa)
+	var tagType Type
+	if stmt.Tag != nil {
+		tagType = a.analyzeExpression(stmt.Tag)
+		if tagType == nil {
+			tagType = &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
+		}
+	}
+
+	// Her case clause'unu analiz et
+	for _, caseClause := range stmt.Cases {
+		a.analyzeCaseClause(caseClause, tagType)
+	}
+
+	return &BasicType{Name: "void", Kind: VOID_TYPE}
+}
+
+// analyzeCaseClause, bir case clause'unu analiz eder.
+func (a *Analyzer) analyzeCaseClause(clause *ast.CaseClause, tagType Type) Type {
+	// Case değerlerini analiz et (default case için boş)
+	for _, value := range clause.Values {
+		valueType := a.analyzeExpression(value)
+
+		// Eğer switch tag'i varsa, case değerinin tag ile uyumlu olup olmadığını kontrol et
+		if tagType != nil && valueType != nil {
+			if !tagType.Equals(valueType) {
+				// Token bilgisini almak için AST node'dan token'ı çıkar
+				if ident, ok := value.(*ast.Identifier); ok {
+					a.reportError(ident.Token,
+						"Case değeri (%s) switch tag'i (%s) ile uyumlu değil",
+						valueType.String(), tagType.String())
+				}
+			}
+		}
+	}
+
+	// Case body'sini analiz et
+	for _, bodyStmt := range clause.Body {
+		a.analyzeStatement(bodyStmt)
+	}
+
+	return &BasicType{Name: "void", Kind: VOID_TYPE}
 }
 
 // reportError, bir hata rapor eder.
@@ -980,11 +1030,11 @@ func (a *Analyzer) analyzeArrayLiteral(expr *ast.ArrayLiteral) Type {
 		}
 
 		// Dizi tipini döndür
-		return &ArrayType{ElementType: elemType}
+		return &ArrayType{ElementType: elemType, Size: -1}
 	}
 
 	// Boş dizi
-	return &ArrayType{ElementType: &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}}
+	return &ArrayType{ElementType: &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}, Size: -1}
 }
 
 func (a *Analyzer) analyzeIndexExpression(expr *ast.IndexExpression) Type {
@@ -1137,5 +1187,41 @@ func (a *Analyzer) analyzeTemplateExpression(expr *ast.TemplateExpression) Type 
 		Name:       "template",
 		Parameters: make([]string, len(expr.Parameters)),
 		BaseType:   bodyType,
+	}
+}
+
+// analyzeArrayType, bir array type'ını analiz eder.
+func (a *Analyzer) analyzeArrayType(expr *ast.ArrayType) Type {
+	// Element type'ını analiz et
+	elementType := a.analyzeExpression(expr.ElementType)
+	if elementType == nil {
+		elementType = &BasicType{Name: "unknown", Kind: UNKNOWN_TYPE}
+	}
+
+	// Size expression'ını analiz et (eğer varsa)
+	var size int64 = -1 // -1 indicates slice (dynamic array)
+	if expr.Size != nil {
+		sizeType := a.analyzeExpression(expr.Size)
+
+		// Size integer olmalı
+		if basicType, ok := sizeType.(*BasicType); !ok || basicType.Kind != INTEGER_TYPE {
+			if ident, ok := expr.Size.(*ast.Identifier); ok {
+				a.reportError(ident.Token, "Array boyutu integer olmalıdır")
+			}
+		}
+
+		// Size literal ise değerini al
+		if intLit, ok := expr.Size.(*ast.IntegerLiteral); ok {
+			size = intLit.Value
+			if size < 0 {
+				a.reportError(intLit.Token, "Array boyutu negatif olamaz")
+			}
+		}
+	}
+
+	// Array type döndür
+	return &ArrayType{
+		ElementType: elementType,
+		Size:        size,
 	}
 }

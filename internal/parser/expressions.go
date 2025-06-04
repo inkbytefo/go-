@@ -145,11 +145,54 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 // parseArrayLiteral, bir dizi değişmez değerini ayrıştırır.
 func (p *Parser) parseArrayLiteral() ast.Expression {
-	array := &ast.ArrayLiteral{Token: p.curToken}
+	tok := p.curToken
 
+	// Check if this is a typed array literal: [5]int{1,2,3} or []int{1,2,3}
+	// or a simple array literal: [1,2,3]
+
+	// Look ahead to see if this is a typed array literal
+	if p.isTypedArrayLiteral() {
+		return p.parseTypedArrayLiteral()
+	}
+
+	// Simple array literal: [1, 2, 3]
+	array := &ast.ArrayLiteral{Token: tok}
 	array.Elements = p.parseExpressionList(token.RBRACKET)
-
 	return array
+}
+
+// parseArrayType, bir array type'ını ayrıştırır.
+func (p *Parser) parseArrayType() ast.Expression {
+	tok := p.curToken // LBRACKET token
+
+	var size ast.Expression
+
+	// Check if this is a slice type []Type or array type [size]Type
+	if !p.peekTokenIs(token.RBRACKET) {
+		// Array type with size: [5]int
+		p.nextToken()
+		size = p.parseExpression(LOWEST)
+	}
+	// else: slice type []int
+
+	if !p.expectPeek(token.RBRACKET) {
+		return nil
+	}
+
+	// Parse element type
+	if !p.peekTokenIs(token.IDENT) && !p.peekTokenIs(token.INT) && !p.peekTokenIs(token.STRING) {
+		// Not followed by a type, this might be an array literal
+		return nil
+	}
+
+	p.nextToken()
+	elementType := p.parseExpression(LOWEST)
+
+	return &ast.ArrayType{
+		Token:       tok,
+		Size:        size, // nil for slices
+		ElementType: elementType,
+	}
 }
 
 // parseHashLiteral, bir hash değişmez değerini ayrıştırır.
@@ -297,4 +340,41 @@ func (p *Parser) parseExpressionUntil(precedence int, until token.TokenType) ast
 	}
 
 	return leftExp
+}
+
+// isTypedArrayLiteral, mevcut pozisyonun typed array literal olup olmadığını kontrol eder.
+func (p *Parser) isTypedArrayLiteral() bool {
+	// Basit kontrol: şimdilik sadece simple array literal'ları destekleyelim
+	// Typed array literal desteği daha sonra eklenebilir
+	return false
+}
+
+// parseTypedArrayLiteral, typed array literal'ı ayrıştırır: [5]int{1,2,3}
+func (p *Parser) parseTypedArrayLiteral() ast.Expression {
+	tok := p.curToken // LBRACKET token
+
+	// Parse array type first
+	arrayType := p.parseArrayType()
+	if arrayType == nil {
+		return nil
+	}
+
+	// Expect {
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// Parse elements
+	elements := p.parseExpressionList(token.RBRACE)
+
+	// Create a typed array literal (we'll use ArrayLiteral with type info)
+	arrayLit := &ast.ArrayLiteral{
+		Token:    tok,
+		Elements: elements,
+	}
+
+	// Store type information (we might need a new AST node for this)
+	// For now, we'll handle this in semantic analysis
+
+	return arrayLit
 }

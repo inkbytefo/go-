@@ -26,6 +26,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		stmt = p.parseForStatement()
 	case token.WHILE:
 		stmt = p.parseWhileStatement()
+	case token.SWITCH:
+		stmt = p.parseSwitchStatement()
 	case token.CLASS:
 		stmt = p.parseClassStatement()
 	case token.FUNC:

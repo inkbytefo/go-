@@ -540,6 +540,31 @@ func (ie *IndexExpression) String() string {
 func (ie *IndexExpression) Pos() token.Position { return ie.Left.Pos() }
 func (ie *IndexExpression) End() token.Position { return ie.Index.End() }
 
+// ArrayType, bir dizi tipini temsil eder.
+// Örnek: [5]int, []int
+type ArrayType struct {
+	Token       token.Token // token.LBRACKET token'ı
+	Size        Expression  // Array size (nil for slices)
+	ElementType Expression  // Element type
+}
+
+func (at *ArrayType) expressionNode()      {}
+func (at *ArrayType) TokenLiteral() string { return at.Token.Literal }
+func (at *ArrayType) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("[")
+	if at.Size != nil {
+		out.WriteString(at.Size.String())
+	}
+	out.WriteString("]")
+	out.WriteString(at.ElementType.String())
+
+	return out.String()
+}
+func (at *ArrayType) Pos() token.Position { return at.Token.Position }
+func (at *ArrayType) End() token.Position { return at.ElementType.End() }
+
 // HashLiteral, bir hash değişmez değerini temsil eder.
 // Örnek: {"one": 1, "two": 2}
 type HashLiteral struct {
@@ -627,6 +652,85 @@ func (ws *WhileStatement) String() string {
 }
 func (ws *WhileStatement) Pos() token.Position { return ws.Token.Position }
 func (ws *WhileStatement) End() token.Position { return ws.Body.End() }
+
+// SwitchStatement, bir switch ifadesini temsil eder.
+// Örnek: switch x { case 1: ... case 2: ... default: ... }
+type SwitchStatement struct {
+	Token token.Token // token.SWITCH token'ı
+	Tag   Expression  // Opsiyonel switch ifadesi (nil olabilir)
+	Cases []*CaseClause
+}
+
+func (ss *SwitchStatement) statementNode()       {}
+func (ss *SwitchStatement) TokenLiteral() string { return ss.Token.Literal }
+func (ss *SwitchStatement) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("switch ")
+	if ss.Tag != nil {
+		out.WriteString(ss.Tag.String())
+		out.WriteString(" ")
+	}
+	out.WriteString("{\n")
+
+	for _, c := range ss.Cases {
+		out.WriteString(c.String())
+	}
+
+	out.WriteString("}")
+
+	return out.String()
+}
+func (ss *SwitchStatement) Pos() token.Position { return ss.Token.Position }
+func (ss *SwitchStatement) End() token.Position {
+	if len(ss.Cases) > 0 {
+		return ss.Cases[len(ss.Cases)-1].End()
+	}
+	return ss.Token.Position
+}
+
+// CaseClause, bir case veya default bloğunu temsil eder.
+// Örnek: case 1, 2: ... veya default: ...
+type CaseClause struct {
+	Token  token.Token  // token.CASE veya token.DEFAULT token'ı
+	Values []Expression // Case değerleri (default için nil)
+	Body   []Statement  // Case gövdesi
+}
+
+func (cc *CaseClause) statementNode()       {}
+func (cc *CaseClause) TokenLiteral() string { return cc.Token.Literal }
+func (cc *CaseClause) String() string {
+	var out bytes.Buffer
+
+	if cc.Token.Type == token.DEFAULT {
+		out.WriteString("default:")
+	} else {
+		out.WriteString("case ")
+		for i, v := range cc.Values {
+			if i > 0 {
+				out.WriteString(", ")
+			}
+			out.WriteString(v.String())
+		}
+		out.WriteString(":")
+	}
+
+	out.WriteString("\n")
+	for _, stmt := range cc.Body {
+		out.WriteString("\t")
+		out.WriteString(stmt.String())
+		out.WriteString("\n")
+	}
+
+	return out.String()
+}
+func (cc *CaseClause) Pos() token.Position { return cc.Token.Position }
+func (cc *CaseClause) End() token.Position {
+	if len(cc.Body) > 0 {
+		return cc.Body[len(cc.Body)-1].End()
+	}
+	return cc.Token.Position
+}
 
 // ClassStatement, bir sınıf tanımını temsil eder.
 // Örnek: class Person { ... }

@@ -10,6 +10,7 @@ func (ti *TypeInference) inferArrayLiteralType(expr *ast.ArrayLiteral) Type {
 	if len(expr.Elements) == 0 {
 		return &ArrayType{
 			ElementType: &BasicType{Name: "int", Kind: INTEGER_TYPE},
+			Size:        -1,
 		}
 	}
 
@@ -28,6 +29,7 @@ func (ti *TypeInference) inferArrayLiteralType(expr *ast.ArrayLiteral) Type {
 	// Dizi tipini döndür
 	return &ArrayType{
 		ElementType: elementType,
+		Size:        -1,
 	}
 }
 
